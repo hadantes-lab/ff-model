@@ -50,6 +50,11 @@ into team scores — the same engine does everything.
    This prints real projections for current players. From there, feed those
    projections into `simulate.py`'s functions with live odds.
 
+**Run the tests:**
+   ```
+   python -m unittest discover -s tests -v
+   ```
+
 ## How to read the output
 
 - **model_prob** — your model's probability the bet hits
