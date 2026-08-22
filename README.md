@@ -74,6 +74,20 @@ into team scores — the same engine does everything.
 4. **Correlation is simplified.** The game-script factor is a first-order fix, not
    a full covariance model. Good enough to start, not the last word.
 
+## Shareable auction board (HTML)
+
+A point-and-click version of `auction_engine.py` — mark players "Won" or
+"Gone" and watch max bids, tiers, and your budget update live. No Python
+needed to use it, just a browser.
+
+**Regenerate it after pulling fresh data:**
+```
+python export_snapshot.py > web/snapshot.json
+python web/build_page.py
+```
+This writes `web/auction_board.html`, a single self-contained file (real
+player values baked in) you can open directly or upload anywhere to share.
+
 ## What to add next (natural extensions)
 
 - Live odds via The Odds API (feeds real lines into `find_edge`)

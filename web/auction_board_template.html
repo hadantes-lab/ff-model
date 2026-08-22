@@ -1,0 +1,765 @@
+<title>Auction Board</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+  :root {
+    --bg: #12151b;
+    --surface: #1b2028;
+    --surface-2: #242a34;
+    --surface-3: #2e3542;
+    --border: #333b48;
+    --text: #e9eaed;
+    --text-dim: #98a0ac;
+    --text-faint: #626b78;
+    --gold: #d9a441;
+    --gold-dim: #7a6535;
+    --stud: #5b8fd6;
+    --stud-bg: #223047;
+    --gamble: #d9705f;
+    --gamble-bg: #3a2622;
+    --value: #5cb88a;
+    --value-bg: #1f3128;
+    --danger: #d9705f;
+    --shadow: 0 8px 24px rgba(0,0,0,0.35);
+    --radius: 10px;
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="light"]) {
+      --bg: #f4f2ee;
+      --surface: #ffffff;
+      --surface-2: #ece9e2;
+      --surface-3: #e1ddd3;
+      --border: #d8d3c8;
+      --text: #201d17;
+      --text-dim: #5c574c;
+      --text-faint: #8a8474;
+      --gold: #a1731d;
+      --gold-dim: #cba15c;
+      --stud: #2f5fa3;
+      --stud-bg: #dde8f7;
+      --gamble: #b5432f;
+      --gamble-bg: #f8dfd9;
+      --value: #226b48;
+      --value-bg: #dcf0e5;
+      --danger: #b5432f;
+      --shadow: 0 8px 24px rgba(0,0,0,0.08);
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f2ee;
+    --surface: #ffffff;
+    --surface-2: #ece9e2;
+    --surface-3: #e1ddd3;
+    --border: #d8d3c8;
+    --text: #201d17;
+    --text-dim: #5c574c;
+    --text-faint: #8a8474;
+    --gold: #a1731d;
+    --gold-dim: #cba15c;
+    --stud: #2f5fa3;
+    --stud-bg: #dde8f7;
+    --gamble: #b5432f;
+    --gamble-bg: #f8dfd9;
+    --value: #226b48;
+    --value-bg: #dcf0e5;
+    --danger: #b5432f;
+    --shadow: 0 8px 24px rgba(0,0,0,0.08);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .num { font-family: "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+
+  h1, h2, h3, .display {
+    font-family: "Barlow Condensed", ui-sans-serif, sans-serif;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    text-wrap: balance;
+  }
+
+  a { color: var(--gold); }
+
+  /* ---------- top bar ---------- */
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  .topbar-inner {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+  .brand {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-right: auto;
+  }
+  .brand h1 {
+    font-size: 22px;
+    margin: 0;
+    color: var(--text);
+  }
+  .brand .accent { color: var(--gold); }
+  .brand .tag {
+    font-family: "IBM Plex Sans";
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 400;
+    font-size: 12.5px;
+    color: var(--text-faint);
+  }
+
+  .stat-group {
+    display: flex;
+    gap: 10px;
+  }
+  .stat {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 6px 14px;
+    min-width: 88px;
+    text-align: center;
+  }
+  .stat .label {
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-faint);
+    font-weight: 600;
+  }
+  .stat .value {
+    font-family: "IBM Plex Mono";
+    font-weight: 600;
+    font-size: 19px;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat.gold .value { color: var(--gold); }
+  .stat.danger .value { color: var(--danger); }
+
+  .roster-btn {
+    background: var(--surface-3);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: var(--radius);
+    padding: 9px 16px;
+    font-family: "IBM Plex Sans";
+    font-weight: 600;
+    font-size: 13.5px;
+    cursor: pointer;
+  }
+  .roster-btn:hover { border-color: var(--gold-dim); }
+
+  /* ---------- controls ---------- */
+  .controls {
+    max-width: 1180px;
+    margin: 20px auto 0;
+    padding: 0 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  .seg {
+    display: inline-flex;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 3px;
+    gap: 2px;
+  }
+  .seg button {
+    border: none;
+    background: transparent;
+    color: var(--text-dim);
+    font-family: "IBM Plex Sans";
+    font-weight: 600;
+    font-size: 13px;
+    padding: 6px 13px;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  .seg button.active {
+    background: var(--gold);
+    color: #16130a;
+  }
+  .search {
+    flex: 1;
+    min-width: 160px;
+    max-width: 280px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 12px;
+    color: var(--text);
+    font-family: "IBM Plex Sans";
+    font-size: 13.5px;
+  }
+  .search::placeholder { color: var(--text-faint); }
+  .snapshot-note {
+    margin-left: auto;
+    font-size: 12px;
+    color: var(--text-faint);
+  }
+
+  /* ---------- board ---------- */
+  .board {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 22px 20px 80px;
+  }
+  .tier {
+    margin-bottom: 26px;
+  }
+  .tier-head {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+  .tier-head h2 {
+    font-size: 18px;
+    margin: 0;
+    color: var(--text);
+  }
+  .tier-range {
+    font-family: "IBM Plex Mono";
+    color: var(--gold);
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .tier-urgency {
+    margin-left: auto;
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+    color: var(--text-faint);
+    font-family: "IBM Plex Sans";
+  }
+  .tier-urgency.last { color: var(--gamble); }
+
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    gap: 10px;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 13px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transition: border-color 0.15s ease;
+  }
+  .card:hover { border-color: var(--gold-dim); }
+  .card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .card-name {
+    font-weight: 600;
+    font-size: 15px;
+    line-height: 1.25;
+  }
+  .card-meta {
+    font-size: 12px;
+    color: var(--text-faint);
+    margin-top: 2px;
+  }
+  .chip {
+    font-family: "IBM Plex Sans";
+    font-size: 10.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 3px 8px;
+    border-radius: 20px;
+    white-space: nowrap;
+  }
+  .chip.stud { background: var(--stud-bg); color: var(--stud); }
+  .chip.gamble { background: var(--gamble-bg); color: var(--gamble); }
+  .chip.value { background: var(--value-bg); color: var(--value); }
+
+  .card-nums {
+    display: flex;
+    gap: 16px;
+  }
+  .card-nums div { flex: 1; }
+  .card-nums .k {
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-faint);
+    font-weight: 600;
+  }
+  .card-nums .v {
+    font-family: "IBM Plex Mono";
+    font-weight: 600;
+    font-size: 17px;
+  }
+  .card-nums .v.maxbid { color: var(--gold); }
+
+  .card-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 2px;
+  }
+  .card-actions button {
+    flex: 1;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text);
+    font-family: "IBM Plex Sans";
+    font-weight: 600;
+    font-size: 12.5px;
+    padding: 7px 0;
+    border-radius: 7px;
+    cursor: pointer;
+  }
+  .card-actions .won-btn:hover { border-color: var(--value); color: var(--value); }
+  .card-actions .gone-btn:hover { border-color: var(--danger); color: var(--danger); }
+
+  .win-form {
+    display: flex;
+    gap: 6px;
+  }
+  .win-form input {
+    width: 64px;
+    background: var(--surface-2);
+    border: 1px solid var(--gold-dim);
+    border-radius: 7px;
+    color: var(--text);
+    font-family: "IBM Plex Mono";
+    font-size: 14px;
+    padding: 6px 8px;
+    text-align: center;
+  }
+  .win-form button {
+    flex: 1;
+    background: var(--gold);
+    color: #16130a;
+    border: none;
+    border-radius: 7px;
+    font-family: "IBM Plex Sans";
+    font-weight: 700;
+    font-size: 12.5px;
+    cursor: pointer;
+  }
+  .win-form .cancel {
+    background: var(--surface-3);
+    color: var(--text-dim);
+    flex: 0 0 30px;
+  }
+
+  .empty-msg {
+    color: var(--text-faint);
+    padding: 40px 0;
+    text-align: center;
+    font-size: 14px;
+  }
+
+  /* ---------- roster drawer ---------- */
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    z-index: 29;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+  .overlay.open { opacity: 1; pointer-events: auto; }
+
+  .drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100%;
+    width: 340px;
+    max-width: 90vw;
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    z-index: 30;
+    transform: translateX(100%);
+    transition: transform 0.22s ease;
+    display: flex;
+    flex-direction: column;
+    box-shadow: var(--shadow);
+  }
+  .drawer.open { transform: translateX(0); }
+  .drawer-head {
+    padding: 18px 18px 12px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .drawer-head h2 { margin: 0; font-size: 19px; }
+  .drawer-close {
+    background: none;
+    border: none;
+    color: var(--text-faint);
+    font-size: 22px;
+    cursor: pointer;
+    line-height: 1;
+  }
+  .drawer-body {
+    padding: 14px 18px;
+    overflow-y: auto;
+    flex: 1;
+  }
+  .roster-summary {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .roster-summary .stat { flex: 1; }
+  .roster-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13.5px;
+  }
+  .roster-row .price {
+    font-family: "IBM Plex Mono";
+    color: var(--gold);
+    font-weight: 600;
+  }
+  .drawer-foot {
+    padding: 14px 18px;
+    border-top: 1px solid var(--border);
+  }
+  .undo-btn, .reset-btn {
+    width: 100%;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text);
+    font-family: "IBM Plex Sans";
+    font-weight: 600;
+    font-size: 13.5px;
+    cursor: pointer;
+    margin-bottom: 8px;
+  }
+  .reset-btn { color: var(--danger); border-color: var(--gamble-bg); }
+
+  .foot-note {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 0 20px 40px;
+    color: var(--text-faint);
+    font-size: 12px;
+  }
+
+  @media (max-width: 640px) {
+    .topbar-inner { gap: 10px; }
+    .stat { min-width: 72px; padding: 5px 10px; }
+    .stat .value { font-size: 16px; }
+    .brand h1 { font-size: 19px; }
+  }
+</style>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <h1><span class="accent">Auction</span> Board</h1>
+      <span class="tag">12-team &middot; $200 budget &middot; 16 slots</span>
+    </div>
+    <div class="stat-group">
+      <div class="stat gold">
+        <div class="label">Budget</div>
+        <div class="value num" id="stat-budget">$200</div>
+      </div>
+      <div class="stat">
+        <div class="label">Max Bid</div>
+        <div class="value num" id="stat-maxbid">$185</div>
+      </div>
+      <div class="stat">
+        <div class="label">Slots</div>
+        <div class="value num" id="stat-slots">16</div>
+      </div>
+    </div>
+    <button class="roster-btn" id="roster-open">My Roster</button>
+  </div>
+</div>
+
+<div class="controls">
+  <div class="seg" id="pos-filter">
+    <button class="active" data-pos="">All</button>
+    <button data-pos="QB">QB</button>
+    <button data-pos="RB">RB</button>
+    <button data-pos="WR">WR</button>
+    <button data-pos="TE">TE</button>
+  </div>
+  <input class="search" id="search" type="text" placeholder="Search a player&hellip;">
+  <div class="snapshot-note" id="snapshot-note">Snapshot pending</div>
+</div>
+
+<div class="board" id="board"></div>
+
+<p class="foot-note">Values computed with value-above-replacement against a 12-team, $200-budget, 16-slot league (1 QB / 2 RB / 3 WR / 1 TE / 1 FLEX starters). Archetypes: <strong style="color:var(--stud)">STUD</strong> = high floor, pay up · <strong style="color:var(--gamble)">GAMBLE</strong> = high ceiling/low floor, hard-cap it · <strong style="color:var(--value)">VALUE</strong> = buy below listed value.</p>
+
+<div class="overlay" id="overlay"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-head">
+    <h2>My Roster</h2>
+    <button class="drawer-close" id="drawer-close">&times;</button>
+  </div>
+  <div class="drawer-body">
+    <div class="roster-summary">
+      <div class="stat gold"><div class="label">Spent</div><div class="value num" id="d-spent">$0</div></div>
+      <div class="stat"><div class="label">Left</div><div class="value num" id="d-left">$200</div></div>
+    </div>
+    <div id="roster-list"></div>
+  </div>
+  <div class="drawer-foot">
+    <button class="undo-btn" id="undo-btn">Undo last action</button>
+    <button class="reset-btn" id="reset-btn">Reset draft</button>
+  </div>
+</div>
+
+<script>
+// ---- league settings (mirrors auction_engine.py) ----
+const TEAMS = 12, BUDGET = 200, ROSTER_SLOTS = 16;
+
+// ---- data: populated from the snapshot export ----
+const PLAYERS = __PLAYERS_JSON__;
+const SNAPSHOT_DATE = __SNAPSHOT_DATE__;
+
+const ARCHE_RULES = {
+  stud:   { mult: 1.05, advice: "High floor anchor. Pay up; protect budget for 1-2." },
+  gamble: { mult: 0.75, advice: "High ceiling, unknown. Hard cap; collect several cheap." },
+  value:  { mult: 0.90, advice: "Safe production. Buy BELOW value. Win the auction here." },
+};
+
+// ---- draft state ----
+let owned = [];   // {name, price}
+let gone = new Set();
+let history = []; // for undo: {type: 'won'|'gone', name}
+
+function remaining() { return BUDGET - owned.reduce((s, p) => s + p.price, 0); }
+function slotsLeft() { return ROSTER_SLOTS - owned.length; }
+function maxBidNow() { return Math.max(0, remaining() - (slotsLeft() - 1)); }
+
+function maxBidFor(p) {
+  const rule = ARCHE_RULES[p.arch];
+  const raw = p.value * rule.mult;
+  const pace = remaining() / Math.max(1, BUDGET * slotsLeft() / ROSTER_SLOTS);
+  const scaled = raw * Math.min(1.15, pace);
+  return Math.round(Math.max(1, Math.min(maxBidNow(), scaled)));
+}
+
+function availablePlayers() {
+  const takenNames = new Set(owned.map(p => p.name));
+  return PLAYERS.filter(p => !takenNames.has(p.name) && !gone.has(p.name));
+}
+
+// ---- tiering: cliff detection, mirrors show_tiers() ----
+function buildTiers(list, gapFactor = 0.18, maxPlayers = 60) {
+  const sorted = [...list].sort((a, b) => b.value - a.value).slice(0, maxPlayers);
+  if (sorted.length === 0) return [];
+  const tiers = [];
+  let current = [sorted[0]];
+  let tierTop = sorted[0].value;
+  for (let i = 1; i < sorted.length; i++) {
+    const v = sorted[i].value;
+    const drop = tierTop - v;
+    if (tierTop > 0 && drop >= Math.max(2, tierTop * gapFactor)) {
+      tiers.push(current);
+      current = [sorted[i]];
+      tierTop = v;
+    } else {
+      current.push(sorted[i]);
+    }
+  }
+  tiers.push(current);
+  return tiers;
+}
+
+// ---- rendering ----
+let activePos = "";
+let searchTerm = "";
+
+function chipLabel(a) { return { stud: "Stud", gamble: "Gamble", value: "Value" }[a]; }
+
+function render() {
+  document.getElementById("stat-budget").textContent = "$" + remaining();
+  document.getElementById("stat-maxbid").textContent = "$" + maxBidNow();
+  document.getElementById("stat-slots").textContent = slotsLeft();
+
+  let list = availablePlayers();
+  if (activePos) list = list.filter(p => p.pos === activePos);
+  if (searchTerm) {
+    const q = searchTerm.toLowerCase();
+    list = list.filter(p => p.name.toLowerCase().includes(q));
+  }
+
+  const board = document.getElementById("board");
+  board.innerHTML = "";
+
+  if (list.length === 0) {
+    board.innerHTML = '<div class="empty-msg">No players match. Adjust the filter or search.</div>';
+    return;
+  }
+
+  const tiers = buildTiers(list);
+  tiers.forEach((tier, ti) => {
+    const vals = tier.map(p => p.value);
+    const hi = Math.max(...vals), lo = Math.min(...vals);
+    const span = hi === lo ? "$" + hi : "$" + lo + "–$" + hi;
+    const n = tier.length;
+    const urgency = n === 1 ? "Last one" : n === 2 ? "Thin · 2 left" : n + " available";
+
+    const tierEl = document.createElement("div");
+    tierEl.className = "tier";
+    tierEl.innerHTML = `
+      <div class="tier-head">
+        <h2>Tier ${ti + 1}</h2>
+        <span class="tier-range num">${span}</span>
+        <span class="tier-urgency ${n <= 1 ? 'last' : ''}">${urgency}</span>
+      </div>
+      <div class="cards"></div>
+    `;
+    const cardsEl = tierEl.querySelector(".cards");
+    tier.forEach(p => cardsEl.appendChild(buildCard(p)));
+    board.appendChild(tierEl);
+  });
+}
+
+function buildCard(p) {
+  const card = document.createElement("div");
+  card.className = "card";
+  const mb = maxBidFor(p);
+  card.innerHTML = `
+    <div class="card-top">
+      <div>
+        <div class="card-name">${p.name}</div>
+        <div class="card-meta">${p.pos} &middot; ${p.team || "—"} &middot; ${p.proj_points} pts proj</div>
+      </div>
+      <span class="chip ${p.arch}">${chipLabel(p.arch)}</span>
+    </div>
+    <div class="card-nums">
+      <div><div class="k">Value</div><div class="v num">$${p.value}</div></div>
+      <div><div class="k">Max Bid</div><div class="v num maxbid">$${mb}</div></div>
+    </div>
+    <div class="card-actions" data-mode="default">
+      <button class="won-btn">Won</button>
+      <button class="gone-btn">Gone</button>
+    </div>
+  `;
+  const actions = card.querySelector(".card-actions");
+  card.querySelector(".won-btn").addEventListener("click", () => {
+    actions.innerHTML = `
+      <div class="win-form">
+        <input type="number" min="1" placeholder="$${mb}" />
+        <button class="confirm">Lock</button>
+        <button class="cancel">&times;</button>
+      </div>
+    `;
+    const input = actions.querySelector("input");
+    input.focus();
+    const commit = () => {
+      const price = parseInt(input.value, 10) || mb;
+      owned.push({ name: p.name, price });
+      history.push({ type: "won", name: p.name });
+      render();
+    };
+    actions.querySelector(".confirm").addEventListener("click", commit);
+    input.addEventListener("keydown", e => { if (e.key === "Enter") commit(); });
+    actions.querySelector(".cancel").addEventListener("click", render);
+  });
+  card.querySelector(".gone-btn").addEventListener("click", () => {
+    gone.add(p.name);
+    history.push({ type: "gone", name: p.name });
+    render();
+  });
+  return card;
+}
+
+function renderRoster() {
+  document.getElementById("d-spent").textContent = "$" + owned.reduce((s, p) => s + p.price, 0);
+  document.getElementById("d-left").textContent = "$" + remaining();
+  const list = document.getElementById("roster-list");
+  list.innerHTML = "";
+  if (owned.length === 0) {
+    list.innerHTML = '<div class="empty-msg" style="padding:20px 0;">No players won yet.</div>';
+    return;
+  }
+  owned.forEach(p => {
+    const row = document.createElement("div");
+    row.className = "roster-row";
+    row.innerHTML = `<span>${p.name}</span><span class="price num">$${p.price}</span>`;
+    list.appendChild(row);
+  });
+}
+
+// ---- controls ----
+document.getElementById("pos-filter").addEventListener("click", e => {
+  if (e.target.tagName !== "BUTTON") return;
+  document.querySelectorAll("#pos-filter button").forEach(b => b.classList.remove("active"));
+  e.target.classList.add("active");
+  activePos = e.target.dataset.pos;
+  render();
+});
+document.getElementById("search").addEventListener("input", e => {
+  searchTerm = e.target.value;
+  render();
+});
+
+const drawer = document.getElementById("drawer");
+const overlay = document.getElementById("overlay");
+function openDrawer() { drawer.classList.add("open"); overlay.classList.add("open"); renderRoster(); }
+function closeDrawer() { drawer.classList.remove("open"); overlay.classList.remove("open"); }
+document.getElementById("roster-open").addEventListener("click", openDrawer);
+document.getElementById("drawer-close").addEventListener("click", closeDrawer);
+overlay.addEventListener("click", closeDrawer);
+
+document.getElementById("undo-btn").addEventListener("click", () => {
+  const last = history.pop();
+  if (!last) return;
+  if (last.type === "won") owned = owned.filter(p => p.name !== last.name);
+  else gone.delete(last.name);
+  render();
+  renderRoster();
+});
+document.getElementById("reset-btn").addEventListener("click", () => {
+  if (!confirm("Reset the whole draft board? This clears everyone you've marked won or gone.")) return;
+  owned = []; gone = new Set(); history = [];
+  render();
+  renderRoster();
+});
+
+document.getElementById("snapshot-note").textContent = PLAYERS.length
+  ? `Snapshot: ${SNAPSHOT_DATE} · ${PLAYERS.length} players`
+  : "No data loaded";
+
+render();
+</script>
