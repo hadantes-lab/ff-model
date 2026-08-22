@@ -12,6 +12,7 @@
     --text-faint: #626b78;
     --gold: #d9a441;
     --gold-dim: #7a6535;
+    --gold-glow: 217,164,65;
     --stud: #5b8fd6;
     --stud-bg: #223047;
     --gamble: #d9705f;
@@ -35,6 +36,7 @@
       --text-faint: #8a8474;
       --gold: #a1731d;
       --gold-dim: #cba15c;
+      --gold-glow: 161,115,29;
       --stud: #2f5fa3;
       --stud-bg: #dde8f7;
       --gamble: #b5432f;
@@ -368,6 +370,21 @@
     font-weight: 600;
     font-size: 15px;
     line-height: 1.25;
+  }
+  .card-name.suggested {
+    color: var(--gold);
+    text-shadow: 0 0 7px rgba(var(--gold-glow), 0.5), 0 0 15px rgba(var(--gold-glow), 0.3);
+    animation: suggested-glow 2.4s ease-in-out infinite;
+  }
+  @keyframes suggested-glow {
+    0%, 100% { text-shadow: 0 0 5px rgba(var(--gold-glow), 0.4), 0 0 11px rgba(var(--gold-glow), 0.22); }
+    50%      { text-shadow: 0 0 9px rgba(var(--gold-glow), 0.8), 0 0 20px rgba(var(--gold-glow), 0.5); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .card-name.suggested { animation: none; }
+  }
+  .card.suggested {
+    border-color: rgba(var(--gold-glow), 0.55);
   }
   .card-meta {
     font-size: 12px;
@@ -905,6 +922,27 @@ function buildTiers(list, gapFactor = 0.18, maxPlayers = 60) {
 }
 
 // ==========================================================================
+// Suggested pick: the archetype strategy already baked into ARCHE_RULES --
+// pay up for a stud early, hunt value once rosters fill in, grab cheap
+// upside gambles once slots are scarce -- picks one glowing recommendation
+// from the currently available pool.
+// ==========================================================================
+function draftPhaseFraction() {
+  if (activeMode === "auction") return draft.auction.owned.length / ROSTER_SLOTS;
+  return (snakePickInfo().round - 1) / ROSTER_SLOTS;
+}
+function suggestedPickName() {
+  const pool = activeMode === "auction" ? auctionAvailable() : snakeAvailable();
+  if (pool.length === 0) return null;
+  const fraction = draftPhaseFraction();
+  const preferredArch = fraction < 0.33 ? "stud" : fraction < 0.66 ? "value" : "gamble";
+  let candidates = pool.filter(p => p.arch === preferredArch);
+  if (candidates.length === 0) candidates = pool;
+  candidates = [...candidates].sort((a, b) => b.value - a.value);
+  return candidates[0].name;
+}
+
+// ==========================================================================
 // Rendering
 // ==========================================================================
 let activeMode = "auction";
@@ -977,6 +1015,7 @@ function renderBoard() {
     return;
   }
 
+  const suggested = suggestedPickName();
   const tiers = buildTiers(list);
   tiers.forEach((tier, ti) => {
     let span;
@@ -1003,19 +1042,20 @@ function renderBoard() {
       <div class="cards"></div>
     `;
     const cardsEl = tierEl.querySelector(".cards");
-    tier.forEach(p => cardsEl.appendChild(activeMode === "auction" ? buildAuctionCard(p) : buildSnakeCard(p)));
+    tier.forEach(p => cardsEl.appendChild(activeMode === "auction" ? buildAuctionCard(p, suggested) : buildSnakeCard(p, suggested)));
     board.appendChild(tierEl);
   });
 }
 
-function buildAuctionCard(p) {
+function buildAuctionCard(p, suggested) {
   const card = document.createElement("div");
-  card.className = "card";
+  const isSuggested = p.name === suggested;
+  card.className = "card" + (isSuggested ? " suggested" : "");
   const mb = maxBidFor(p);
   card.innerHTML = `
     <div class="card-top">
       <div>
-        <div class="card-name">${p.name}</div>
+        <div class="card-name${isSuggested ? ' suggested' : ''}">${p.name}</div>
         <div class="card-meta">${p.pos} &middot; ${p.team || "—"} &middot; ${p.proj_points} pts proj</div>
       </div>
       <span class="chip ${p.arch}">${chipLabel(p.arch)}</span>
@@ -1060,14 +1100,15 @@ function buildAuctionCard(p) {
   return card;
 }
 
-function buildSnakeCard(p) {
+function buildSnakeCard(p, suggested) {
   const card = document.createElement("div");
-  card.className = "card";
+  const isSuggested = p.name === suggested;
+  card.className = "card" + (isSuggested ? " suggested" : "");
   const info = snakePickInfo();
   card.innerHTML = `
     <div class="card-top">
       <div>
-        <div class="card-name">${p.name}</div>
+        <div class="card-name${isSuggested ? ' suggested' : ''}">${p.name}</div>
         <div class="card-meta">${p.pos} &middot; ${p.team || "—"} &middot; ${p.proj_points} pts proj</div>
       </div>
       <span class="chip ${p.arch}">${chipLabel(p.arch)}</span>
@@ -1085,10 +1126,11 @@ function buildSnakeCard(p) {
 
 function renderFootNote() {
   const el = document.getElementById("foot-note");
+  const glowNote = 'The <span style="color:var(--gold); text-shadow:0 0 6px rgba(var(--gold-glow),0.6);">glowing name</span> is the strategy pick for where you are in the draft — stud early, best value once your roster fills in, upside gambles once slots get scarce.';
   if (activeMode === "auction") {
-    el.innerHTML = 'Values computed with value-above-replacement against a 12-team, $200-budget, 16-slot league (1 QB / 2 RB / 3 WR / 1 TE / 1 FLEX starters). Archetypes: <strong style="color:var(--stud)">STUD</strong> = high floor, pay up &middot; <strong style="color:var(--gamble)">GAMBLE</strong> = high ceiling/low floor, hard-cap it &middot; <strong style="color:var(--value)">VALUE</strong> = buy below listed value.';
+    el.innerHTML = 'Values computed with value-above-replacement against a 12-team, $200-budget, 16-slot league (1 QB / 2 RB / 3 WR / 1 TE / 1 FLEX starters). Archetypes: <strong style="color:var(--stud)">STUD</strong> = high floor, pay up &middot; <strong style="color:var(--gamble)">GAMBLE</strong> = high ceiling/low floor, hard-cap it &middot; <strong style="color:var(--value)">VALUE</strong> = buy below listed value. ' + glowNote;
   } else {
-    el.innerHTML = 'Rank and tiers use the same value-above-replacement model as the auction board, re-purposed as a draft-order signal. A "cliff" between tiers means the position thins out fast — reach now or plan to wait.';
+    el.innerHTML = 'Rank and tiers use the same value-above-replacement model as the auction board, re-purposed as a draft-order signal. A "cliff" between tiers means the position thins out fast — reach now or plan to wait. ' + glowNote;
   }
 }
 
