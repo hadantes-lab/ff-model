@@ -979,9 +979,16 @@ function renderBoard() {
 
   const tiers = buildTiers(list);
   tiers.forEach((tier, ti) => {
-    const vals = tier.map(p => p.value);
-    const hi = Math.max(...vals), lo = Math.min(...vals);
-    const span = hi === lo ? "$" + hi : "$" + lo + "–$" + hi;
+    let span;
+    if (activeMode === "auction") {
+      const vals = tier.map(p => p.value);
+      const hi = Math.max(...vals), lo = Math.min(...vals);
+      span = hi === lo ? "$" + hi : "$" + lo + "–$" + hi;
+    } else {
+      const ranks = tier.map(p => RANK_MAP[p.name]);
+      const best = Math.min(...ranks), worst = Math.max(...ranks);
+      span = best === worst ? "#" + best : "#" + best + "–#" + worst;
+    }
     const n = tier.length;
     const urgency = n === 1 ? "Last one" : n === 2 ? "Thin · 2 left" : n + " available";
 
@@ -1067,7 +1074,6 @@ function buildSnakeCard(p) {
     </div>
     <div class="card-nums">
       <div><div class="k">Overall Rank</div><div class="v num">#${RANK_MAP[p.name]}</div></div>
-      <div><div class="k">Value</div><div class="v num">$${p.value}</div></div>
     </div>
     <div class="card-actions">
       <button class="draft-btn ${info.isMine ? 'mine' : ''}">${info.isMine ? 'Draft to Me' : 'Log Pick (Team ' + info.teamOnClock + ')'}</button>
