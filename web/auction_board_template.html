@@ -1,4 +1,4 @@
-<title>Auction Board</title>
+<title>Draft Board</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
 <style>
   :root {
@@ -87,6 +87,7 @@
   }
 
   a { color: var(--gold); }
+  button { font-family: inherit; }
 
   /* ---------- top bar ---------- */
   .topbar {
@@ -103,14 +104,13 @@
     padding: 14px 20px;
     display: flex;
     align-items: center;
-    gap: 20px;
+    gap: 16px;
     flex-wrap: wrap;
   }
   .brand {
     display: flex;
     align-items: baseline;
     gap: 10px;
-    margin-right: auto;
   }
   .brand h1 {
     font-size: 22px;
@@ -127,9 +127,36 @@
     color: var(--text-faint);
   }
 
+  .mode-tabs {
+    display: inline-flex;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 3px;
+    gap: 2px;
+  }
+  .mode-tabs button {
+    border: none;
+    background: transparent;
+    color: var(--text-dim);
+    font-family: "Barlow Condensed";
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    font-size: 13.5px;
+    padding: 7px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  .mode-tabs button.active {
+    background: var(--gold);
+    color: #16130a;
+  }
+
   .stat-group {
     display: flex;
     gap: 10px;
+    margin-left: auto;
   }
   .stat {
     background: var(--surface-2);
@@ -151,11 +178,12 @@
     font-weight: 600;
     font-size: 19px;
     font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
   .stat.gold .value { color: var(--gold); }
   .stat.danger .value { color: var(--danger); }
 
-  .roster-btn {
+  .icon-btn {
     background: var(--surface-3);
     border: 1px solid var(--border);
     color: var(--text);
@@ -165,8 +193,9 @@
     font-weight: 600;
     font-size: 13.5px;
     cursor: pointer;
+    white-space: nowrap;
   }
-  .roster-btn:hover { border-color: var(--gold-dim); }
+  .icon-btn:hover { border-color: var(--gold-dim); }
 
   /* ---------- controls ---------- */
   .controls {
@@ -214,10 +243,64 @@
     font-size: 13.5px;
   }
   .search::placeholder { color: var(--text-faint); }
+
+  .slot-picker {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 13px;
+    color: var(--text-dim);
+    font-weight: 600;
+  }
+  .slot-picker select {
+    background: var(--surface-3);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-family: "IBM Plex Mono";
+    font-weight: 600;
+  }
+
   .snapshot-note {
     margin-left: auto;
     font-size: 12px;
     color: var(--text-faint);
+  }
+
+  .clock-banner {
+    max-width: 1180px;
+    margin: 16px auto 0;
+    padding: 0 20px;
+  }
+  .clock-banner .inner {
+    border-radius: var(--radius);
+    padding: 12px 18px;
+    font-family: "Barlow Condensed";
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .clock-banner.mine .inner {
+    background: var(--gold);
+    color: #16130a;
+  }
+  .clock-banner.theirs .inner {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+  }
+  .clock-banner.done .inner {
+    background: var(--value-bg);
+    color: var(--value);
   }
 
   /* ---------- board ---------- */
@@ -304,6 +387,11 @@
   .chip.stud { background: var(--stud-bg); color: var(--stud); }
   .chip.gamble { background: var(--gamble-bg); color: var(--gamble); }
   .chip.value { background: var(--value-bg); color: var(--value); }
+  .chip.rank {
+    background: var(--surface-2);
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+  }
 
   .card-nums {
     display: flex;
@@ -343,6 +431,15 @@
   }
   .card-actions .won-btn:hover { border-color: var(--value); color: var(--value); }
   .card-actions .gone-btn:hover { border-color: var(--danger); color: var(--danger); }
+  .card-actions .draft-btn {
+    background: var(--surface-2);
+  }
+  .card-actions .draft-btn.mine {
+    background: var(--gold);
+    color: #16130a;
+    border-color: var(--gold);
+    font-weight: 700;
+  }
 
   .win-form {
     display: flex;
@@ -383,7 +480,7 @@
     font-size: 14px;
   }
 
-  /* ---------- roster drawer ---------- */
+  /* ---------- side drawers ---------- */
   .overlay {
     position: fixed;
     inset: 0;
@@ -412,6 +509,14 @@
     box-shadow: var(--shadow);
   }
   .drawer.open { transform: translateX(0); }
+  .drawer.left {
+    right: auto;
+    left: 0;
+    border-left: none;
+    border-right: 1px solid var(--border);
+    transform: translateX(-100%);
+  }
+  .drawer.left.open { transform: translateX(0); }
   .drawer-head {
     padding: 18px 18px 12px;
     border-bottom: 1px solid var(--border);
@@ -438,7 +543,7 @@
     gap: 10px;
     margin-bottom: 16px;
   }
-  .roster-summary .stat { flex: 1; }
+  .roster-summary .stat { flex: 1; margin-left: 0; }
   .roster-row {
     display: flex;
     justify-content: space-between;
@@ -447,6 +552,7 @@
     border-bottom: 1px solid var(--border);
     font-size: 13.5px;
   }
+  .roster-row .meta { color: var(--text-faint); font-size: 11.5px; }
   .roster-row .price {
     font-family: "IBM Plex Mono";
     color: var(--gold);
@@ -456,7 +562,7 @@
     padding: 14px 18px;
     border-top: 1px solid var(--border);
   }
-  .undo-btn, .reset-btn {
+  .undo-btn, .reset-btn, .new-draft-btn {
     width: 100%;
     padding: 10px;
     border-radius: 8px;
@@ -468,8 +574,72 @@
     font-size: 13.5px;
     cursor: pointer;
     margin-bottom: 8px;
+    text-align: center;
+    text-decoration: none;
+    display: block;
+    box-sizing: border-box;
   }
   .reset-btn { color: var(--danger); border-color: var(--gamble-bg); }
+  .new-draft-btn { background: var(--gold); color: #16130a; border-color: var(--gold); font-weight: 700; }
+
+  .draft-name-input {
+    width: 100%;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    color: var(--text);
+    font-family: "IBM Plex Sans";
+    font-weight: 600;
+    font-size: 14px;
+    padding: 8px 10px;
+    margin-bottom: 14px;
+  }
+
+  .section-label {
+    font-family: "Barlow Condensed";
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 13px;
+    color: var(--text-faint);
+    margin: 18px 0 8px;
+  }
+  .section-label:first-child { margin-top: 0; }
+
+  .draft-list-item {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+  }
+  .draft-list-item.active { border-color: var(--gold-dim); background: var(--surface-2); }
+  .draft-list-item .name { font-weight: 600; font-size: 13.5px; }
+  .draft-list-item .meta { font-size: 11.5px; color: var(--text-faint); margin-top: 2px; }
+  .draft-list-item .row-actions { display: flex; gap: 6px; margin-top: 8px; }
+  .draft-list-item .row-actions button {
+    flex: 1;
+    border: 1px solid var(--border);
+    background: var(--surface-3);
+    color: var(--text-dim);
+    border-radius: 6px;
+    padding: 5px 0;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .draft-list-item .row-actions .del-btn:hover { color: var(--danger); border-color: var(--gamble-bg); }
+  .draft-list-item .row-actions .open-btn:hover { color: var(--gold); border-color: var(--gold-dim); }
+
+  .log-row {
+    display: flex;
+    gap: 8px;
+    font-size: 12.5px;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-dim);
+  }
+  .log-row .pk { color: var(--text-faint); font-family: "IBM Plex Mono"; width: 46px; flex-shrink: 0; }
+  .log-row.mine { color: var(--gold); font-weight: 600; }
 
   .foot-note {
     max-width: 1180px;
@@ -490,24 +660,16 @@
 <div class="topbar">
   <div class="topbar-inner">
     <div class="brand">
-      <h1><span class="accent">Auction</span> Board</h1>
-      <span class="tag">12-team &middot; $200 budget &middot; 16 slots</span>
+      <h1><span class="accent">Draft</span> Board</h1>
+      <span class="tag" id="brand-tag">12-team &middot; $200 budget &middot; 16 slots</span>
     </div>
-    <div class="stat-group">
-      <div class="stat gold">
-        <div class="label">Budget</div>
-        <div class="value num" id="stat-budget">$200</div>
-      </div>
-      <div class="stat">
-        <div class="label">Max Bid</div>
-        <div class="value num" id="stat-maxbid">$185</div>
-      </div>
-      <div class="stat">
-        <div class="label">Slots</div>
-        <div class="value num" id="stat-slots">16</div>
-      </div>
+    <div class="mode-tabs" id="mode-tabs">
+      <button class="active" data-mode="auction">Auction</button>
+      <button data-mode="snake">Snake</button>
     </div>
-    <button class="roster-btn" id="roster-open">My Roster</button>
+    <div class="stat-group" id="stat-group"></div>
+    <button class="icon-btn" id="roster-open">My Team</button>
+    <button class="icon-btn" id="drafts-open">Drafts</button>
   </div>
 </div>
 
@@ -520,34 +682,53 @@
     <button data-pos="TE">TE</button>
   </div>
   <input class="search" id="search" type="text" placeholder="Search a player&hellip;">
+  <div class="slot-picker" id="slot-picker" style="display:none;">
+    Your slot
+    <select id="slot-select"></select>
+    of 12
+  </div>
   <div class="snapshot-note" id="snapshot-note">Snapshot pending</div>
+</div>
+
+<div class="clock-banner" id="clock-banner" style="display:none;">
+  <div class="inner" id="clock-banner-inner"></div>
 </div>
 
 <div class="board" id="board"></div>
 
-<p class="foot-note">Values computed with value-above-replacement against a 12-team, $200-budget, 16-slot league (1 QB / 2 RB / 3 WR / 1 TE / 1 FLEX starters). Archetypes: <strong style="color:var(--stud)">STUD</strong> = high floor, pay up · <strong style="color:var(--gamble)">GAMBLE</strong> = high ceiling/low floor, hard-cap it · <strong style="color:var(--value)">VALUE</strong> = buy below listed value.</p>
+<p class="foot-note" id="foot-note"></p>
 
 <div class="overlay" id="overlay"></div>
+
 <div class="drawer" id="drawer">
   <div class="drawer-head">
-    <h2>My Roster</h2>
-    <button class="drawer-close" id="drawer-close">&times;</button>
+    <h2 id="drawer-title">My Team</h2>
+    <button class="drawer-close" data-close>&times;</button>
+  </div>
+  <div class="drawer-body" id="drawer-body"></div>
+  <div class="drawer-foot" id="drawer-foot"></div>
+</div>
+
+<div class="drawer left" id="drafts-drawer">
+  <div class="drawer-head">
+    <h2>Drafts</h2>
+    <button class="drawer-close" data-close>&times;</button>
   </div>
   <div class="drawer-body">
-    <div class="roster-summary">
-      <div class="stat gold"><div class="label">Spent</div><div class="value num" id="d-spent">$0</div></div>
-      <div class="stat"><div class="label">Left</div><div class="value num" id="d-left">$200</div></div>
+    <div class="section-label">Current draft</div>
+    <input class="draft-name-input" id="draft-name-input" type="text" placeholder="Name this draft">
+    <a class="new-draft-btn" id="new-draft-link" href="#" target="_blank" rel="noopener">+ New draft (opens a tab)</a>
+    <div class="empty-msg" id="new-draft-fallback" style="display:none; padding:8px 0 4px; text-align:left; font-size:11.5px;">
+      If a new tab didn't open, copy this link:<br>
+      <input class="draft-name-input" id="new-draft-url" type="text" readonly style="margin-top:6px; font-family:'IBM Plex Mono'; font-size:11.5px;">
     </div>
-    <div id="roster-list"></div>
-  </div>
-  <div class="drawer-foot">
-    <button class="undo-btn" id="undo-btn">Undo last action</button>
-    <button class="reset-btn" id="reset-btn">Reset draft</button>
+    <div class="section-label">Saved drafts</div>
+    <div id="draft-list"></div>
   </div>
 </div>
 
 <script>
-// ---- league settings (mirrors auction_engine.py) ----
+// ---- league settings ----
 const TEAMS = 12, BUDGET = 200, ROSTER_SLOTS = 16;
 
 // ---- data: populated from the snapshot export ----
@@ -560,29 +741,148 @@ const ARCHE_RULES = {
   value:  { mult: 0.90, advice: "Safe production. Buy BELOW value. Win the auction here." },
 };
 
-// ---- draft state ----
-let owned = [];   // {name, price}
-let gone = new Set();
-let history = []; // for undo: {type: 'won'|'gone', name}
+// global overall rank, by value desc (used in snake mode)
+const RANK_MAP = {};
+[...PLAYERS].sort((a, b) => b.value - a.value).forEach((p, i) => { RANK_MAP[p.name] = i + 1; });
 
-function remaining() { return BUDGET - owned.reduce((s, p) => s + p.price, 0); }
-function slotsLeft() { return ROSTER_SLOTS - owned.length; }
-function maxBidNow() { return Math.max(0, remaining() - (slotsLeft() - 1)); }
+// ==========================================================================
+// Draft storage: each "draft" holds independent auction + snake progress.
+// Persisted to localStorage; the active draft id lives in the URL (?draft=)
+// so opening a fresh id in a new tab starts a clean draft alongside others.
+// ==========================================================================
+const STORE_KEY = "draftboard_drafts_v1";
+
+function loadStore() {
+  try {
+    return JSON.parse(localStorage.getItem(STORE_KEY)) || {};
+  } catch (e) { return {}; }
+}
+function saveStore(store) {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(store)); } catch (e) { /* storage unavailable */ }
+}
+function newId() {
+  return "d_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+function blankDraft(id) {
+  const d = new Date();
+  return {
+    id,
+    name: "Draft " + (d.getMonth() + 1) + "/" + d.getDate(),
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    auction: { owned: [], gone: [], history: [] },
+    snake: { mySlot: 1, owned: [], log: [] },
+  };
+}
+
+let store = loadStore();
+
+function getDraftIdFromUrl() {
+  try {
+    const params = new URLSearchParams(location.search);
+    return params.get("draft");
+  } catch (e) { return null; }
+}
+function setDraftIdInUrl(id) {
+  // Some sandboxed hosts (e.g. a data: URL preview) throw on history.replaceState.
+  // Losing the URL-persisted id there just means "new tab" won't carry the id over --
+  // it must never take down the rest of the app.
+  try {
+    const params = new URLSearchParams(location.search);
+    params.set("draft", id);
+    const newUrl = location.pathname + "?" + params.toString();
+    history.replaceState(null, "", newUrl);
+  } catch (e) { /* not fatal */ }
+}
+
+let activeId = getDraftIdFromUrl();
+if (!activeId || !store[activeId]) {
+  activeId = activeId || newId();
+  store[activeId] = store[activeId] || blankDraft(activeId);
+  setDraftIdInUrl(activeId);
+  saveStore(store);
+}
+let draft = store[activeId];
+
+function persist() {
+  draft.updatedAt = Date.now();
+  store[activeId] = draft;
+  saveStore(store);
+}
+
+function switchToDraft(id) {
+  if (!store[id]) return;
+  activeId = id;
+  draft = store[id];
+  setDraftIdInUrl(id);
+  renderAll();
+  renderDraftsPanel();
+}
+
+// ==========================================================================
+// Auction mode
+// ==========================================================================
+function auctionRemaining() { return BUDGET - draft.auction.owned.reduce((s, p) => s + p.price, 0); }
+function auctionSlotsLeft() { return ROSTER_SLOTS - draft.auction.owned.length; }
+function auctionMaxBidNow() { return Math.max(0, auctionRemaining() - (auctionSlotsLeft() - 1)); }
 
 function maxBidFor(p) {
   const rule = ARCHE_RULES[p.arch];
   const raw = p.value * rule.mult;
-  const pace = remaining() / Math.max(1, BUDGET * slotsLeft() / ROSTER_SLOTS);
+  const pace = auctionRemaining() / Math.max(1, BUDGET * auctionSlotsLeft() / ROSTER_SLOTS);
   const scaled = raw * Math.min(1.15, pace);
-  return Math.round(Math.max(1, Math.min(maxBidNow(), scaled)));
+  return Math.round(Math.max(1, Math.min(auctionMaxBidNow(), scaled)));
 }
 
-function availablePlayers() {
-  const takenNames = new Set(owned.map(p => p.name));
-  return PLAYERS.filter(p => !takenNames.has(p.name) && !gone.has(p.name));
+function auctionAvailable() {
+  const taken = new Set(draft.auction.owned.map(p => p.name).concat(draft.auction.gone));
+  return PLAYERS.filter(p => !taken.has(p.name));
 }
 
-// ---- tiering: cliff detection, mirrors show_tiers() ----
+// ==========================================================================
+// Snake mode
+// ==========================================================================
+function snakePickInfo(overallOverride) {
+  const picksMade = overallOverride !== undefined ? overallOverride - 1 : draft.snake.log.length;
+  const overall = picksMade + 1;
+  const round = Math.floor(picksMade / TEAMS) + 1;
+  const posInRound = (picksMade % TEAMS) + 1;
+  const teamOnClock = (round % 2 === 1) ? posInRound : (TEAMS - posInRound + 1);
+  return {
+    overall, round, posInRound, teamOnClock,
+    isMine: teamOnClock === draft.snake.mySlot,
+    done: overall > TEAMS * ROSTER_SLOTS,
+  };
+}
+function snakeTakenNames() {
+  return new Set(draft.snake.log.map(e => e.name));
+}
+function snakeAvailable() {
+  const taken = snakeTakenNames();
+  return PLAYERS.filter(p => !taken.has(p.name));
+}
+function draftPlayer(p) {
+  const info = snakePickInfo();
+  if (info.done) return;
+  draft.snake.log.push({ overall: info.overall, round: info.round, team: info.teamOnClock, name: p.name });
+  if (info.isMine) draft.snake.owned.push({ name: p.name, round: info.round, pick: info.overall });
+  persist();
+  renderAll();
+}
+function undoSnake() {
+  const last = draft.snake.log.pop();
+  if (!last) return;
+  if (last.team === draft.snake.mySlot) {
+    const i = draft.snake.owned.findIndex(o => o.name === last.name);
+    if (i >= 0) draft.snake.owned.splice(i, 1);
+  }
+  persist();
+  renderAll();
+}
+
+// ==========================================================================
+// Tiering: cliff detection shared by both modes
+// ==========================================================================
 function buildTiers(list, gapFactor = 0.18, maxPlayers = 60) {
   const sorted = [...list].sort((a, b) => b.value - a.value).slice(0, maxPlayers);
   if (sorted.length === 0) return [];
@@ -604,27 +904,74 @@ function buildTiers(list, gapFactor = 0.18, maxPlayers = 60) {
   return tiers;
 }
 
-// ---- rendering ----
+// ==========================================================================
+// Rendering
+// ==========================================================================
+let activeMode = "auction";
 let activePos = "";
 let searchTerm = "";
 
 function chipLabel(a) { return { stud: "Stud", gamble: "Gamble", value: "Value" }[a]; }
 
-function render() {
-  document.getElementById("stat-budget").textContent = "$" + remaining();
-  document.getElementById("stat-maxbid").textContent = "$" + maxBidNow();
-  document.getElementById("stat-slots").textContent = slotsLeft();
-
-  let list = availablePlayers();
-  if (activePos) list = list.filter(p => p.pos === activePos);
+function filteredList(list) {
+  let out = list;
+  if (activePos) out = out.filter(p => p.pos === activePos);
   if (searchTerm) {
     const q = searchTerm.toLowerCase();
-    list = list.filter(p => p.name.toLowerCase().includes(q));
+    out = out.filter(p => p.name.toLowerCase().includes(q));
   }
+  return out;
+}
 
+function renderTopStats() {
+  const group = document.getElementById("stat-group");
+  const tag = document.getElementById("brand-tag");
+  if (activeMode === "auction") {
+    group.innerHTML = `
+      <div class="stat gold"><div class="label">Budget</div><div class="value num">$${auctionRemaining()}</div></div>
+      <div class="stat"><div class="label">Max Bid</div><div class="value num">$${auctionMaxBidNow()}</div></div>
+      <div class="stat"><div class="label">Slots</div><div class="value num">${auctionSlotsLeft()}</div></div>
+    `;
+    tag.textContent = `${draft.name} · 12-team · $200 budget · 16 slots`;
+  } else {
+    const info = snakePickInfo();
+    group.innerHTML = `
+      <div class="stat"><div class="label">Round</div><div class="value num">${Math.min(info.round, ROSTER_SLOTS)}</div></div>
+      <div class="stat"><div class="label">Pick</div><div class="value num">${Math.min(info.overall, TEAMS * ROSTER_SLOTS)}</div></div>
+      <div class="stat ${info.isMine ? 'gold' : ''}"><div class="label">On Clock</div><div class="value num">${info.done ? 'Done' : (info.isMine ? 'You' : 'Team ' + info.teamOnClock)}</div></div>
+    `;
+    tag.textContent = `${draft.name} · Team ${draft.snake.mySlot} of ${TEAMS} · Snake · ${ROSTER_SLOTS} rounds`;
+  }
+}
+
+function renderClockBanner() {
+  const el = document.getElementById("clock-banner");
+  const inner = document.getElementById("clock-banner-inner");
+  if (activeMode !== "snake") { el.style.display = "none"; return; }
+  el.style.display = "block";
+  const info = snakePickInfo();
+  if (info.done) {
+    el.className = "clock-banner done";
+    inner.textContent = "Draft complete — every roster slot is filled.";
+  } else if (info.isMine) {
+    el.className = "clock-banner mine";
+    inner.textContent = `You're on the clock — Round ${info.round}, Pick ${info.overall} overall.`;
+  } else {
+    el.className = "clock-banner theirs";
+    inner.textContent = `Team ${info.teamOnClock} is on the clock — Round ${info.round}, Pick ${info.overall} overall.`;
+  }
+}
+
+function renderBoard() {
   const board = document.getElementById("board");
   board.innerHTML = "";
 
+  const list = activeMode === "auction" ? filteredList(auctionAvailable()) : filteredList(snakeAvailable());
+
+  if (activeMode === "snake" && snakePickInfo().done) {
+    board.innerHTML = '<div class="empty-msg">Draft complete. Check My Team for your final roster.</div>';
+    return;
+  }
   if (list.length === 0) {
     board.innerHTML = '<div class="empty-msg">No players match. Adjust the filter or search.</div>';
     return;
@@ -649,12 +996,12 @@ function render() {
       <div class="cards"></div>
     `;
     const cardsEl = tierEl.querySelector(".cards");
-    tier.forEach(p => cardsEl.appendChild(buildCard(p)));
+    tier.forEach(p => cardsEl.appendChild(activeMode === "auction" ? buildAuctionCard(p) : buildSnakeCard(p)));
     board.appendChild(tierEl);
   });
 }
 
-function buildCard(p) {
+function buildAuctionCard(p) {
   const card = document.createElement("div");
   card.className = "card";
   const mb = maxBidFor(p);
@@ -670,7 +1017,7 @@ function buildCard(p) {
       <div><div class="k">Value</div><div class="v num">$${p.value}</div></div>
       <div><div class="k">Max Bid</div><div class="v num maxbid">$${mb}</div></div>
     </div>
-    <div class="card-actions" data-mode="default">
+    <div class="card-actions">
       <button class="won-btn">Won</button>
       <button class="gone-btn">Gone</button>
     </div>
@@ -688,78 +1035,299 @@ function buildCard(p) {
     input.focus();
     const commit = () => {
       const price = parseInt(input.value, 10) || mb;
-      owned.push({ name: p.name, price });
-      history.push({ type: "won", name: p.name });
-      render();
+      draft.auction.owned.push({ name: p.name, price });
+      draft.auction.history.push({ type: "won", name: p.name });
+      persist();
+      renderAll();
     };
     actions.querySelector(".confirm").addEventListener("click", commit);
     input.addEventListener("keydown", e => { if (e.key === "Enter") commit(); });
-    actions.querySelector(".cancel").addEventListener("click", render);
+    actions.querySelector(".cancel").addEventListener("click", renderAll);
   });
   card.querySelector(".gone-btn").addEventListener("click", () => {
-    gone.add(p.name);
-    history.push({ type: "gone", name: p.name });
-    render();
+    draft.auction.gone.push(p.name);
+    draft.auction.history.push({ type: "gone", name: p.name });
+    persist();
+    renderAll();
   });
   return card;
 }
 
-function renderRoster() {
-  document.getElementById("d-spent").textContent = "$" + owned.reduce((s, p) => s + p.price, 0);
-  document.getElementById("d-left").textContent = "$" + remaining();
-  const list = document.getElementById("roster-list");
-  list.innerHTML = "";
-  if (owned.length === 0) {
-    list.innerHTML = '<div class="empty-msg" style="padding:20px 0;">No players won yet.</div>';
+function buildSnakeCard(p) {
+  const card = document.createElement("div");
+  card.className = "card";
+  const info = snakePickInfo();
+  card.innerHTML = `
+    <div class="card-top">
+      <div>
+        <div class="card-name">${p.name}</div>
+        <div class="card-meta">${p.pos} &middot; ${p.team || "—"} &middot; ${p.proj_points} pts proj</div>
+      </div>
+      <span class="chip ${p.arch}">${chipLabel(p.arch)}</span>
+    </div>
+    <div class="card-nums">
+      <div><div class="k">Overall Rank</div><div class="v num">#${RANK_MAP[p.name]}</div></div>
+      <div><div class="k">Value</div><div class="v num">$${p.value}</div></div>
+    </div>
+    <div class="card-actions">
+      <button class="draft-btn ${info.isMine ? 'mine' : ''}">${info.isMine ? 'Draft to Me' : 'Log Pick (Team ' + info.teamOnClock + ')'}</button>
+    </div>
+  `;
+  card.querySelector(".draft-btn").addEventListener("click", () => draftPlayer(p));
+  return card;
+}
+
+function renderFootNote() {
+  const el = document.getElementById("foot-note");
+  if (activeMode === "auction") {
+    el.innerHTML = 'Values computed with value-above-replacement against a 12-team, $200-budget, 16-slot league (1 QB / 2 RB / 3 WR / 1 TE / 1 FLEX starters). Archetypes: <strong style="color:var(--stud)">STUD</strong> = high floor, pay up &middot; <strong style="color:var(--gamble)">GAMBLE</strong> = high ceiling/low floor, hard-cap it &middot; <strong style="color:var(--value)">VALUE</strong> = buy below listed value.';
+  } else {
+    el.innerHTML = 'Rank and tiers use the same value-above-replacement model as the auction board, re-purposed as a draft-order signal. A "cliff" between tiers means the position thins out fast — reach now or plan to wait.';
+  }
+}
+
+// ---- roster / team drawer ----
+function renderDrawer() {
+  const title = document.getElementById("drawer-title");
+  const body = document.getElementById("drawer-body");
+  const foot = document.getElementById("drawer-foot");
+
+  if (activeMode === "auction") {
+    title.textContent = "My Team — Auction";
+    const spent = draft.auction.owned.reduce((s, p) => s + p.price, 0);
+    body.innerHTML = `
+      <div class="roster-summary">
+        <div class="stat gold"><div class="label">Spent</div><div class="value num">$${spent}</div></div>
+        <div class="stat"><div class="label">Left</div><div class="value num">$${auctionRemaining()}</div></div>
+      </div>
+      <div id="roster-list"></div>
+    `;
+    const list = document.getElementById("roster-list");
+    if (draft.auction.owned.length === 0) {
+      list.innerHTML = '<div class="empty-msg" style="padding:20px 0;">No players won yet.</div>';
+    } else {
+      draft.auction.owned.forEach(p => {
+        const row = document.createElement("div");
+        row.className = "roster-row";
+        row.innerHTML = `<span>${p.name}</span><span class="price num">$${p.price}</span>`;
+        list.appendChild(row);
+      });
+    }
+    foot.innerHTML = `
+      <button class="undo-btn" id="undo-btn">Undo last action</button>
+      <button class="reset-btn" id="reset-btn">Reset draft</button>
+    `;
+    document.getElementById("undo-btn").addEventListener("click", () => {
+      const last = draft.auction.history.pop();
+      if (!last) return;
+      if (last.type === "won") draft.auction.owned = draft.auction.owned.filter(p => p.name !== last.name);
+      else draft.auction.gone = draft.auction.gone.filter(n => n !== last.name);
+      persist();
+      renderAll();
+    });
+    document.getElementById("reset-btn").addEventListener("click", () => {
+      if (!confirm("Reset the auction board? This clears everyone you've marked won or gone.")) return;
+      draft.auction = { owned: [], gone: [], history: [] };
+      persist();
+      renderAll();
+    });
+  } else {
+    title.textContent = "My Team — Snake";
+    const info = snakePickInfo();
+    body.innerHTML = `
+      <div class="roster-summary">
+        <div class="stat gold"><div class="label">Drafted</div><div class="value num">${draft.snake.owned.length}/${ROSTER_SLOTS}</div></div>
+        <div class="stat"><div class="label">Next Pick</div><div class="value num">${info.done ? '—' : '#' + info.overall}</div></div>
+      </div>
+      <div id="roster-list"></div>
+      <div class="section-label">Full draft log</div>
+      <div id="draft-log"></div>
+    `;
+    const list = document.getElementById("roster-list");
+    if (draft.snake.owned.length === 0) {
+      list.innerHTML = '<div class="empty-msg" style="padding:20px 0;">No players drafted yet.</div>';
+    } else {
+      draft.snake.owned.forEach(p => {
+        const row = document.createElement("div");
+        row.className = "roster-row";
+        row.innerHTML = `<span>${p.name}</span><span class="meta num">R${p.round} &middot; #${p.pick}</span>`;
+        list.appendChild(row);
+      });
+    }
+    const log = document.getElementById("draft-log");
+    if (draft.snake.log.length === 0) {
+      log.innerHTML = '<div class="empty-msg" style="padding:12px 0;">No picks yet.</div>';
+    } else {
+      [...draft.snake.log].reverse().forEach(e => {
+        const row = document.createElement("div");
+        row.className = "log-row" + (e.team === draft.snake.mySlot ? " mine" : "");
+        row.innerHTML = `<span class="pk">#${e.overall}</span><span>${e.name} — Team ${e.team}</span>`;
+        log.appendChild(row);
+      });
+    }
+    foot.innerHTML = `
+      <button class="undo-btn" id="undo-btn">Undo last pick</button>
+      <button class="reset-btn" id="reset-btn">Reset draft</button>
+    `;
+    document.getElementById("undo-btn").addEventListener("click", undoSnake);
+    document.getElementById("reset-btn").addEventListener("click", () => {
+      if (!confirm("Reset the snake draft? This clears the entire pick log.")) return;
+      draft.snake.owned = [];
+      draft.snake.log = [];
+      persist();
+      renderAll();
+    });
+  }
+}
+
+// ---- drafts management drawer ----
+function relTime(ts) {
+  const s = Math.floor((Date.now() - ts) / 1000);
+  if (s < 60) return "just now";
+  const m = Math.floor(s / 60);
+  if (m < 60) return m + "m ago";
+  const h = Math.floor(m / 60);
+  if (h < 24) return h + "h ago";
+  return Math.floor(h / 24) + "d ago";
+}
+function draftSummary(d) {
+  const aPicks = d.auction.owned.length;
+  const sPicks = d.snake.owned.length;
+  return `Auction: ${aPicks} won · Snake: ${sPicks} picked · ${relTime(d.updatedAt)}`;
+}
+function renderDraftsPanel() {
+  document.getElementById("draft-name-input").value = draft.name;
+  const linkEl = document.getElementById("new-draft-link");
+  linkEl.addEventListener("click", () => {
+    try {
+      const id = newId();
+      const params = new URLSearchParams(location.search);
+      params.set("draft", id);
+      linkEl.href = location.pathname + "?" + params.toString();
+      document.getElementById("new-draft-url").value = linkEl.href;
+      document.getElementById("new-draft-fallback").style.display = "block";
+    } catch (e) { /* leave href as-is */ }
+  });
+
+  const listEl = document.getElementById("draft-list");
+  listEl.innerHTML = "";
+  const others = Object.values(store).sort((a, b) => b.updatedAt - a.updatedAt);
+  if (others.length === 0) {
+    listEl.innerHTML = '<div class="empty-msg" style="padding:12px 0;">No other saved drafts.</div>';
     return;
   }
-  owned.forEach(p => {
-    const row = document.createElement("div");
-    row.className = "roster-row";
-    row.innerHTML = `<span>${p.name}</span><span class="price num">$${p.price}</span>`;
-    list.appendChild(row);
+  others.forEach(d => {
+    const item = document.createElement("div");
+    item.className = "draft-list-item" + (d.id === activeId ? " active" : "");
+    item.innerHTML = `
+      <div class="name"${d.id === activeId ? ' id="current-draft-list-name"' : ''}>${d.name}${d.id === activeId ? " (current)" : ""}</div>
+      <div class="meta">${draftSummary(d)}</div>
+      <div class="row-actions">
+        <button class="open-btn">Open here</button>
+        <button class="del-btn">Delete</button>
+      </div>
+    `;
+    if (d.id !== activeId) {
+      item.querySelector(".open-btn").addEventListener("click", () => switchToDraft(d.id));
+    } else {
+      item.querySelector(".open-btn").disabled = true;
+      item.querySelector(".open-btn").style.opacity = "0.5";
+    }
+    item.querySelector(".del-btn").addEventListener("click", () => {
+      if (Object.keys(store).length <= 1) { alert("Can't delete your only draft."); return; }
+      if (!confirm(`Delete "${d.name}"? This can't be undone.`)) return;
+      delete store[d.id];
+      saveStore(store);
+      if (d.id === activeId) {
+        const remaining = Object.keys(store)[0];
+        switchToDraft(remaining);
+      } else {
+        renderDraftsPanel();
+      }
+    });
+    listEl.appendChild(item);
   });
 }
 
-// ---- controls ----
+function renderAll() {
+  renderTopStats();
+  renderClockBanner();
+  renderBoard();
+  renderFootNote();
+  document.getElementById("slot-picker").style.display = activeMode === "snake" ? "inline-flex" : "none";
+  if (document.getElementById("drawer").classList.contains("open")) renderDrawer();
+}
+
+// ==========================================================================
+// Wiring
+// ==========================================================================
+document.getElementById("mode-tabs").addEventListener("click", e => {
+  if (e.target.tagName !== "BUTTON") return;
+  document.querySelectorAll("#mode-tabs button").forEach(b => b.classList.remove("active"));
+  e.target.classList.add("active");
+  activeMode = e.target.dataset.mode;
+  renderAll();
+});
+
 document.getElementById("pos-filter").addEventListener("click", e => {
   if (e.target.tagName !== "BUTTON") return;
   document.querySelectorAll("#pos-filter button").forEach(b => b.classList.remove("active"));
   e.target.classList.add("active");
   activePos = e.target.dataset.pos;
-  render();
+  renderBoard();
 });
 document.getElementById("search").addEventListener("input", e => {
   searchTerm = e.target.value;
-  render();
+  renderBoard();
 });
 
-const drawer = document.getElementById("drawer");
+const slotSelect = document.getElementById("slot-select");
+for (let i = 1; i <= TEAMS; i++) {
+  const opt = document.createElement("option");
+  opt.value = i; opt.textContent = i;
+  slotSelect.appendChild(opt);
+}
+slotSelect.addEventListener("change", () => {
+  draft.snake.mySlot = parseInt(slotSelect.value, 10);
+  persist();
+  renderAll();
+});
+
 const overlay = document.getElementById("overlay");
-function openDrawer() { drawer.classList.add("open"); overlay.classList.add("open"); renderRoster(); }
-function closeDrawer() { drawer.classList.remove("open"); overlay.classList.remove("open"); }
-document.getElementById("roster-open").addEventListener("click", openDrawer);
-document.getElementById("drawer-close").addEventListener("click", closeDrawer);
-overlay.addEventListener("click", closeDrawer);
-
-document.getElementById("undo-btn").addEventListener("click", () => {
-  const last = history.pop();
-  if (!last) return;
-  if (last.type === "won") owned = owned.filter(p => p.name !== last.name);
-  else gone.delete(last.name);
-  render();
-  renderRoster();
+const drawer = document.getElementById("drawer");
+const draftsDrawer = document.getElementById("drafts-drawer");
+function closeAllDrawers() {
+  drawer.classList.remove("open");
+  draftsDrawer.classList.remove("open");
+  overlay.classList.remove("open");
+}
+document.getElementById("roster-open").addEventListener("click", () => {
+  closeAllDrawers();
+  drawer.classList.add("open");
+  overlay.classList.add("open");
+  renderDrawer();
 });
-document.getElementById("reset-btn").addEventListener("click", () => {
-  if (!confirm("Reset the whole draft board? This clears everyone you've marked won or gone.")) return;
-  owned = []; gone = new Set(); history = [];
-  render();
-  renderRoster();
+document.getElementById("drafts-open").addEventListener("click", () => {
+  closeAllDrawers();
+  draftsDrawer.classList.add("open");
+  overlay.classList.add("open");
+  renderDraftsPanel();
+});
+document.querySelectorAll("[data-close]").forEach(b => b.addEventListener("click", closeAllDrawers));
+overlay.addEventListener("click", closeAllDrawers);
+
+document.getElementById("draft-name-input").addEventListener("input", e => {
+  draft.name = e.target.value || draft.name;
+  persist();
+  renderTopStats();
+  const listName = document.getElementById("current-draft-list-name");
+  if (listName) listName.textContent = draft.name + " (current)";
 });
 
 document.getElementById("snapshot-note").textContent = PLAYERS.length
   ? `Snapshot: ${SNAPSHOT_DATE} · ${PLAYERS.length} players`
   : "No data loaded";
 
-render();
+slotSelect.value = draft.snake.mySlot;
+renderAll();
 </script>
