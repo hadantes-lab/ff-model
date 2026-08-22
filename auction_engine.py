@@ -109,16 +109,21 @@ def load_player_points():
     agg = agg[agg["games"] >= 3].copy()
     agg["sd"] = agg["sd"].fillna(agg["ppg"] * 0.3)
 
-    # position lookup from roster data
+    # position lookup from roster data, joined by gsis_id (pbp's player ids use
+    # this same format) rather than name -- pbp names are abbreviated
+    # ("J.Conner") while roster full_name is not ("James Conner"), so a
+    # name-based join silently matches almost nothing.
     try:
-        rosters = nfl.load_rosters(SEASONS[-1]).to_pandas()
-        pos_map = dict(zip(rosters["player_name"], rosters["position"]))
-        team_map = dict(zip(rosters["player_name"], rosters["team"]))
+        rosters = nfl.load_rosters([SEASONS[-1]]).to_pandas()
+        pos_map = dict(zip(rosters["gsis_id"], rosters["position"]))
+        team_map = dict(zip(rosters["gsis_id"], rosters["team"]))
+        name_map = dict(zip(rosters["gsis_id"], rosters["full_name"]))
     except Exception:
-        pos_map, team_map = {}, {}
+        pos_map, team_map, name_map = {}, {}, {}
 
-    agg["pos"] = agg["name"].map(pos_map).fillna("NA")
-    agg["team"] = agg["name"].map(team_map).fillna("")
+    agg["pos"] = agg["pid"].map(pos_map).fillna("NA")
+    agg["team"] = agg["pid"].map(team_map).fillna("")
+    agg["name"] = agg["pid"].map(name_map).fillna(agg["name"])
     agg = agg[agg["pos"].isin(["QB", "RB", "WR", "TE"])].copy()
 
     # project season points (17 games), and floor/ceiling on 1-10 scale for archetypes
