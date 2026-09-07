@@ -65,6 +65,17 @@ for _, r in players.sort_values("value", ascending=False).iterrows():
         "ceiling": int(r["ceiling"]),
         "value": int(r["value"]),
         "arch": r["arch"],
+        # per-game raw stat means, so the dashboard can re-score under a
+        # different PPR setting and re-derive $ value for a different league
+        # size without needing fresh data.
+        "rush_yd_pg": round(float(r["rush_yd"]), 2),
+        "rush_td_pg": round(float(r["rush_td"]), 3),
+        "rec_pg": round(float(r["rec"]), 2),
+        "rec_yd_pg": round(float(r["rec_yd"]), 2),
+        "rec_td_pg": round(float(r["rec_td"]), 3),
+        "pass_yd_pg": round(float(r["pass_yd"]), 2),
+        "pass_td_pg": round(float(r["pass_td"]), 3),
+        "int_pg": round(float(r["int"]), 3),
         "adp": a["ecr"] if a else None,
         "adp_sd": a["sd"] if a else None,
         "bye": a["bye"] if a else None,

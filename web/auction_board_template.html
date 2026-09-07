@@ -623,6 +623,33 @@
   }
   .section-label:first-child { margin-top: 0; }
 
+  .settings-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .settings-row label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-dim);
+  }
+  .settings-row .seg button {
+    font-size: 11.5px;
+    padding: 6px 9px;
+  }
+  .teams-select {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 7px;
+    padding: 6px 10px;
+    font-family: "IBM Plex Mono";
+    font-weight: 600;
+    font-size: 13px;
+  }
+
   .draft-list-item {
     border: 1px solid var(--border);
     border-radius: 8px;
@@ -702,7 +729,7 @@
   <div class="slot-picker" id="slot-picker" style="display:none;">
     Your slot
     <select id="slot-select"></select>
-    of 12
+    of <span id="slot-total">12</span>
   </div>
   <div class="snapshot-note" id="snapshot-note">Snapshot pending</div>
 </div>
@@ -732,6 +759,21 @@
     <button class="drawer-close" data-close>&times;</button>
   </div>
   <div class="drawer-body">
+    <div class="section-label">League settings</div>
+    <div class="settings-row">
+      <label>Scoring</label>
+      <div class="seg" id="scoring-seg">
+        <button data-scoring="std">Standard</button>
+        <button data-scoring="half">Half PPR</button>
+        <button data-scoring="ppr">Full PPR</button>
+      </div>
+    </div>
+    <div class="settings-row">
+      <label>Teams</label>
+      <select class="teams-select" id="teams-select"></select>
+    </div>
+    <div class="empty-msg" style="padding:6px 0 0; text-align:left; font-size:11px;">Changes $ value, max bid, and VOR replacement level for this draft. ADP and tiers are set by the market and don't change.</div>
+
     <div class="section-label">Current draft</div>
     <input class="draft-name-input" id="draft-name-input" type="text" placeholder="Name this draft">
     <a class="new-draft-btn" id="new-draft-link" href="#" target="_blank" rel="noopener">+ New draft (opens a tab)</a>
@@ -746,7 +788,11 @@
 
 <script>
 // ---- league settings ----
-const TEAMS = 12, BUDGET = 200, ROSTER_SLOTS = 16;
+const BUDGET = 200, ROSTER_SLOTS = 16;
+const STARTERS = { QB: 1, RB: 2, WR: 3, TE: 1, FLEX: 1 };
+const TEAM_SIZE_OPTIONS = [8, 10, 12, 14, 16];
+const REC_WEIGHTS = { std: 0, half: 0.5, ppr: 1.0 };
+const SCORING_LABELS = { std: "Standard", half: "Half PPR", ppr: "Full PPR" };
 
 // ---- data: populated from the snapshot export ----
 const PLAYERS = __PLAYERS_JSON__;
@@ -785,9 +831,17 @@ function blankDraft(id) {
     name: "Draft " + (d.getMonth() + 1) + "/" + d.getDate(),
     createdAt: Date.now(),
     updatedAt: Date.now(),
+    settings: { teams: 12, scoring: "ppr" },
     auction: { owned: [], gone: [], history: [] },
     snake: { mySlot: 1, owned: [], log: [] },
   };
+}
+function ensureSettings(d) {
+  d.settings = d.settings || { teams: 12, scoring: "ppr" };
+  if (!REC_WEIGHTS.hasOwnProperty(d.settings.scoring)) d.settings.scoring = "ppr";
+  if (!TEAM_SIZE_OPTIONS.includes(d.settings.teams)) d.settings.teams = 12;
+  d.snake.mySlot = Math.min(Math.max(1, d.snake.mySlot || 1), d.settings.teams);
+  return d;
 }
 
 let store = loadStore();
@@ -817,7 +871,7 @@ if (!activeId || !store[activeId]) {
   setDraftIdInUrl(activeId);
   saveStore(store);
 }
-let draft = store[activeId];
+let draft = ensureSettings(store[activeId]);
 
 function persist() {
   draft.updatedAt = Date.now();
@@ -828,11 +882,71 @@ function persist() {
 function switchToDraft(id) {
   if (!store[id]) return;
   activeId = id;
-  draft = store[id];
+  draft = ensureSettings(store[id]);
   setDraftIdInUrl(id);
+  rebuildSlotPicker();
   renderAll();
   renderDraftsPanel();
 }
+
+// ==========================================================================
+// Live stats: proj. points and $ value are baked into PLAYERS at full-PPR,
+// 12-team math, but both depend on the league's actual scoring format and
+// team count -- so they're recomputed here from each player's raw per-game
+// stat means whenever the active draft's settings change. ADP, floor and
+// ceiling are external/shape signals that don't shift with scoring format,
+// so those stay as baked.
+// ==========================================================================
+let liveStats = {};
+
+function recomputeLiveStats() {
+  const recWeight = REC_WEIGHTS[draft.settings.scoring] ?? 1.0;
+  const teams = draft.settings.teams;
+
+  const projByName = {};
+  const byPos = {};
+  PLAYERS.forEach(p => {
+    const ppg = (p.pass_yd_pg || 0) * 0.04 + (p.pass_td_pg || 0) * 4 + (p.int_pg || 0) * -1
+      + (p.rush_yd_pg || 0) * 0.1 + (p.rush_td_pg || 0) * 6
+      + (p.rec_pg || 0) * recWeight + (p.rec_yd_pg || 0) * 0.1 + (p.rec_td_pg || 0) * 6;
+    const projPoints = ppg * 17;
+    projByName[p.name] = projPoints;
+    (byPos[p.pos] = byPos[p.pos] || []).push({ name: p.name, projPoints });
+  });
+
+  const flexShare = STARTERS.FLEX;
+  const startCounts = {
+    QB: STARTERS.QB * teams,
+    RB: (STARTERS.RB + flexShare * 0.4) * teams,
+    WR: (STARTERS.WR + flexShare * 0.4) * teams,
+    TE: (STARTERS.TE + flexShare * 0.2) * teams,
+  };
+  const discretionary = teams * BUDGET - teams * ROSTER_SLOTS;
+
+  const vorByName = {};
+  let totalVor = 0;
+  Object.entries(byPos).forEach(([pos, grp]) => {
+    const sorted = [...grp].sort((a, b) => b.projPoints - a.projPoints);
+    let nStart = Math.round(startCounts[pos] ?? teams);
+    if (nStart >= sorted.length) nStart = Math.max(1, sorted.length - 1);
+    const replacement = sorted[nStart] ? sorted[nStart].projPoints : 0;
+    sorted.forEach(p => {
+      const vor = Math.max(0, p.projPoints - replacement);
+      vorByName[p.name] = vor;
+      totalVor += vor;
+    });
+  });
+
+  const out = {};
+  PLAYERS.forEach(p => {
+    const vor = vorByName[p.name] || 0;
+    const value = totalVor > 0 ? Math.max(1, Math.round(1 + (vor / totalVor) * discretionary)) : 1;
+    out[p.name] = { projPoints: Math.round(projByName[p.name] * 10) / 10, value };
+  });
+  liveStats = out;
+}
+function liveValue(p) { return (liveStats[p.name] && liveStats[p.name].value) ?? p.value; }
+function liveProjPoints(p) { return (liveStats[p.name] && liveStats[p.name].projPoints) ?? p.proj_points; }
 
 // ==========================================================================
 // Auction mode
@@ -843,7 +957,7 @@ function auctionMaxBidNow() { return Math.max(0, auctionRemaining() - (auctionSl
 
 function maxBidFor(p) {
   const rule = ARCHE_RULES[p.arch];
-  const raw = p.value * rule.mult;
+  const raw = liveValue(p) * rule.mult;
   const pace = auctionRemaining() / Math.max(1, BUDGET * auctionSlotsLeft() / ROSTER_SLOTS);
   const scaled = raw * Math.min(1.15, pace);
   return Math.round(Math.max(1, Math.min(auctionMaxBidNow(), scaled)));
@@ -858,15 +972,16 @@ function auctionAvailable() {
 // Snake mode
 // ==========================================================================
 function snakePickInfo(overallOverride) {
+  const teams = draft.settings.teams;
   const picksMade = overallOverride !== undefined ? overallOverride - 1 : draft.snake.log.length;
   const overall = picksMade + 1;
-  const round = Math.floor(picksMade / TEAMS) + 1;
-  const posInRound = (picksMade % TEAMS) + 1;
-  const teamOnClock = (round % 2 === 1) ? posInRound : (TEAMS - posInRound + 1);
+  const round = Math.floor(picksMade / teams) + 1;
+  const posInRound = (picksMade % teams) + 1;
+  const teamOnClock = (round % 2 === 1) ? posInRound : (teams - posInRound + 1);
   return {
     overall, round, posInRound, teamOnClock,
     isMine: teamOnClock === draft.snake.mySlot,
-    done: overall > TEAMS * ROSTER_SLOTS,
+    done: overall > teams * ROSTER_SLOTS,
   };
 }
 function snakeTakenNames() {
@@ -905,7 +1020,7 @@ function undoSnake() {
 // ==========================================================================
 function buildAdpTiers(list, maxPlayers = 80) {
   const ranked = list.filter(p => p.adp != null).sort((a, b) => a.adp - b.adp).slice(0, maxPlayers);
-  const unranked = list.filter(p => p.adp == null).sort((a, b) => b.value - a.value);
+  const unranked = list.filter(p => p.adp == null).sort((a, b) => liveValue(b) - liveValue(a));
 
   const tiers = [];
   if (ranked.length > 0) {
@@ -948,7 +1063,7 @@ function suggestedPickName() {
     const aAdp = a.adp != null ? a.adp : 999;
     const bAdp = b.adp != null ? b.adp : 999;
     if (aAdp !== bAdp) return aAdp - bAdp;
-    return b.value - a.value;
+    return liveValue(b) - liveValue(a);
   });
   return candidates[0].name;
 }
@@ -982,15 +1097,16 @@ function renderTopStats() {
       <div class="stat"><div class="label">Max Bid</div><div class="value num">$${auctionMaxBidNow()}</div></div>
       <div class="stat"><div class="label">Slots</div><div class="value num">${auctionSlotsLeft()}</div></div>
     `;
-    tag.textContent = `${draft.name} · 12-team · $200 budget · 16 slots`;
+    tag.textContent = `${draft.name} · ${draft.settings.teams}-team · $200 budget · 16 slots · ${SCORING_LABELS[draft.settings.scoring]}`;
   } else {
     const info = snakePickInfo();
+    const teams = draft.settings.teams;
     group.innerHTML = `
       <div class="stat"><div class="label">Round</div><div class="value num">${Math.min(info.round, ROSTER_SLOTS)}</div></div>
-      <div class="stat"><div class="label">Pick</div><div class="value num">${Math.min(info.overall, TEAMS * ROSTER_SLOTS)}</div></div>
+      <div class="stat"><div class="label">Pick</div><div class="value num">${Math.min(info.overall, teams * ROSTER_SLOTS)}</div></div>
       <div class="stat ${info.isMine ? 'gold' : ''}"><div class="label">On Clock</div><div class="value num">${info.done ? 'Done' : (info.isMine ? 'You' : 'Team ' + info.teamOnClock)}</div></div>
     `;
-    tag.textContent = `${draft.name} · Team ${draft.snake.mySlot} of ${TEAMS} · Snake · ${ROSTER_SLOTS} rounds`;
+    tag.textContent = `${draft.name} · Team ${draft.snake.mySlot} of ${teams} · Snake · ${ROSTER_SLOTS} rounds · ${SCORING_LABELS[draft.settings.scoring]}`;
   }
 }
 
@@ -1071,12 +1187,12 @@ function buildAuctionCard(p, suggested) {
     <div class="card-top">
       <div>
         <div class="card-name${isSuggested ? ' suggested' : ''}">${p.name}</div>
-        <div class="card-meta">${p.pos} &middot; ${p.team || "—"} &middot; ${p.proj_points} pts proj &middot; ADP ${adpText(p)}</div>
+        <div class="card-meta">${p.pos} &middot; ${p.team || "—"} &middot; ${liveProjPoints(p)} pts proj &middot; ADP ${adpText(p)}</div>
       </div>
       <span class="chip ${p.arch}">${chipLabel(p.arch)}</span>
     </div>
     <div class="card-nums">
-      <div><div class="k">Value</div><div class="v num">$${p.value}</div></div>
+      <div><div class="k">Value</div><div class="v num">$${liveValue(p)}</div></div>
       <div><div class="k">Max Bid</div><div class="v num maxbid">$${mb}</div></div>
     </div>
     <div class="card-actions">
@@ -1130,7 +1246,7 @@ function buildSnakeCard(p, suggested) {
     </div>
     <div class="card-nums">
       <div><div class="k">ADP</div><div class="v num">${adpText(p)}</div></div>
-      <div><div class="k">Proj Pts</div><div class="v num">${p.proj_points}</div></div>
+      <div><div class="k">Proj Pts</div><div class="v num">${liveProjPoints(p)}</div></div>
     </div>
     <div class="card-actions">
       <button class="draft-btn ${info.isMine ? 'mine' : ''}">${info.isMine ? 'Draft to Me' : 'Log Pick (Team ' + info.teamOnClock + ')'}</button>
@@ -1145,7 +1261,7 @@ function renderFootNote() {
   const glowNote = 'The <span style="color:var(--gold); text-shadow:0 0 6px rgba(var(--gold-glow),0.6);">glowing name</span> is the strategy pick for where you are in the draft — stud early, best value once your roster fills in, upside gambles once slots get scarce.';
   const adpNote = `Tiers are built from current expert consensus draft rank (ADP) — FantasyPros overall redraft rankings${ADP_SCRAPE_DATE ? ", scraped " + ADP_SCRAPE_DATE : ""} — breaking to a new tier whenever the gap to the next player exceeds the experts' own disagreement (std. dev.) at that range. Deep-bench players outside the consensus rankings land in "Unranked" at the bottom, sorted by this tool's own value model instead.`;
   if (activeMode === "auction") {
-    el.innerHTML = 'Dollar values computed with value-above-replacement against a 12-team, $200-budget, 16-slot league (1 QB / 2 RB / 3 WR / 1 TE / 1 FLEX starters). Archetypes: <strong style="color:var(--stud)">STUD</strong> = high floor, pay up &middot; <strong style="color:var(--gamble)">GAMBLE</strong> = high ceiling/low floor, hard-cap it &middot; <strong style="color:var(--value)">VALUE</strong> = buy below listed value. ' + adpNote + ' ' + glowNote;
+    el.innerHTML = `Dollar values computed with value-above-replacement against a ${draft.settings.teams}-team, $200-budget, 16-slot league (1 QB / 2 RB / 3 WR / 1 TE / 1 FLEX starters), scored ${SCORING_LABELS[draft.settings.scoring]}. Archetypes: <strong style="color:var(--stud)">STUD</strong> = high floor, pay up &middot; <strong style="color:var(--gamble)">GAMBLE</strong> = high ceiling/low floor, hard-cap it &middot; <strong style="color:var(--value)">VALUE</strong> = buy below listed value. ` + adpNote + ' ' + glowNote;
   } else {
     el.innerHTML = adpNote + ' ' + glowNote;
   }
@@ -1256,11 +1372,41 @@ function relTime(ts) {
   return Math.floor(h / 24) + "d ago";
 }
 function draftSummary(d) {
+  ensureSettings(d);
   const aPicks = d.auction.owned.length;
   const sPicks = d.snake.owned.length;
-  return `Auction: ${aPicks} won · Snake: ${sPicks} picked · ${relTime(d.updatedAt)}`;
+  return `${d.settings.teams}-team, ${SCORING_LABELS[d.settings.scoring]} · Auction: ${aPicks} won · Snake: ${sPicks} picked · ${relTime(d.updatedAt)}`;
 }
+function renderSettingsControls() {
+  document.querySelectorAll("#scoring-seg button").forEach(b => {
+    b.classList.toggle("active", b.dataset.scoring === draft.settings.scoring);
+  });
+  const teamsSelect = document.getElementById("teams-select");
+  teamsSelect.innerHTML = "";
+  TEAM_SIZE_OPTIONS.forEach(n => {
+    const opt = document.createElement("option");
+    opt.value = n; opt.textContent = n + " teams";
+    teamsSelect.appendChild(opt);
+  });
+  teamsSelect.value = draft.settings.teams;
+}
+document.getElementById("scoring-seg").addEventListener("click", e => {
+  if (e.target.tagName !== "BUTTON") return;
+  draft.settings.scoring = e.target.dataset.scoring;
+  persist();
+  renderSettingsControls();
+  renderAll();
+});
+document.getElementById("teams-select").addEventListener("change", e => {
+  draft.settings.teams = parseInt(e.target.value, 10);
+  draft.snake.mySlot = Math.min(draft.snake.mySlot, draft.settings.teams);
+  persist();
+  rebuildSlotPicker();
+  renderAll();
+});
+
 function renderDraftsPanel() {
+  renderSettingsControls();
   document.getElementById("draft-name-input").value = draft.name;
   const linkEl = document.getElementById("new-draft-link");
   linkEl.addEventListener("click", () => {
@@ -1315,6 +1461,7 @@ function renderDraftsPanel() {
 }
 
 function renderAll() {
+  recomputeLiveStats();
   renderTopStats();
   renderClockBanner();
   renderBoard();
@@ -1347,10 +1494,15 @@ document.getElementById("search").addEventListener("input", e => {
 });
 
 const slotSelect = document.getElementById("slot-select");
-for (let i = 1; i <= TEAMS; i++) {
-  const opt = document.createElement("option");
-  opt.value = i; opt.textContent = i;
-  slotSelect.appendChild(opt);
+function rebuildSlotPicker() {
+  slotSelect.innerHTML = "";
+  for (let i = 1; i <= draft.settings.teams; i++) {
+    const opt = document.createElement("option");
+    opt.value = i; opt.textContent = i;
+    slotSelect.appendChild(opt);
+  }
+  slotSelect.value = draft.snake.mySlot;
+  document.getElementById("slot-total").textContent = draft.settings.teams;
 }
 slotSelect.addEventListener("change", () => {
   draft.snake.mySlot = parseInt(slotSelect.value, 10);
@@ -1393,6 +1545,6 @@ document.getElementById("snapshot-note").textContent = PLAYERS.length
   ? `Snapshot: ${SNAPSHOT_DATE} · ${PLAYERS.length} players`
   : "No data loaded";
 
-slotSelect.value = draft.snake.mySlot;
+rebuildSlotPicker();
 renderAll();
 </script>

@@ -109,6 +109,16 @@ def load_player_points():
     agg = agg[agg["games"] >= 3].copy()
     agg["sd"] = agg["sd"].fillna(agg["ppg"] * 0.3)
 
+    # per-game mean of each raw stat component, kept alongside the blended
+    # points so callers can re-score under a different format (e.g. PPR vs
+    # half-PPR just changes the "rec" weight) without re-pulling play-by-play.
+    raw_cols = ["rush_yd", "rush_td", "rec", "rec_yd", "rec_td", "pass_yd", "pass_td", "int"]
+    for c in raw_cols:
+        if c not in gm.columns:
+            gm[c] = 0.0
+    raw_means = gm.groupby(["pid", "name"], as_index=False)[raw_cols].mean()
+    agg = agg.merge(raw_means, on=["pid", "name"], how="left")
+
     # position lookup from roster data, joined by gsis_id (pbp's player ids use
     # this same format) rather than name -- pbp names are abbreviated
     # ("J.Conner") while roster full_name is not ("James Conner"), so a
