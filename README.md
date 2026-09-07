@@ -74,11 +74,19 @@ into team scores — the same engine does everything.
 4. **Correlation is simplified.** The game-script factor is a first-order fix, not
    a full covariance model. Good enough to start, not the last word.
 
-## Shareable auction board (HTML)
+## Shareable draft board (HTML)
 
-A point-and-click version of `auction_engine.py` — mark players "Won" or
-"Gone" and watch max bids, tiers, and your budget update live. No Python
-needed to use it, just a browser.
+A point-and-click version of `auction_engine.py`, with an Auction and a
+Snake mode. Mark players "Won"/"Gone" (auction) or "Draft" (snake) and
+watch max bids, budget, and pick order update live. No Python needed to
+use it, just a browser.
+
+Tiers are built from current expert consensus draft rank (ADP) — FantasyPros
+overall redraft rankings pulled via `nflreadpy`'s `load_ff_rankings`, merged
+onto this tool's own per-player projections by name. A new tier starts
+whenever the gap to the next player exceeds the experts' own disagreement
+(std. dev.) at that range. Players outside the ADP consensus land in an
+"Unranked" group at the bottom, sorted by this tool's own value model.
 
 **Regenerate it after pulling fresh data:**
 ```

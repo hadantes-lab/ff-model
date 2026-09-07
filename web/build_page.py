@@ -20,6 +20,7 @@ template = (here / "auction_board_template.html").read_text(encoding="utf-8")
 
 html = template.replace("__PLAYERS_JSON__", json.dumps(snap["players"], separators=(",", ":")))
 html = html.replace("__SNAPSHOT_DATE__", json.dumps(snap["generated"]))
+html = html.replace("__ADP_SCRAPE_DATE__", json.dumps(snap.get("adp_scrape_date")))
 
 out = here / "auction_board.html"
 out.write_text(html, encoding="utf-8")

@@ -758,9 +758,7 @@ const ARCHE_RULES = {
   value:  { mult: 0.90, advice: "Safe production. Buy BELOW value. Win the auction here." },
 };
 
-// global overall rank, by value desc (used in snake mode)
-const RANK_MAP = {};
-[...PLAYERS].sort((a, b) => b.value - a.value).forEach((p, i) => { RANK_MAP[p.name] = i + 1; });
+const ADP_SCRAPE_DATE = __ADP_SCRAPE_DATE__;
 
 // ==========================================================================
 // Draft storage: each "draft" holds independent auction + snake progress.
@@ -898,26 +896,34 @@ function undoSnake() {
 }
 
 // ==========================================================================
-// Tiering: cliff detection shared by both modes
+// Tiering: groups players by current ADP (expert consensus draft rank),
+// breaking to a new tier whenever the gap between two consecutive picks
+// exceeds the experts' own disagreement (std. dev.) at that range -- the
+// same "does the next pick overlap this one's uncertainty" logic real
+// draft-prep tiering uses. Players outside the ADP consensus (deep bench)
+// land in one trailing "Unranked" group, sorted by this tool's own value.
 // ==========================================================================
-function buildTiers(list, gapFactor = 0.18, maxPlayers = 60) {
-  const sorted = [...list].sort((a, b) => b.value - a.value).slice(0, maxPlayers);
-  if (sorted.length === 0) return [];
+function buildAdpTiers(list, maxPlayers = 80) {
+  const ranked = list.filter(p => p.adp != null).sort((a, b) => a.adp - b.adp).slice(0, maxPlayers);
+  const unranked = list.filter(p => p.adp == null).sort((a, b) => b.value - a.value);
+
   const tiers = [];
-  let current = [sorted[0]];
-  let tierTop = sorted[0].value;
-  for (let i = 1; i < sorted.length; i++) {
-    const v = sorted[i].value;
-    const drop = tierTop - v;
-    if (tierTop > 0 && drop >= Math.max(2, tierTop * gapFactor)) {
-      tiers.push(current);
-      current = [sorted[i]];
-      tierTop = v;
-    } else {
-      current.push(sorted[i]);
+  if (ranked.length > 0) {
+    let current = [ranked[0]];
+    for (let i = 1; i < ranked.length; i++) {
+      const prev = ranked[i - 1], cur = ranked[i];
+      const gap = cur.adp - prev.adp;
+      const threshold = Math.max(1.5, ((prev.adp_sd || 0) + (cur.adp_sd || 0)) / 2 * 1.2);
+      if (gap > threshold) {
+        tiers.push(current);
+        current = [cur];
+      } else {
+        current.push(cur);
+      }
     }
+    tiers.push(current);
   }
-  tiers.push(current);
+  if (unranked.length > 0) tiers.push(unranked);
   return tiers;
 }
 
@@ -938,7 +944,12 @@ function suggestedPickName() {
   const preferredArch = fraction < 0.33 ? "stud" : fraction < 0.66 ? "value" : "gamble";
   let candidates = pool.filter(p => p.arch === preferredArch);
   if (candidates.length === 0) candidates = pool;
-  candidates = [...candidates].sort((a, b) => b.value - a.value);
+  candidates = [...candidates].sort((a, b) => {
+    const aAdp = a.adp != null ? a.adp : 999;
+    const bAdp = b.adp != null ? b.adp : 999;
+    if (aAdp !== bAdp) return aAdp - bAdp;
+    return b.value - a.value;
+  });
   return candidates[0].name;
 }
 
@@ -950,6 +961,7 @@ let activePos = "";
 let searchTerm = "";
 
 function chipLabel(a) { return { stud: "Stud", gamble: "Gamble", value: "Value" }[a]; }
+function adpText(p) { return p.adp != null ? p.adp.toFixed(1) : "—"; }
 
 function filteredList(list) {
   let out = list;
@@ -1016,26 +1028,29 @@ function renderBoard() {
   }
 
   const suggested = suggestedPickName();
-  const tiers = buildTiers(list);
-  tiers.forEach((tier, ti) => {
-    let span;
-    if (activeMode === "auction") {
-      const vals = tier.map(p => p.value);
-      const hi = Math.max(...vals), lo = Math.min(...vals);
-      span = hi === lo ? "$" + hi : "$" + lo + "–$" + hi;
-    } else {
-      const ranks = tier.map(p => RANK_MAP[p.name]);
-      const best = Math.min(...ranks), worst = Math.max(...ranks);
-      span = best === worst ? "#" + best : "#" + best + "–#" + worst;
-    }
+  const tiers = buildAdpTiers(list);
+  let tierNum = 0;
+  tiers.forEach((tier) => {
+    const hasAdp = tier[0].adp != null;
     const n = tier.length;
     const urgency = n === 1 ? "Last one" : n === 2 ? "Thin · 2 left" : n + " available";
+    let title, span;
+    if (hasAdp) {
+      tierNum++;
+      title = "Tier " + tierNum;
+      const adps = tier.map(p => p.adp);
+      const lo = Math.min(...adps), hi = Math.max(...adps);
+      span = "ADP " + (lo === hi ? lo.toFixed(1) : lo.toFixed(1) + "–" + hi.toFixed(1));
+    } else {
+      title = "Unranked";
+      span = "No ADP data";
+    }
 
     const tierEl = document.createElement("div");
     tierEl.className = "tier";
     tierEl.innerHTML = `
       <div class="tier-head">
-        <h2>Tier ${ti + 1}</h2>
+        <h2>${title}</h2>
         <span class="tier-range num">${span}</span>
         <span class="tier-urgency ${n <= 1 ? 'last' : ''}">${urgency}</span>
       </div>
@@ -1056,7 +1071,7 @@ function buildAuctionCard(p, suggested) {
     <div class="card-top">
       <div>
         <div class="card-name${isSuggested ? ' suggested' : ''}">${p.name}</div>
-        <div class="card-meta">${p.pos} &middot; ${p.team || "—"} &middot; ${p.proj_points} pts proj</div>
+        <div class="card-meta">${p.pos} &middot; ${p.team || "—"} &middot; ${p.proj_points} pts proj &middot; ADP ${adpText(p)}</div>
       </div>
       <span class="chip ${p.arch}">${chipLabel(p.arch)}</span>
     </div>
@@ -1109,12 +1124,13 @@ function buildSnakeCard(p, suggested) {
     <div class="card-top">
       <div>
         <div class="card-name${isSuggested ? ' suggested' : ''}">${p.name}</div>
-        <div class="card-meta">${p.pos} &middot; ${p.team || "—"} &middot; ${p.proj_points} pts proj</div>
+        <div class="card-meta">${p.pos} &middot; ${p.team || "—"}${p.bye != null ? ' &middot; Bye ' + p.bye : ''}</div>
       </div>
       <span class="chip ${p.arch}">${chipLabel(p.arch)}</span>
     </div>
     <div class="card-nums">
-      <div><div class="k">Overall Rank</div><div class="v num">#${RANK_MAP[p.name]}</div></div>
+      <div><div class="k">ADP</div><div class="v num">${adpText(p)}</div></div>
+      <div><div class="k">Proj Pts</div><div class="v num">${p.proj_points}</div></div>
     </div>
     <div class="card-actions">
       <button class="draft-btn ${info.isMine ? 'mine' : ''}">${info.isMine ? 'Draft to Me' : 'Log Pick (Team ' + info.teamOnClock + ')'}</button>
@@ -1127,10 +1143,11 @@ function buildSnakeCard(p, suggested) {
 function renderFootNote() {
   const el = document.getElementById("foot-note");
   const glowNote = 'The <span style="color:var(--gold); text-shadow:0 0 6px rgba(var(--gold-glow),0.6);">glowing name</span> is the strategy pick for where you are in the draft — stud early, best value once your roster fills in, upside gambles once slots get scarce.';
+  const adpNote = `Tiers are built from current expert consensus draft rank (ADP) — FantasyPros overall redraft rankings${ADP_SCRAPE_DATE ? ", scraped " + ADP_SCRAPE_DATE : ""} — breaking to a new tier whenever the gap to the next player exceeds the experts' own disagreement (std. dev.) at that range. Deep-bench players outside the consensus rankings land in "Unranked" at the bottom, sorted by this tool's own value model instead.`;
   if (activeMode === "auction") {
-    el.innerHTML = 'Values computed with value-above-replacement against a 12-team, $200-budget, 16-slot league (1 QB / 2 RB / 3 WR / 1 TE / 1 FLEX starters). Archetypes: <strong style="color:var(--stud)">STUD</strong> = high floor, pay up &middot; <strong style="color:var(--gamble)">GAMBLE</strong> = high ceiling/low floor, hard-cap it &middot; <strong style="color:var(--value)">VALUE</strong> = buy below listed value. ' + glowNote;
+    el.innerHTML = 'Dollar values computed with value-above-replacement against a 12-team, $200-budget, 16-slot league (1 QB / 2 RB / 3 WR / 1 TE / 1 FLEX starters). Archetypes: <strong style="color:var(--stud)">STUD</strong> = high floor, pay up &middot; <strong style="color:var(--gamble)">GAMBLE</strong> = high ceiling/low floor, hard-cap it &middot; <strong style="color:var(--value)">VALUE</strong> = buy below listed value. ' + adpNote + ' ' + glowNote;
   } else {
-    el.innerHTML = 'Rank and tiers use the same value-above-replacement model as the auction board, re-purposed as a draft-order signal. A "cliff" between tiers means the position thins out fast — reach now or plan to wait. ' + glowNote;
+    el.innerHTML = adpNote + ' ' + glowNote;
   }
 }
 
