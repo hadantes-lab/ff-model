@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -28,6 +28,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check for Odds API key
+        id: key
+        run: |
+          if [ -z "$ODDS_API_KEY" ]; then
+            echo "::warning::ODDS_API_KEY secret is not set - skipping the props page. Add it with: gh secret set ODDS_API_KEY"
+            echo "have_key=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "have_key=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -40,17 +50,21 @@ jobs:
           python export_snapshot.py > web/snapshot.json
           python web/build_page.py
 
-      # Props page: needs the Odds API key. Without it this part is skipped and
-      # the site simply has no props page yet.
-      - name: Rebuild props page
+      # Grade props logged on earlier runs against now-final results, before pulling this
+      # week's lines, so the report reflects everything finished so far.
+      - name: Grade previous props and build the track record
+        if: steps.key.outputs.have_key == 'true'
         run: |
-          if [ -z "$ODDS_API_KEY" ]; then
-            echo "::warning::ODDS_API_KEY secret is not set - skipping the props page. Add it with: gh secret set ODDS_API_KEY"
-          else
-            # only games starting in the next 24 hours: about one slate of API credits per run
-            python export_props.py --days 1
-            python web/build_props_page.py
-          fi
+          python props_tracker.py grade
+          python props_tracker.py report --json
+
+      # Only games starting in the next 24 hours: about one slate of API credits per run.
+      # export_props.py logs every prop it prices to tracking/props_log.csv for future grading.
+      - name: Rebuild props page
+        if: steps.key.outputs.have_key == 'true'
+        run: |
+          python export_props.py --days 1
+          python web/build_props_page.py
 
       # Copies finished HTML pages only -- never the raw JSON snapshots.
       - name: Assemble site
@@ -63,3 +77,15 @@ jobs:
       - name: Publish
         id: deploy
         uses: actions/deploy-pages@v4
+
+      # tracking/props_log.csv and web/track_record.json are this workflow's memory: Actions
+      # runs are ephemeral, so they only persist by being committed back to the repo. This
+      # holds our own logged predictions and results, never a sportsbook's odds board.
+      - name: Commit the props tracking log
+        if: steps.key.outputs.have_key == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tracking/props_log.csv web/track_record.json
+          git diff --cached --quiet && echo "No tracker changes." || git commit -m "Update props tracking log [skip ci]"
+          git push

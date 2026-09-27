@@ -191,6 +191,7 @@
     <div class="stats" id="stats"></div>
   </div>
 </div>
+<div class="wrap" id="track-record" hidden></div>
 <div class="demo-banner" id="demo" hidden><div class="wrap">Demo lines &mdash; these prices were generated from the model itself to show the layout. They are not real sportsbook lines and any &ldquo;edge&rdquo; here is meaningless.</div></div>
 
 <div class="wrap controls">
@@ -219,6 +220,7 @@
 
 <script>
 const DATA = __PROPS_JSON__;
+const TRACK = __TRACK_RECORD_JSON__;
 const P = DATA.props.map((p, i) => Object.assign(p, { id: i }));
 
 /* ---------- helpers ---------- */
@@ -251,6 +253,22 @@ function probsAt(p, line) {
 }
 
 /* ---------- header ---------- */
+function renderTrackRecord() {
+  const el = document.getElementById("track-record");
+  if (!TRACK || !TRACK.n_graded) return;
+  el.hidden = false;
+  const roiClass = TRACK.roi_per_dollar > 0 ? "pos" : TRACK.roi_per_dollar < 0 ? "neg" : "flat";
+  el.innerHTML = `<div class="row" style="padding:12px 16px; margin:14px 0 0;">
+    <div style="display:flex; gap:22px; flex-wrap:wrap; align-items:baseline;">
+      <div><span class="k" style="font-size:10.5px; text-transform:uppercase; letter-spacing:.07em; color:var(--text-faint); font-weight:600;">Track record</span>
+        <div style="font-size:12.5px; color:var(--text-faint); margin-top:2px;">${TRACK.n_graded.toLocaleString()} graded props since tracking began</div></div>
+      <div><div class="k" style="font-size:10.5px; color:var(--text-faint);">Pick win rate</div><div class="num" style="font-weight:700; font-size:16px;">${TRACK.pick_win_rate == null ? "—" : pct(TRACK.pick_win_rate, 1)}</div></div>
+      <div><div class="k" style="font-size:10.5px; color:var(--text-faint);">ROI / $1</div><div class="num ev ${roiClass}" style="display:inline-block; font-size:16px;">${TRACK.roi_per_dollar == null ? "—" : signed(TRACK.roi_per_dollar * 100, 1) + "%"}</div></div>
+    </div>
+    <div class="note" style="margin-top:8px;">Flat $1-per-pick at the price recorded when logged, not a simulated bankroll -- and still a small, noisy sample this early. This is the model being checked against what actually happened, not a claim that it works.</div>
+  </div>`;
+}
+
 function renderHeader() {
   const when = new Date(DATA.generated);
   $("meta").textContent = `Week ${DATA.week}, ${DATA.season} · ${DATA.n_games} games · lines pulled ${when.toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })}`;
@@ -439,5 +457,5 @@ $("rows").addEventListener("keydown", e => {
   if ((e.key === "Enter" || e.key === " ") && e.target.classList.contains("row-head")) { e.preventDefault(); e.target.click(); }
 });
 
-renderHeader(); buildControls(); renderList();
+renderHeader(); renderTrackRecord(); buildControls(); renderList();
 </script>

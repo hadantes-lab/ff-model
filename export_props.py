@@ -184,6 +184,7 @@ def build_prop(event, home, away, player_row, market, cons, fit, mult, inj, matc
     team = player_row["team"]
     opp = away if team == home else home
     return {
+        "player_id": player_row["player_id"],
         "player": player_row["player_display_name"], "team": team, "opp": opp,
         "home": team == home, "pos": player_row["position"],
         "game": f"{away} @ {home}", "commence": event["commence_time"],
@@ -323,13 +324,19 @@ def main():
     if unmatched:
         log("  unmatched: " + ", ".join(sorted(unmatched)[:12]) + (" ..." if len(unmatched) > 12 else ""))
 
-    OUT.parent.mkdir(exist_ok=True)
-    OUT.write_text(json.dumps({
+    snapshot = {
         "generated": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
         "season": int(season), "week": int(week), "sample": bool(args.sample),
         "credits": credits, "markets": markets, "n_games": len(events), "props": props,
-    }, separators=(",", ":")), encoding="utf-8")
+    }
+    OUT.parent.mkdir(exist_ok=True)
+    OUT.write_text(json.dumps(snapshot, separators=(",", ":")), encoding="utf-8")
     log(f"Wrote {OUT}")
+
+    if not args.sample:
+        import props_tracker
+        n = props_tracker.log_predictions(snapshot)
+        log(f"Tracker: logged/updated {n} props for later grading (tracking/props_log.csv)")
 
 
 if __name__ == "__main__":
