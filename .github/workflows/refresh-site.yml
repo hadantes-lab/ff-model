@@ -1,0 +1,65 @@
+name: Refresh site
+
+# Sunday, Monday and Thursday mornings (NFL game days). Cron runs in UTC:
+# 13:00 UTC = 8:00 AM CDT / 7:00 AM CST. GitHub can start scheduled runs a few
+# minutes late. Edit the hour below to move it.
+on:
+  schedule:
+    - cron: "0 13 * * 0,1,4"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    env:
+      ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      # Draft board: needs no key (nflverse stats + consensus rankings).
+      - name: Rebuild draft board
+        run: |
+          python export_snapshot.py > web/snapshot.json
+          python web/build_page.py
+
+      # Props page: needs the Odds API key. Without it this part is skipped and
+      # the site simply has no props page yet.
+      - name: Rebuild props page
+        run: |
+          if [ -z "$ODDS_API_KEY" ]; then
+            echo "::warning::ODDS_API_KEY secret is not set - skipping the props page. Add it with: gh secret set ODDS_API_KEY"
+          else
+            # only games starting in the next 24 hours: about one slate of API credits per run
+            python export_props.py --days 1
+            python web/build_props_page.py
+          fi
+
+      # Copies finished HTML pages only -- never the raw JSON snapshots.
+      - name: Assemble site
+        run: python web/build_site.py site
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - name: Publish
+        id: deploy
+        uses: actions/deploy-pages@v4

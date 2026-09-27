@@ -124,14 +124,15 @@ cached for 30 minutes so re-running is free. `--all-markets` adds attempts,
 completions, interceptions and rush+rec yards; `--max-events N` limits games.
 Whether player props are included on a free plan is up to the Odds API, not this code.
 
-**Scheduled refresh.** `.github/workflows/refresh-props.yml` rebuilds the props page and
-publishes it to GitHub Pages every Sunday, Monday and Thursday morning (8 AM Central) using
-only games starting in the next 24 hours. It needs the key stored as a repository secret:
+**Scheduled refresh.** `.github/workflows/refresh-site.yml` rebuilds the site every Sunday,
+Monday and Thursday morning (8 AM Central) and publishes it to GitHub Pages: the draft board
+at `/draft/` (always) and the props page at `/props/` (when the key below exists), using only
+games starting in the next 24 hours. Add the key as a repository secret:
 ```
 gh secret set ODDS_API_KEY
 ```
-(it prompts for the value; it is never written to the repo). Until the secret exists the
-workflow skips without failing. Run it any time from the repo's Actions tab.
+(it prompts for the value; it is never written to the repo). Until the secret exists the props
+part is skipped without failing. Run it any time from the repo's Actions tab.
 
 How the model works, and what it can't see: `props_model.py`. It does not know
 about injuries, role changes, weather, or game script, and it simulates players
