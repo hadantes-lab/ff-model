@@ -16,14 +16,17 @@ import argparse
 import datetime
 import json
 import pathlib
+import re
 import sys
 
 import numpy as np
 import nflreadpy as nfl
 
+import game_context as gc
 import odds_api
+from matchups import CoverageModel, load_coverage_targets
 from props_model import (
-    MARKETS, CORE_MARKETS, MIN_GAMES, build_history, distribution_summary, draw, fit_player,
+    MARKETS, CORE_MARKETS, MIN_GAMES, blend_toward_market, environment_effect, load_calibration, market_weight, build_history, distribution_summary, draw, fit_player,
     line_probs, normalize_name, opponent_multipliers, position_priors, rng_for,
 )
 
@@ -62,7 +65,7 @@ def injury_map(season):
 
 
 # ---- demo lines ---------------------------------------------------------
-def sample_event_odds(event, history, idx, rng, priors):
+def sample_event_odds(event, history, idx, rng, priors, markets):
     """
     Fabricated sportsbook lines, *derived from the model itself* with random
     noise, in the same shape the Odds API returns. For exercising the pipeline
@@ -91,6 +94,8 @@ def sample_event_odds(event, history, idx, rng, priors):
     books = {}
     for r, mkts in picks:
         for m in mkts:
+            if m not in markets:
+                continue
             fit = fit_player(history, r["player_id"], MARKETS[m], 1.0, priors.get(m))
             if not fit:
                 continue
@@ -146,7 +151,8 @@ def ev_per_dollar(win_prob, lose_prob, american):
     return win_prob * (odds_api.american_to_decimal(american) - 1) - lose_prob
 
 
-def build_prop(event, home, away, player_row, market, cons, fit, mult, inj):
+def build_prop(event, home, away, player_row, market, cons, fit, mult, inj, matchup=None):
+    env = fit.get("env")
     spec = MARKETS[market]
     line = cons["point"]
     rng = rng_for(player_row["player_id"], market)
@@ -156,6 +162,13 @@ def build_prop(event, home, away, player_row, market, cons, fit, mult, inj):
     market_over = cons["fair_over"]
     if market_over is None and cons["best_over"]:
         market_over = odds_api.american_to_prob(cons["best_over"]["price"])   # includes the vig
+
+    # The raw model disagrees with real markets far more than real edges exist, so everything
+    # downstream (edge, EV, the pick) uses the model shrunk toward the market. Raw stays visible.
+    raw = dict(p)
+    if market_over is not None:
+        adj_over = blend_toward_market(p["over"], market_over, fit["n_eff"])
+        p = {"over": adj_over, "push": p["push"], "under": max(0.0, 1.0 - p["push"] - adj_over)}
 
     ev_o = ev_per_dollar(p["over"], p["under"], cons["best_over"]["price"]) if cons["best_over"] else None
     ev_u = ev_per_dollar(p["under"], p["over"], cons["best_under"]["price"]) if cons["best_under"] else None
@@ -179,12 +192,21 @@ def build_prop(event, home, away, player_row, market, cons, fit, mult, inj):
         "opp_mult": round(mult, 3), "n_games": fit["n_games"], "thin": fit["n_games"] < THIN_GAMES,
         "injury": inj,
         "over": round(p["over"], 4), "push": round(p["push"], 4), "under": round(p["under"], 4),
+        "model_over": round(raw["over"], 4), "model_under": round(raw["under"], 4),
+        "gap": None if market_over is None else round((raw["over"] - market_over) * 100, 1),
+        "trust": round(market_weight(fit["n_eff"]), 3),
         "fair_over": cons["fair_over"], "market_over": None if market_over is None else round(market_over, 4),
         "edge": None if market_over is None else round((p["over"] - market_over) * 100, 1),
         "best_over": cons["best_over"], "best_under": cons["best_under"],
         "ev_over": None if ev_o is None else round(ev_o, 4),
         "ev_under": None if ev_u is None else round(ev_u, 4),
         "pick": pick, "pick_ev": None if pick_ev is None else round(pick_ev, 4),
+        "matchup": matchup,
+        "env": None if not env or "total" not in env else {
+            "mult": round(env["mult"], 4), "total": env["total"], "margin": env["margin"],
+            "avg_total": round(env["avg_total"], 1), "avg_margin": round(env["avg_margin"], 1),
+            "implied": round((env["total"] + env["margin"]) / 2, 1),
+            "implied_opp": round((env["total"] - env["margin"]) / 2, 1)},
         "books": cons["books"], "dfs": dfs, "log": fit["log"], "dist": distribution_summary(spec.kind, draws),
     }
 
@@ -197,6 +219,8 @@ def main():
     ap.add_argument("--all-markets", action="store_true", help="every offensive market")
     ap.add_argument("--books", help="comma-separated bookmaker keys, e.g. draftkings,fanduel,underdog "
                                     "(up to 10 cost the same as one region; overrides the default 'us' region)")
+    ap.add_argument("--no-matchups", action="store_true",
+                    help="skip the man/zone coverage matchup (saves ~1 min of play-by-play loading)")
     ap.add_argument("--max-events", type=int, help="only the first N games (saves credits)")
     ap.add_argument("--days", type=int, default=7, help="games starting within N days")
     args = ap.parse_args()
@@ -212,9 +236,16 @@ def main():
 
     log(f"Loading nflverse history (season {season}, week {week})...")
     history = build_history(nfl.load_player_stats([season - 1, season]).to_pandas())
+    history = gc.attach_context(history, gc.load_game_lines([season - 1, season]))   # totals/spreads of past games
+    calibration = load_calibration()
+    log("Calibration: " + ("loaded" if calibration else "NOT FOUND (run tune_props.py --write) -- using raw projections"))
     idx = build_roster_index(history)
     inj = injury_map(season)
     mults = {m: opponent_multipliers(history, MARKETS[m]) for m in markets}
+    coverage = None
+    if not args.no_matchups and "player_reception_yds" in markets:
+        log("Loading man/zone coverage tags (2024-25) for receiver matchups...")
+        coverage = CoverageModel(load_coverage_targets())
     priors = {m: position_priors(history, MARKETS[m]) for m in markets if MARKETS[m].kind != "yards"}
 
     credits = None
@@ -236,18 +267,30 @@ def main():
             f"{len(events) * len(markets) * regions} credits ({len(events)} games x {len(markets)} markets x "
             f"{regions} region(s); only markets that return data are charged, cached games cost 0). {credits}")
 
+    # this week's game totals and spreads: schedule lines for the demo, one bulk Odds API call otherwise
+    if args.sample:
+        gl = {r["game_id"]: {"total": r["total_line"], "home_spread": -r["spread_line"]}
+              for _, r in nfl.load_schedules([season]).to_pandas().iterrows()
+              if r["total_line"] == r["total_line"] and r["spread_line"] == r["spread_line"]}
+    else:
+        try:
+            gl = odds_api.consensus_game_lines(odds_api.fetch_game_lines(key)[0])
+        except odds_api.OddsApiError as e:
+            log(f"  no game lines ({e}); game environment adjustment skipped")
+            gl = {}
+
     props, unmatched, skipped = [], set(), 0
     for ev in events:
         home, away = odds_api.TEAM_ABBR[ev["home_team"]], odds_api.TEAM_ABBR[ev["away_team"]]
         if args.sample:
-            odds = sample_event_odds(ev, history, idx, rng_for("sample", ev["id"]), priors)
+            odds = sample_event_odds(ev, history, idx, rng_for("sample", ev["id"]), priors, markets)
         else:
             odds, cached = odds_api.fetch_event_props(key, ev["id"], markets, bookmakers=books)
             log(f"  {away} @ {home}: {'cached' if cached else 'fetched'}")
         cons = odds_api.consensus(odds_api.flatten(odds))
         for (name, market), c in cons.items():
-            if market not in MARKETS:
-                continue
+            if market not in MARKETS or re.search(r"(D/ST|Defense)$", name):
+                continue                # team-defense TD props are not player props
             row = find_player(idx, name, {home, away})
             if row is None:
                 unmatched.add(name)
@@ -258,11 +301,22 @@ def main():
                 continue
             opp = away if row["team"] == home else home
             mult = mults.get(market, {}).get((opp, row["position"]), 1.0)
-            fit = fit_player(history, row["player_id"], MARKETS[market], mult, priors.get(market))
+            eff = environment_effect(calibration, market)
+            g_line = gl.get(ev["id"], {})
+            env_fn = None
+            if eff and g_line.get("total") is not None and g_line.get("home_spread") is not None:
+                team_margin = -g_line["home_spread"] if row["team"] == home else g_line["home_spread"]
+                env_fn = lambda g, w, e=eff, t=g_line["total"], m=team_margin: gc.env_multiplier(g, w, t, m, e)
+            matchup = None
+            if coverage is not None and market == "player_reception_yds":
+                matchup = coverage.for_receiver(row["player_id"], opp)     # scheme fit, on top of defense strength
+            fit = fit_player(history, row["player_id"], MARKETS[market],
+                             mult * (matchup["mult"] if matchup else 1.0), priors.get(market),
+                             (calibration or {}).get("calibration", {}).get(market), env_fn)
             if fit is None:
                 skipped += 1
                 continue
-            props.append(build_prop(ev, home, away, row, market, c, fit, mult, status))
+            props.append(build_prop(ev, home, away, row, market, c, fit, mult, status, matchup))
 
     log(f"{len(props)} props simulated; {skipped} skipped (out/doubtful or under {MIN_GAMES} games); "
         f"{len(unmatched)} names not matched to a player.")

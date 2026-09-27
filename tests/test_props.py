@@ -10,9 +10,10 @@ import numpy as np
 import pandas as pd
 
 import odds_api
+import game_context as gc
 from props_model import (
-    MARKETS, distribution_summary, draw, fit_moments, fit_player, line_probs,
-    normalize_name, opponent_multipliers, recency_weights, rng_for,
+    LAMBDA_MAX, environment_effect, load_calibration, MARKETS, blend_toward_market, distribution_summary, draw, fit_moments, fit_player,
+    line_probs, market_weight, normalize_name, opponent_multipliers, position_priors, recency_weights, rng_for,
 )
 
 
@@ -46,6 +47,23 @@ class TestDistributions(unittest.TestCase):
         b = rng_for("p2", "player_rush_yds").random()
         self.assertEqual(a1, a2)
         self.assertNotEqual(a1, b)
+
+
+class TestMarketBlend(unittest.TestCase):
+    def test_zero_history_gets_zero_weight_and_full_history_is_capped(self):
+        self.assertEqual(market_weight(0), 0.0)
+        self.assertEqual(market_weight(50), LAMBDA_MAX)
+        self.assertLess(market_weight(3), market_weight(6))
+
+    def test_blend_moves_toward_the_market_but_keeps_direction(self):
+        adj = blend_toward_market(0.70, 0.50, 20)
+        self.assertGreater(adj, 0.50)                          # still leans the model's way...
+        self.assertLess(adj, 0.55)                             # ...but only a little of the 20-pt gap survives
+        self.assertLess(blend_toward_market(0.30, 0.50, 20), 0.50)
+
+    def test_agreement_is_unchanged_and_thin_samples_defer_to_the_market(self):
+        self.assertAlmostEqual(blend_toward_market(0.5, 0.5, 20), 0.5)
+        self.assertLess(abs(blend_toward_market(0.8, 0.5, 2) - 0.5), abs(blend_toward_market(0.8, 0.5, 20) - 0.5))
 
 
 class TestLineProbs(unittest.TestCase):
@@ -93,12 +111,28 @@ class TestFitting(unittest.TestCase):
 
     def test_td_with_zero_history_is_not_zero_probability(self):
         rows = []
-        for w in range(1, 9):                    # scoreless WR
+        for w in range(1, 9):                    # scoreless WR seeing 6 targets a game
             rows.append(dict(player_id="a", season=2026, week=w, opponent_team="X", position="WR",
-                             rushing_tds=0.0, receiving_tds=0.0))
+                             rushing_tds=0.0, receiving_tds=0.0, targets=6.0, carries=0.0))
         h = pd.DataFrame(rows)
-        fit = fit_player(h, "a", MARKETS["player_anytime_td"], 1.0, {"WR": 0.3})
-        self.assertGreater(fit["mean"], 0.05)    # regressed toward the 0.3/game position rate
+        fit = fit_player(h, "a", MARKETS["player_anytime_td"], 1.0, {"WR": 0.05})   # 0.05 TD per touch
+        self.assertGreater(fit["mean"], 0.05)    # regressed toward 6 touches x 0.05 = 0.3/game
+
+    def test_td_prior_follows_usage_not_the_position_average(self):
+        def player(pid, touches):
+            return [dict(player_id=pid, season=2026, week=w, opponent_team="X", position="WR",
+                         rushing_tds=0.0, receiving_tds=0.0, targets=touches, carries=0.0) for w in range(1, 9)]
+        h = pd.DataFrame(player("star", 10.0) + player("scrub", 1.0))
+        rate = {"WR": 0.05}
+        star = fit_player(h, "star", MARKETS["player_anytime_td"], 1.0, rate)["mean"]
+        scrub = fit_player(h, "scrub", MARKETS["player_anytime_td"], 1.0, rate)["mean"]
+        self.assertGreater(star, 4 * scrub)      # a low-usage player is not lifted to a starter's rate
+
+    def test_position_prior_for_tds_is_per_touch(self):
+        rows = [dict(player_id="a", season=2026, week=w, opponent_team="X", position="WR", rushing_tds=0.0,
+                     receiving_tds=1.0 if w % 2 else 0.0, targets=10.0, carries=0.0, attempts=0.0) for w in range(1, 11)]
+        rate = position_priors(pd.DataFrame(rows), MARKETS["player_anytime_td"])
+        self.assertAlmostEqual(rate["WR"], 5 / 100)          # 5 TDs on 100 touches
 
     def test_low_volume_count_is_not_zero_probability(self):
         rows = [dict(player_id="a", season=2026, week=w, opponent_team="X", position="RB", receptions=0.0)
@@ -222,6 +256,81 @@ class TestPickemBooks(unittest.TestCase):
         ev["bookmakers"][2]["markets"][0]["outcomes"] = [{"name": "Higher", "description": "Test Back", "price": -110}]
         c = odds_api.consensus(odds_api.flatten(ev))[("Test Back", "player_rush_yds")]
         self.assertEqual([d["book"] for d in c["dfs"]], ["PrizePicks"])
+
+
+class TestCalibrationAndEnvironment(unittest.TestCase):
+    def _games(self, n=10, yards=60.0, total=44.0, margin=0.0):
+        return pd.DataFrame([dict(player_id="a", season=2026, week=w, opponent_team="X", position="WR",
+                                  receiving_yards=yards, total=total, margin=margin) for w in range(1, n + 1)])
+
+    def test_calibration_pulls_a_hot_projection_back_and_keeps_the_spread_proportional(self):
+        h = self._games()
+        raw = fit_player(h, "a", MARKETS["player_reception_yds"])
+        cal = fit_player(h, "a", MARKETS["player_reception_yds"], calib={"a": 2.0, "b": 0.85})
+        self.assertAlmostEqual(cal["mean"], 2.0 + 0.85 * raw["mean"])
+        self.assertAlmostEqual(np.sqrt(cal["var"]) / cal["mean"], np.sqrt(raw["var"]) / raw["mean"], places=6)
+
+    def test_environment_bumps_a_shootout_and_docks_a_slog(self):
+        h = self._games(total=44.0)
+        eff = {"a": 0.5, "b": 0.0}
+        base = fit_player(h, "a", MARKETS["player_reception_yds"])["mean"]
+        hi = fit_player(h, "a", MARKETS["player_reception_yds"], env_fn=lambda g, w: gc.env_multiplier(g, w, 51.0, 0.0, eff))
+        lo = fit_player(h, "a", MARKETS["player_reception_yds"], env_fn=lambda g, w: gc.env_multiplier(g, w, 38.0, 0.0, eff))
+        self.assertGreater(hi["mean"], base * 1.03)          # a 51 total vs his usual 44
+        self.assertLess(lo["mean"], base * 0.97)
+        self.assertGreater(hi["env"]["mult"], 1.0)
+
+    def test_environment_is_neutral_when_the_game_looks_like_his_usual_games(self):
+        h = self._games(total=44.0, margin=3.0)
+        m = gc.env_multiplier(h, np.ones(len(h)), 44.0, 3.0, {"a": 0.5, "b": 0.02})
+        self.assertAlmostEqual(m["mult"], 1.0, places=6)
+
+    def test_environment_is_capped_and_missing_lines_mean_no_adjustment(self):
+        h = self._games(total=44.0)
+        self.assertLessEqual(gc.env_multiplier(h, np.ones(len(h)), 200.0, 0.0, {"a": 5.0, "b": 0.0})["mult"], gc.MULT_CLIP[1])
+        self.assertEqual(gc.env_multiplier(h, np.ones(len(h)), None, None, {"a": 0.5, "b": 0.0})["mult"], 1.0)
+        self.assertEqual(gc.env_multiplier(h, np.ones(len(h)), 50.0, 0.0, None)["mult"], 1.0)
+
+    def test_td_props_ignore_calibration_and_environment(self):
+        rows = [dict(player_id="a", season=2026, week=w, opponent_team="X", position="WR", rushing_tds=0.0,
+                     receiving_tds=1.0 if w % 3 == 0 else 0.0, targets=6.0, carries=0.0, total=44.0, margin=0.0)
+                for w in range(1, 10)]
+        h = pd.DataFrame(rows)
+        base = fit_player(h, "a", MARKETS["player_anytime_td"])["mean"]
+        same = fit_player(h, "a", MARKETS["player_anytime_td"], calib={"a": 9, "b": 0}, env_fn=lambda g, w: {"mult": 2.0})
+        self.assertAlmostEqual(base, same["mean"])
+
+    def test_environment_effect_is_dampened_by_out_of_sample_strength(self):
+        cal = {"environment": {"m": {"a": 0.8, "b": 0.02, "damp": 0.5}}}
+        self.assertEqual(environment_effect(cal, "m"), {"a": 0.4, "b": 0.01})
+        self.assertIsNone(environment_effect(cal, "other"))
+        self.assertIsNone(environment_effect(None, "m"))
+
+    def test_missing_calibration_file_is_not_fatal(self):
+        self.assertIsNone(load_calibration("does-not-exist.json"))
+
+
+class TestGameLines(unittest.TestCase):
+    def test_consensus_uses_medians_and_the_home_teams_spread(self):
+        games = [{"id": "g1", "home_team": "Detroit Lions", "away_team": "New York Jets", "bookmakers": [
+            {"markets": [{"key": "totals", "outcomes": [{"name": "Over", "point": 48.5}, {"name": "Under", "point": 48.5}]},
+                         {"key": "spreads", "outcomes": [{"name": "Detroit Lions", "point": -7.5}, {"name": "New York Jets", "point": 7.5}]}]},
+            {"markets": [{"key": "totals", "outcomes": [{"name": "Over", "point": 49.5}]},
+                         {"key": "spreads", "outcomes": [{"name": "Detroit Lions", "point": -6.5}]}]},
+            {"markets": [{"key": "totals", "outcomes": [{"name": "Over", "point": 49.0}]},
+                         {"key": "spreads", "outcomes": [{"name": "Detroit Lions", "point": -7.0}]}]},
+        ]}]
+        out = odds_api.consensus_game_lines(games)["g1"]
+        self.assertEqual(out["total"], 49.0)
+        self.assertEqual(out["home_spread"], -7.0)
+
+    def test_game_without_lines_yields_none_not_a_crash(self):
+        out = odds_api.consensus_game_lines([{"id": "g", "home_team": "A", "away_team": "B", "bookmakers": []}])
+        self.assertEqual(out["g"], {"total": None, "home_spread": None})
+
+    def test_implied_team_totals(self):
+        team, opp = gc.implied_team_totals(50.0, 3.0)         # favored by 3 in a 50 total
+        self.assertEqual((team, opp), (26.5, 23.5))
 
 
 if __name__ == "__main__":

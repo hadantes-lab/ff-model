@@ -134,6 +134,22 @@ gh secret set ODDS_API_KEY
 (it prompts for the value; it is never written to the repo). Until the secret exists the props
 part is skipped without failing. Run it any time from the repo's Actions tab.
 
+**Testing and refining the model.** Nothing in the projection engine is taken on faith; it is
+checked against history:
+```
+python backtest_props.py            # walk-forward: project every 2024-25 game from earlier games only,
+                                    # compare to what happened (accuracy, bias, interval calibration)
+python tune_props.py --write        # re-fit the bias calibration and game-environment effects
+                                    # -> model_calibration.json (read by export_props.py)
+```
+What that found so far: projections for high-usage players run ~5% hot (fixed by calibration, which
+improved every market); a defense-strength adjustment helps slightly; the game total/spread genuinely
+moves volume and yardage out of sample (higher totals lift receiving and passing-TD projections,
+favorites pass less); and man/zone coverage matchups are a very weak signal (`matchups.py`).
+Two limits: there are no historical *prop lines* to score edges against, only outcomes, so the
+model's agreement with the market can't be validated yet; and anytime TD is opt-in
+(`--markets player_anytime_td`) because long shots are mostly noise.
+
 How the model works, and what it can't see: `props_model.py`. It does not know
 about injuries, role changes, weather, or game script, and it simulates players
 independently. Treat large model-vs-market gaps as "the model is missing

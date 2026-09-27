@@ -148,6 +148,44 @@ def fetch_event_props(key, event_id, markets, regions="us", bookmakers=None):
     return _cached(tag, fetch)
 
 
+def fetch_game_lines(key, regions="us"):
+    """
+    Spreads and totals for every upcoming game in ONE call. Costs (2 markets x regions) credits
+    per run, regardless of how many games are on the slate. -> (odds json, from_cache)
+    """
+    def fetch():
+        data, headers = _get(f"/sports/{SPORT}/odds",
+                             {"regions": regions, "markets": "totals,spreads", "oddsFormat": "american"}, key)
+        print(f"  game lines: {credits_line(headers)}", file=sys.stderr)
+        return data
+
+    return _cached(f"gamelines_{regions}", fetch)
+
+
+def _median(xs):
+    xs = sorted(xs)
+    n = len(xs)
+    return None if not n else (xs[n // 2] if n % 2 else (xs[n // 2 - 1] + xs[n // 2]) / 2)
+
+
+def consensus_game_lines(games):
+    """{event_id: {"total", "home_spread"}}: medians across books. home_spread < 0 means the home team is favored."""
+    out = {}
+    for g in games:
+        totals, spreads = [], []
+        for bk in g.get("bookmakers", []):
+            for mk in bk.get("markets", []):
+                for o in mk.get("outcomes", []):
+                    if o.get("point") is None:
+                        continue
+                    if mk["key"] == "totals" and o["name"] == "Over":
+                        totals.append(float(o["point"]))
+                    elif mk["key"] == "spreads" and o["name"] == g["home_team"]:
+                        spreads.append(float(o["point"]))
+        out[g["id"]] = {"total": _median(totals), "home_spread": _median(spreads)}
+    return out
+
+
 # ---- parsing ------------------------------------------------------------
 def american_to_decimal(odds):
     return 1 + (odds / 100 if odds > 0 else 100 / -odds)

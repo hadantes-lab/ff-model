@@ -1,0 +1,102 @@
+{
+ "calibration": {
+  "player_pass_yds": {
+   "a": 16.606286871313547,
+   "b": 0.8972231875048533
+  },
+  "player_pass_tds": {
+   "a": 0.49826527028900125,
+   "b": 0.6384946336310559
+  },
+  "player_pass_attempts": {
+   "a": 2.9450041542389234,
+   "b": 0.8692572807225235
+  },
+  "player_pass_completions": {
+   "a": 1.1032862909228385,
+   "b": 0.9094612229752386
+  },
+  "player_pass_interceptions": {
+   "a": 0.5600352989644182,
+   "b": 0.10992337769666981
+  },
+  "player_rush_yds": {
+   "a": 1.5850566072999406,
+   "b": 0.9204300069403292
+  },
+  "player_rush_attempts": {
+   "a": 0.15405258505007385,
+   "b": 0.9587636898941476
+  },
+  "player_receptions": {
+   "a": 0.22427852476812535,
+   "b": 0.8934377161009203
+  },
+  "player_reception_yds": {
+   "a": 2.620473050345054,
+   "b": 0.8918309743210165
+  },
+  "player_rush_reception_yds": {
+   "a": 2.694906565976859,
+   "b": 0.9086143431837647
+  }
+ },
+ "environment": {
+  "player_pass_yds": {
+   "a": -0.11280745144812789,
+   "b": -0.0075752190091263865,
+   "damp": 0.628896923499469
+  },
+  "player_pass_tds": {
+   "a": 0.8039184103925823,
+   "b": 0.008175971851865953,
+   "damp": 0.7792804564691479
+  },
+  "player_pass_attempts": {
+   "a": -0.4432325159548388,
+   "b": -0.013044329215644964,
+   "damp": 0.9115312018445526
+  },
+  "player_pass_completions": {
+   "a": -0.14053361974452072,
+   "b": -0.008273061375831102,
+   "damp": 0.9550289354577487
+  },
+  "player_pass_interceptions": {
+   "a": -0.6287792493772932,
+   "b": -0.030213543290797555,
+   "damp": 1.0
+  },
+  "player_rush_yds": {
+   "a": 0.12154286773214805,
+   "b": 0.008558935751109345,
+   "damp": 0.6483247541815492
+  },
+  "player_rush_attempts": {
+   "a": -0.19122864112902582,
+   "b": 0.003312951670969182,
+   "damp": 0.46088399835406463
+  },
+  "player_receptions": {
+   "a": 0.4642114165519893,
+   "b": -0.0005460693324793159,
+   "damp": 1.0
+  },
+  "player_reception_yds": {
+   "a": 0.5085586258412809,
+   "b": 0.002871108509629448,
+   "damp": 0.7131451421306877
+  },
+  "player_rush_reception_yds": {
+   "a": 0.37658822176956125,
+   "b": 0.004773605563139989,
+   "damp": 0.8711505793925424
+  }
+ },
+ "seasons": [
+  2023,
+  2024,
+  2025
+ ],
+ "note": "Fitted by tune_props.py on walk-forward backtests (calibration: actual ~ a + b*projection; environment: relative error ~ a*ln(total/usual) + b*(margin - usual), times damp). Regenerate with: python tune_props.py --write"
+}

@@ -261,8 +261,9 @@ function renderHeader() {
   ].map(([k, v, c]) => `<div class="stat ${c}"><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
   $("foot").innerHTML = `
     <p><strong>How it works.</strong> Each prop is simulated 20,000 times from the player's last 17 games (recent games weigh more), scaled for how the opposing defense treats that position. Counts (receptions, TDs) use Poisson / negative-binomial draws; yardage uses a skewed gamma. Anytime TD rates are pulled toward the position average so a scoreless streak doesn't read as impossible.</p>
-    <p><strong>Edge</strong> is model P(over) minus the market's no-vig P(over), averaged across books. <strong>EV / $1</strong> uses the best price on the recommended side. Anytime TD has no &ldquo;under&rdquo; to remove the vig with, so its market number includes the vig.</p>
-    <p><strong>Read big edges skeptically.</strong> The market knows about injuries, role changes, weather and game script; this model does not, and simulates every player independently. A 15-point edge is usually the model missing something, not a mispriced line. Thin samples (fewer than 6 games) are tagged.</p>
+    <p><strong>Validated against history.</strong> The projection engine was tested walk-forward on 2024&ndash;25 (each game projected using only earlier games). That found projections for high-usage players run about 5% hot, so they are calibrated back (this cut error on every market); it confirmed a defense-strength adjustment helps a little; and it showed the game total and spread genuinely move volume and yardage out of sample (higher totals lift receiving and passing-TD projections; favorites pass less). Man/zone coverage matchups turned out to be a very weak signal, so they move projections by well under 1%.</p>
+    <p><strong>Adjusted vs raw.</strong> Against real lines the raw simulation differed from the market by about 12 points on a typical prop, when a genuine edge is a few points at most, so most of that gap is the model missing things the market knows (roles, injuries, weather, game script). Edge and EV therefore use the model <em>shrunk toward the market</em>: the market's price plus a small share (at most 15%, less for players with thin history) of the model's disagreement. That 15% is a judgment call, not a fitted number; calibrating it properly needs closing lines and game results. The raw model probability is shown next to it. Rows tagged &ldquo;model far from market&rdquo; are where the raw model disagrees most, and are the ones most likely to be model error.</p>
+    <p><strong>Edge</strong> is adjusted P(over) minus the market's no-vig P(over), averaged across books. <strong>EV / $1</strong> uses the best price on the recommended side. Anytime TD has no &ldquo;under&rdquo; to remove the vig with, so its market number includes the vig, which makes its edges conservative. Thin samples (fewer than 6 games) are tagged.</p>
     <p>${DATA.credits ? esc(DATA.credits) + " · " : ""}Distributions are simulated from nflverse play data; lines from The Odds API.</p>`;
 }
 
@@ -289,15 +290,15 @@ function rowHTML(p) {
   const e = p.edge, ec = e == null ? "flat" : e > 1 ? "pos" : e < -1 ? "neg" : "flat";
   const pick = p.pick ? p[p.pick === "over" ? "best_over" : "best_under"] : null;
   const evc = p.pick_ev == null ? "flat" : p.pick_ev > 0.005 ? "pos" : p.pick_ev < -0.005 ? "neg" : "flat";
-  const big = e != null && Math.abs(e) >= 12;
+  const big = p.gap != null && Math.abs(p.gap) >= 12;
   return `<div class="row ${S.open === p.id ? "open" : ""}" data-id="${p.id}">
     <div class="row-head" role="button" tabindex="0" aria-expanded="${S.open === p.id}">
       <div class="who"><div class="name">${esc(p.player)}</div>
         <div class="sub"><span>${p.team} ${p.home ? "vs" : "@"} ${p.opp}</span><span class="tag">${p.pos}</span>
-          ${p.injury ? `<span class="tag warn">${esc(p.injury)}</span>` : ""}${p.thin ? `<span class="tag warn">${p.n_games} games</span>` : ""}${p.dfs && p.dfs.some(d => d.gap !== 0) ? `<span class="tag">pick'em line differs</span>` : ""}${big ? `<span class="tag warn">big gap</span>` : ""}</div></div>
+          ${p.injury ? `<span class="tag warn">${esc(p.injury)}</span>` : ""}${p.thin ? `<span class="tag warn">${p.n_games} games</span>` : ""}${p.env && Math.abs(p.env.mult - 1) >= 0.04 ? `<span class="tag" title="Game total ${p.env.total}, ${p.team} implied ${p.env.implied}: moves the projection ${signed((p.env.mult - 1) * 100, 1)}%">${p.env.total} total ${signed((p.env.mult - 1) * 100, 0)}%</span>` : ""}${p.dfs && p.dfs.some(d => d.gap !== 0) ? `<span class="tag">pick'em line differs</span>` : ""}${big ? `<span class="tag warn" title="The raw model is ${Math.abs(p.gap).toFixed(0)} points from the market, far more than a real edge usually is">model far from market</span>` : ""}</div></div>
       <div class="mk"><div class="lbl">${esc(p.label)}</div><div class="line">${fmtLine(p)}</div></div>
-      <div class="model"><div class="mean">${p.kind === "td" ? pct(p.over) : "μ " + p.mean}</div>
-        <div class="pair">${p.kind === "td" ? "model P(TD)" : `P(over) ${pct(p.over)}`}${p.market_over != null ? ` · mkt ${pct(p.market_over)}${p.fair_over == null ? "*" : ""}` : ""}</div></div>
+      <div class="model"><div class="mean">${p.kind === "td" ? pct(p.over, 1) : "μ " + p.mean}</div>
+        <div class="pair">${p.kind === "td" ? "P(TD) adj" : "P(over) adj " + pct(p.over)} · raw ${pct(p.model_over)}${p.market_over != null ? ` · mkt ${pct(p.market_over)}${p.fair_over == null ? "*" : ""}` : ""}</div></div>
       <div class="edge ${ec}">${e == null ? "—" : signed(e) + " pt"}</div>
       <div class="pick">${pick ? `<div class="side ${p.pick}">${sideName(p, p.pick)} <span class="num">${price(pick.price)}</span></div><div class="book">${esc(pick.book)}</div>` : "—"}</div>
       <div class="ev ${evc} num">${p.pick_ev == null ? "—" : signed(p.pick_ev * 100, 1) + "%"}</div>
@@ -359,8 +360,14 @@ function renderDetail(p) {
       <div class="facts">
         <div class="fact"><div class="k">Model mean</div><div class="v">${p.mean}</div></div>
         <div class="fact"><div class="k">Std dev</div><div class="v">${p.sd}</div></div>
-        <div class="fact"><div class="k">Opp. adj</div><div class="v">×${p.opp_mult.toFixed(2)}</div></div>
+        <div class="fact"><div class="k">Defense adj</div><div class="v">×${p.opp_mult.toFixed(2)}</div></div>
+        <div class="fact"><div class="k">Game env adj</div><div class="v">${p.env ? "×" + p.env.mult.toFixed(3) : "—"}</div></div>
+        <div class="fact"><div class="k">Coverage adj</div><div class="v">${p.matchup ? "×" + p.matchup.mult.toFixed(3) : "—"}</div></div>
       </div>
+      ${p.env ? `<div class="note"><strong>Game environment.</strong> Total ${p.env.total}, ${esc(p.team)} ${p.env.margin >= 0 ? "favored by " + p.env.margin : "underdogs by " + Math.abs(p.env.margin)} &rarr; implied ${esc(p.team)} ${p.env.implied}, ${esc(p.opp)} ${p.env.implied_opp}. This player's recent games averaged a ${p.env.avg_total} total and ${signed(p.env.avg_margin, 1)} margin, so this setup moves the projection &times;${p.env.mult.toFixed(3)}. The size of the effect per market was measured on 2023&ndash;25 games and shrunk by how well it held up out of sample.</div>` : ""}
+      ${p.matchup ? `<div class="note"><strong>Coverage matchup.</strong> ${esc(p.opp)} played zone on about ${(p.matchup.opp_zone * 100).toFixed(0)}% of pass plays (league ${(p.matchup.league_zone * 100).toFixed(0)}%; 2024&ndash;25 tendencies, pulled toward the league because schemes only partly carry over).
+        ${p.matchup.split ? `${esc(p.player)} averaged ${p.matchup.split.zone_ypt} yards/target against zone (${p.matchup.split.zone_n} targets) and ${p.matchup.split.man_ypt} against man (${p.matchup.split.man_n}); only ${(p.matchup.reliability * 100).toFixed(0)}% of that split is trusted, because a receiver's zone-vs-man gap barely repeats year to year. Net effect &times;${p.matchup.mult.toFixed(3)}.` : "No reliable zone/man split for this receiver, so no adjustment."}
+        Coverage tags are not published for 2026 yet.</div>` : ""}
       <h3 style="margin-top:18px">Last ${log.length} games${p.kind === "td" ? " (rush + rec TDs)" : ""}</h3>
       <div class="log" id="log-${p.id}"></div>
       <div class="note" id="hit-${p.id}"></div>
@@ -373,9 +380,9 @@ function renderDetail(p) {
         <div><label for="wu-${p.id}">Under price</label><input class="field" id="wu-${p.id}" type="number" step="5" value="${bu ? bu.price : -110}" ${p.kind === "td" ? "disabled" : ""}></div>
       </div>
       <div class="results" id="res-${p.id}"></div>
-      <div class="note">Change the line or price to match your book. The chart and probabilities re-read the simulated distribution; the market comparison only applies at the posted line.</div>
+      <div class="note">Change the line or price to match your book. These numbers come straight from the <strong>raw</strong> simulation (not market-adjusted), so treat them as the model's own opinion. At the posted line the adjusted probability is <strong>${pct(p.over, 1)}</strong> (raw ${pct(p.model_over, 1)}), because only ${pct(p.trust)} of the model's disagreement with the market is trusted for a player with ${p.n_games} games of history.</div>
       ${p.dfs && p.dfs.length ? `<h3 style="margin-top:18px">Pick'em lines</h3>
-      <table class="books"><thead><tr><th>Book</th><th>Line</th><th>Model P(over)</th><th>Model P(under)</th></tr></thead>
+      <table class="books"><thead><tr><th>Book</th><th>Line</th><th>Raw model P(over)</th><th>Raw model P(under)</th></tr></thead>
         <tbody>${p.dfs.map(d => `<tr><td>${esc(d.book)}</td><td>${d.line}${d.gap !== 0 ? ` <span class="pair">(${signed(d.gap, 1)} vs books)</span>` : ""}</td><td>${pct(d.over, 1)}</td><td>${pct(d.under, 1)}</td></tr>`).join("")}</tbody></table>
       <div class="note">Pick'em sites take one side at fixed payouts, so compare these probabilities to that site's breakeven, not to a sportsbook price. A line that sits away from the sportsbooks' is where the model and the market disagree most cleanly.</div>` : ""}
       <h3 style="margin-top:18px">Books at ${fmtLine(p)}</h3>
