@@ -51,6 +51,17 @@ TEAM_ABBR = {
 }
 
 
+# Pick'em / DFS operators (DraftKings Pick6, PrizePicks, Underdog, Dabble...) post one line with
+# fixed-payout entries, not two-way prices. They are kept OUT of the sportsbook consensus (their
+# "prices" aren't odds) and reported separately as extra lines to compare against.
+DFS_MARKERS = ("underdog", "prizepicks", "pick6", "dabble")
+
+
+def is_dfs(book_key, book_title=""):
+    name = f"{book_key} {book_title}".lower()
+    return any(m in name for m in DFS_MARKERS)
+
+
 class OddsApiError(RuntimeError):
     pass
 
@@ -118,14 +129,19 @@ def fetch_events(key, days_ahead=7):
     return keep, headers
 
 
-def fetch_event_props(key, event_id, markets, regions="us"):
-    """-> (event odds json, from_cache). Costs len(markets) x len(regions) credits if not cached."""
-    tag = f"{event_id}_{regions}_{'-'.join(sorted(m.replace('player_', '') for m in markets))}"
+def fetch_event_props(key, event_id, markets, regions="us", bookmakers=None):
+    """
+    -> (event odds json, from_cache).
+    Cost = markets that actually return data x regions, and every group of up to 10
+    `bookmakers` counts as one region (bookmakers, when given, overrides regions).
+    """
+    where = "bk-" + "-".join(sorted(bookmakers)) if bookmakers else regions
+    tag = f"{event_id}_{where}_{'-'.join(sorted(m.replace('player_', '') for m in markets))}"
 
     def fetch():
-        data, headers = _get(
-            f"/sports/{SPORT}/events/{event_id}/odds",
-            {"regions": regions, "markets": ",".join(markets), "oddsFormat": "american"}, key)
+        params = {"markets": ",".join(markets), "oddsFormat": "american"}
+        params.update({"bookmakers": ",".join(bookmakers)} if bookmakers else {"regions": regions})
+        data, headers = _get(f"/sports/{SPORT}/events/{event_id}/odds", params, key)
         print(f"  {credits_line(headers)}", file=sys.stderr)
         return data
 
@@ -146,7 +162,8 @@ def flatten(event_odds):
                 if not o.get("description"):
                     continue
                 rows.append({
-                    "book": bk["title"], "market": mk["key"], "player": o["description"],
+                    "book": bk["title"], "book_key": bk.get("key", bk["title"]).lower(),
+                    "market": mk["key"], "player": o["description"],
                     "side": o["name"].lower(), "point": o.get("point"), "price": o["price"],
                 })
     return rows
@@ -158,9 +175,10 @@ def consensus(rows):
     line -- the line offered by the most books (ties: the one closest to a
     coin flip). Returns {(player, market): {...}}.
     """
-    by_pm = {}
+    by_pm, dfs_by_pm = {}, {}
     for r in rows:
-        by_pm.setdefault((r["player"], r["market"]), []).append(r)
+        dest = dfs_by_pm if is_dfs(r["book_key"], r["book"]) else by_pm
+        dest.setdefault((r["player"], r["market"]), []).append(r)
 
     out = {}
     for (player, market), rs in by_pm.items():
@@ -200,5 +218,15 @@ def consensus(rows):
             "best_under": {"price": best_under[1], "book": best_under[2]} if best_under else None,
             "books": [{"book": n, "over": b.get(over_key), "under": b.get("under")}
                       for n, b in sorted(books.items())],
+            "dfs": _dfs_lines(dfs_by_pm.get((player, market), [])),
         }
     return out
+
+
+def _dfs_lines(rows):
+    """[{book, line}] -- one posted line per pick'em book (the prices are ignored on purpose)."""
+    lines = {}
+    for r in rows:
+        if r["point"] is not None:
+            lines.setdefault(r["book"], float(r["point"]))
+    return [{"book": b, "line": pt} for b, pt in sorted(lines.items())]

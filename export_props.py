@@ -123,8 +123,20 @@ def sample_event_odds(event, history, idx, rng, priors):
                                "price": -110 + j, "point": line})
                     mk.append({"name": "Under", "description": r["player_display_name"],
                                "price": -110 - j, "point": line})
+    # a made-up pick'em book: one line per prop, sometimes a step away from the sportsbook line
+    pickem = {}
+    for m, outs in books["DemoBook A"].items():
+        for o in outs:
+            if o["name"] == "Over" and rng.random() < 0.6:
+                step = 1.0 if MARKETS[m].kind == "count" else 2.0 if MARKETS[m].kind == "yards" else 0.0
+                pt = o["point"] + float(rng.choice([-1, 0, 1])) * step
+                pickem.setdefault(m, []).append(
+                    {"name": "Over", "description": o["description"], "price": -110, "point": max(0.5, pt)})
+    if pickem:
+        books["DemoUnderdog"] = pickem
     return {"bookmakers": [
-        {"title": b, "markets": [{"key": k, "outcomes": o} for k, o in ms.items()]}
+        {"title": b, "key": b.lower().replace(" ", "_"),
+         "markets": [{"key": k, "outcomes": o} for k, o in ms.items()]}
         for b, ms in books.items()]}
 
 
@@ -150,6 +162,12 @@ def build_prop(event, home, away, player_row, market, cons, fit, mult, inj):
     sides = [(ev, s) for ev, s in ((ev_o, "over"), (ev_u, "under")) if ev is not None]
     pick_ev, pick = max(sides) if sides else (None, None)
 
+    dfs = []
+    for d in cons.get("dfs", []):
+        dp = line_probs(draws, d["line"])
+        dfs.append({"book": d["book"], "line": d["line"], "gap": round(d["line"] - line, 2),
+                    "over": round(dp["over"], 4), "under": round(dp["under"], 4), "push": round(dp["push"], 4)})
+
     team = player_row["team"]
     opp = away if team == home else home
     return {
@@ -167,7 +185,7 @@ def build_prop(event, home, away, player_row, market, cons, fit, mult, inj):
         "ev_over": None if ev_o is None else round(ev_o, 4),
         "ev_under": None if ev_u is None else round(ev_u, 4),
         "pick": pick, "pick_ev": None if pick_ev is None else round(pick_ev, 4),
-        "books": cons["books"], "log": fit["log"], "dist": distribution_summary(spec.kind, draws),
+        "books": cons["books"], "dfs": dfs, "log": fit["log"], "dist": distribution_summary(spec.kind, draws),
     }
 
 
@@ -177,6 +195,8 @@ def main():
     ap.add_argument("--sample", action="store_true", help="demo lines derived from the model (no API)")
     ap.add_argument("--markets", help="comma-separated Odds API market keys")
     ap.add_argument("--all-markets", action="store_true", help="every offensive market")
+    ap.add_argument("--books", help="comma-separated bookmaker keys, e.g. draftkings,fanduel,underdog "
+                                    "(up to 10 cost the same as one region; overrides the default 'us' region)")
     ap.add_argument("--max-events", type=int, help="only the first N games (saves credits)")
     ap.add_argument("--days", type=int, default=7, help="games starting within N days")
     args = ap.parse_args()
@@ -185,6 +205,7 @@ def main():
     week = nfl.get_current_week()
     markets = (args.markets.split(",") if args.markets
                else list(MARKETS) if args.all_markets else CORE_MARKETS)
+    books = [b.strip() for b in args.books.split(",")] if args.books else None
     bad = [m for m in markets if m not in MARKETS]
     if bad:
         sys.exit(f"Unknown market(s): {bad}. Choose from: {list(MARKETS)}")
@@ -210,9 +231,10 @@ def main():
         credits = odds_api.credits_line(headers)
         if args.max_events:
             events = events[: args.max_events]
+        regions = -(-len(books) // 10) if books else 1
         log(f"{len(events)} games in the next {args.days} days. Worst-case cost this run: "
-            f"{len(events) * len(markets)} credits ({len(events)} games x {len(markets)} markets; "
-            f"cached games cost 0). {credits}")
+            f"{len(events) * len(markets) * regions} credits ({len(events)} games x {len(markets)} markets x "
+            f"{regions} region(s); only markets that return data are charged, cached games cost 0). {credits}")
 
     props, unmatched, skipped = [], set(), 0
     for ev in events:
@@ -220,7 +242,7 @@ def main():
         if args.sample:
             odds = sample_event_odds(ev, history, idx, rng_for("sample", ev["id"]), priors)
         else:
-            odds, cached = odds_api.fetch_event_props(key, ev["id"], markets)
+            odds, cached = odds_api.fetch_event_props(key, ev["id"], markets, bookmakers=books)
             log(f"  {away} @ {home}: {'cached' if cached else 'fetched'}")
         cons = odds_api.consensus(odds_api.flatten(odds))
         for (name, market), c in cons.items():

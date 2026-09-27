@@ -294,7 +294,7 @@ function rowHTML(p) {
     <div class="row-head" role="button" tabindex="0" aria-expanded="${S.open === p.id}">
       <div class="who"><div class="name">${esc(p.player)}</div>
         <div class="sub"><span>${p.team} ${p.home ? "vs" : "@"} ${p.opp}</span><span class="tag">${p.pos}</span>
-          ${p.injury ? `<span class="tag warn">${esc(p.injury)}</span>` : ""}${p.thin ? `<span class="tag warn">${p.n_games} games</span>` : ""}${big ? `<span class="tag warn">big gap</span>` : ""}</div></div>
+          ${p.injury ? `<span class="tag warn">${esc(p.injury)}</span>` : ""}${p.thin ? `<span class="tag warn">${p.n_games} games</span>` : ""}${p.dfs && p.dfs.some(d => d.gap !== 0) ? `<span class="tag">pick'em line differs</span>` : ""}${big ? `<span class="tag warn">big gap</span>` : ""}</div></div>
       <div class="mk"><div class="lbl">${esc(p.label)}</div><div class="line">${fmtLine(p)}</div></div>
       <div class="model"><div class="mean">${p.kind === "td" ? pct(p.over) : "μ " + p.mean}</div>
         <div class="pair">${p.kind === "td" ? "model P(TD)" : `P(over) ${pct(p.over)}`}${p.market_over != null ? ` · mkt ${pct(p.market_over)}${p.fair_over == null ? "*" : ""}` : ""}</div></div>
@@ -374,6 +374,10 @@ function renderDetail(p) {
       </div>
       <div class="results" id="res-${p.id}"></div>
       <div class="note">Change the line or price to match your book. The chart and probabilities re-read the simulated distribution; the market comparison only applies at the posted line.</div>
+      ${p.dfs && p.dfs.length ? `<h3 style="margin-top:18px">Pick'em lines</h3>
+      <table class="books"><thead><tr><th>Book</th><th>Line</th><th>Model P(over)</th><th>Model P(under)</th></tr></thead>
+        <tbody>${p.dfs.map(d => `<tr><td>${esc(d.book)}</td><td>${d.line}${d.gap !== 0 ? ` <span class="pair">(${signed(d.gap, 1)} vs books)</span>` : ""}</td><td>${pct(d.over, 1)}</td><td>${pct(d.under, 1)}</td></tr>`).join("")}</tbody></table>
+      <div class="note">Pick'em sites take one side at fixed payouts, so compare these probabilities to that site's breakeven, not to a sportsbook price. A line that sits away from the sportsbooks' is where the model and the market disagree most cleanly.</div>` : ""}
       <h3 style="margin-top:18px">Books at ${fmtLine(p)}</h3>
       <table class="books"><thead><tr><th>Book</th><th>${p.kind === "td" ? "Yes" : "Over"}</th><th>${p.kind === "td" ? "" : "Under"}</th></tr></thead>
         <tbody>${p.books.map(b => `<tr><td>${esc(b.book)}</td><td>${price(b.over)}</td><td>${p.kind === "td" ? "" : price(b.under)}</td></tr>`).join("")}</tbody></table>

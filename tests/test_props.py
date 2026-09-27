@@ -185,5 +185,44 @@ class TestOddsParsing(unittest.TestCase):
                 os.environ["ODDS_API_KEY"] = old
 
 
+class TestPickemBooks(unittest.TestCase):
+    def _event(self):
+        def book(key, title, o, u, pt):
+            return {"key": key, "title": title, "markets": [{"key": "player_rush_yds", "outcomes": [
+                {"name": "Over", "description": "Test Back", "price": o, "point": pt},
+                {"name": "Under", "description": "Test Back", "price": u, "point": pt}]}]}
+        return {"bookmakers": [
+            book("draftkings", "DraftKings", -110, -110, 64.5),
+            book("fanduel", "FanDuel", -115, -105, 64.5),
+            book("underdog", "Underdog", -137, -105, 61.5),       # fixed-payout entry "prices", different line
+            book("prizepicks", "PrizePicks", -119, -119, 62.5),
+        ]}
+
+    def test_classifier(self):
+        self.assertTrue(odds_api.is_dfs("underdog", "Underdog"))
+        self.assertTrue(odds_api.is_dfs("prizepicks", "PrizePicks"))
+        self.assertTrue(odds_api.is_dfs("draftkings_pick6", "DraftKings Pick6"))
+        self.assertFalse(odds_api.is_dfs("draftkings", "DraftKings"))
+        self.assertFalse(odds_api.is_dfs("fanduel", "FanDuel"))
+
+    def test_pickem_lines_never_touch_the_sportsbook_consensus(self):
+        c = odds_api.consensus(odds_api.flatten(self._event()))[("Test Back", "player_rush_yds")]
+        self.assertEqual(c["point"], 64.5)                          # not dragged to 61.5/62.5
+        self.assertEqual(c["n_books"], 2)
+        self.assertEqual({b["book"] for b in c["books"]}, {"DraftKings", "FanDuel"})
+        self.assertAlmostEqual(c["fair_over"], 0.5, delta=0.02)     # only the two real books
+        self.assertEqual(c["dfs"], [{"book": "PrizePicks", "line": 62.5}, {"book": "Underdog", "line": 61.5}])
+
+    def test_pickem_only_props_are_not_priced(self):
+        ev = {"bookmakers": [self._event()["bookmakers"][2]]}
+        self.assertEqual(odds_api.consensus(odds_api.flatten(ev)), {})
+
+    def test_line_without_a_point_is_ignored_not_crashed(self):
+        ev = self._event()
+        ev["bookmakers"][2]["markets"][0]["outcomes"] = [{"name": "Higher", "description": "Test Back", "price": -110}]
+        c = odds_api.consensus(odds_api.flatten(ev))[("Test Back", "player_rush_yds")]
+        self.assertEqual([d["book"] for d in c["dfs"]], ["PrizePicks"])
+
+
 if __name__ == "__main__":
     unittest.main()
