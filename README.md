@@ -96,6 +96,39 @@ python web/build_page.py
 This writes `web/auction_board.html`, a single self-contained file (real
 player values baked in) you can open directly or upload anywhere to share.
 
+## Player props simulator (HTML)
+
+Simulates every offensive player prop on this week's slate 20,000 times and
+compares the result to the sportsbook lines: model probability vs. the market's
+no-vig probability, best price across books, and EV per $1. Click any row for
+the simulated distribution, last-10-games hit rate, and a calculator where you
+can type in *your* book's line and price.
+
+**One-time setup** (real lines need a free key from https://the-odds-api.com):
+```
+# create a file named .env in this folder containing one line (it is git-ignored):
+ODDS_API_KEY=your_key_here
+```
+
+**Each time you want fresh lines:**
+```
+python export_props.py            # pulls lines + simulates -> web/props_snapshot.json
+python web/build_props_page.py    # -> web/props.html (one self-contained file)
+```
+`python export_props.py --sample` builds the page from *demo* lines made up from
+the model, with no key and no credits, just to see the layout.
+
+Credits: listing games is free; each game costs one credit per market. The default
+run (6 core markets) is at most ~90 credits for a 15-game week, and responses are
+cached for 30 minutes so re-running is free. `--all-markets` adds attempts,
+completions, interceptions and rush+rec yards; `--max-events N` limits games.
+Whether player props are included on a free plan is up to the Odds API, not this code.
+
+How the model works, and what it can't see: `props_model.py`. It does not know
+about injuries, role changes, weather, or game script, and it simulates players
+independently. Treat large model-vs-market gaps as "the model is missing
+something" until proven otherwise.
+
 ## What to add next (natural extensions)
 
 - Live odds via The Odds API (feeds real lines into `find_edge`)

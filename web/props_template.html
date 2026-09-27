@@ -1,0 +1,432 @@
+<meta charset="utf-8">
+<title>Props Simulator</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+  :root {
+    --bg: #12151b;
+    --surface: #1b2028;
+    --surface-2: #242a34;
+    --surface-3: #2e3542;
+    --border: #333b48;
+    --text: #e9eaed;
+    --text-dim: #98a0ac;
+    --text-faint: #7a8391;
+    --gold: #d9a441;
+    --gold-dim: #7a6535;
+    --gold-ink: #16130a;
+    --pos: #5cb88a;
+    --pos-bg: #1f3128;
+    --neg: #d9705f;
+    --neg-bg: #3a2622;
+    --warn: #d9a441;
+    --warn-bg: #3b3220;
+    --bar: #3a4352;
+    --shadow: 0 8px 24px rgba(0,0,0,0.35);
+    --radius: 10px;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: #f4f2ee; --surface: #ffffff; --surface-2: #ece9e2; --surface-3: #e1ddd3;
+      --border: #d8d3c8; --text: #201d17; --text-dim: #5c574c; --text-faint: #736e60;
+      --gold: #a1731d; --gold-dim: #cba15c; --gold-ink: #ffffff;
+      --pos: #226b48; --pos-bg: #dcf0e5; --neg: #b5432f; --neg-bg: #f8dfd9;
+      --warn: #8a5f0d; --warn-bg: #f6e8c6; --bar: #cfc9bb;
+      --shadow: 0 8px 24px rgba(0,0,0,0.08);
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f2ee; --surface: #ffffff; --surface-2: #ece9e2; --surface-3: #e1ddd3;
+    --border: #d8d3c8; --text: #201d17; --text-dim: #5c574c; --text-faint: #736e60;
+    --gold: #a1731d; --gold-dim: #cba15c; --gold-ink: #ffffff;
+    --pos: #226b48; --pos-bg: #dcf0e5; --neg: #b5432f; --neg-bg: #f8dfd9;
+    --warn: #8a5f0d; --warn-bg: #f6e8c6; --bar: #cfc9bb;
+    --shadow: 0 8px 24px rgba(0,0,0,0.08);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    font-size: 15px; line-height: 1.5; -webkit-font-smoothing: antialiased;
+  }
+  button, select, input { font-family: inherit; color: inherit; }
+  button:focus-visible, select:focus-visible, input:focus-visible, .row-head:focus-visible {
+    outline: 2px solid var(--gold); outline-offset: 2px;
+  }
+  .num { font-family: "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+  h1, h2, h3 { font-family: "Barlow Condensed", ui-sans-serif, sans-serif; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.02em; text-wrap: balance; margin: 0; }
+
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 20px; }
+
+  /* ---- header ---- */
+  .topbar { background: var(--surface); border-bottom: 1px solid var(--border); }
+  .topbar .wrap { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; padding-top: 14px; padding-bottom: 14px; }
+  .brand h1 { font-size: 24px; }
+  .brand .accent { color: var(--gold); }
+  .meta { color: var(--text-faint); font-size: 12.5px; }
+  .stats { display: flex; gap: 10px; margin-left: auto; }
+  .stat { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 6px 14px; min-width: 92px; text-align: center; }
+  .stat .k { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-faint); font-weight: 600; }
+  .stat .v { font-family: "IBM Plex Mono"; font-weight: 600; font-size: 19px; }
+  .stat.hi .v { color: var(--gold); }
+
+  .demo-banner { background: var(--warn-bg); color: var(--warn); border-bottom: 1px solid var(--border);
+    font-size: 13px; font-weight: 600; }
+  .demo-banner .wrap { padding-top: 9px; padding-bottom: 9px; }
+
+  /* ---- controls ---- */
+  .controls { padding-top: 18px; display: flex; flex-direction: column; gap: 12px; }
+  .ctl-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip-btn { border: 1px solid var(--border); background: var(--surface-2); color: var(--text-dim);
+    border-radius: 999px; padding: 5px 13px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+  .chip-btn[aria-pressed="true"] { background: var(--gold); border-color: var(--gold); color: var(--gold-ink); }
+  .seg { display: inline-flex; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 3px; gap: 2px; }
+  .seg button { border: none; background: transparent; color: var(--text-dim); font-weight: 600; font-size: 13px;
+    padding: 6px 13px; border-radius: 6px; cursor: pointer; }
+  .seg button.active { background: var(--gold); color: var(--gold-ink); }
+  .field { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 7px 11px; font-size: 13.5px; }
+  .field::placeholder { color: var(--text-faint); }
+  .check { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: var(--text-dim); cursor: pointer; }
+  .check input { accent-color: var(--gold); width: 15px; height: 15px; }
+  .spacer { margin-left: auto; }
+
+  /* ---- prop list ---- */
+  .list { padding: 14px 0 60px; }
+  .cols, .row-head { display: grid; gap: 12px; align-items: center;
+    grid-template-columns: minmax(190px, 1.7fr) 118px 130px 88px minmax(140px, 1.1fr) 84px 22px; }
+  .cols { padding: 0 16px 6px; font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-faint); font-weight: 600; }
+  .cols .r, .row-head .r { text-align: right; }
+  .row { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 6px; }
+  .row.open { border-color: var(--gold-dim); }
+  .row-head { width: 100%; padding: 11px 16px; cursor: pointer; background: none; border: none; text-align: left; }
+  .who .name { font-weight: 600; line-height: 1.25; }
+  .who .sub { font-size: 12px; color: var(--text-faint); display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 2px; }
+  .tag { font-size: 10px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; padding: 1px 7px; border-radius: 99px;
+    background: var(--surface-3); color: var(--text-dim); }
+  .tag.warn { background: var(--warn-bg); color: var(--warn); }
+  .mk .lbl { font-size: 12px; color: var(--text-dim); }
+  .mk .line { font-family: "IBM Plex Mono"; font-weight: 600; font-size: 18px; }
+  .model .mean { font-family: "IBM Plex Mono"; font-weight: 600; }
+  .model .pair, .price .pair { font-size: 11.5px; color: var(--text-faint); }
+  .edge { font-family: "IBM Plex Mono"; font-weight: 600; text-align: right; }
+  .edge.pos { color: var(--pos); } .edge.neg { color: var(--neg); } .edge.flat { color: var(--text-dim); }
+  .pick .side { font-weight: 700; font-size: 12.5px; letter-spacing: 0.04em; }
+  .pick .side.over { color: var(--gold); }
+  .pick .book { font-size: 11.5px; color: var(--text-faint); }
+  .ev { font-family: "IBM Plex Mono"; font-weight: 700; text-align: right; padding: 3px 8px; border-radius: 7px; justify-self: end; font-size: 13px; }
+  .ev.pos { background: var(--pos-bg); color: var(--pos); }
+  .ev.neg { background: var(--neg-bg); color: var(--neg); }
+  .ev.flat { background: var(--surface-2); color: var(--text-dim); }
+  .caret { color: var(--text-faint); transition: transform .15s; }
+  .row.open .caret { transform: rotate(90deg); }
+
+  .more { display: block; margin: 12px auto 0; padding: 9px 22px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--surface-2); font-weight: 600; cursor: pointer; }
+  .empty { padding: 50px 0; text-align: center; color: var(--text-faint); }
+
+  /* ---- detail ---- */
+  .detail { border-top: 1px solid var(--border); padding: 16px; display: grid; gap: 22px;
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); }
+  .panel h3 { font-size: 13px; color: var(--text-faint); letter-spacing: 0.06em; margin-bottom: 8px; }
+  svg.chart { width: 100%; height: auto; display: block; }
+  .chart text { fill: var(--text-faint); font-size: 10px; font-family: "IBM Plex Mono"; }
+  .legend { display: flex; gap: 14px; font-size: 11.5px; color: var(--text-faint); margin-top: 4px; flex-wrap: wrap; }
+  .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+  .facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; }
+  .fact { background: var(--surface-2); border-radius: 8px; padding: 7px 10px; }
+  .fact .k { font-size: 10px; text-transform: uppercase; letter-spacing: .07em; color: var(--text-faint); font-weight: 600; }
+  .fact .v { font-family: "IBM Plex Mono"; font-weight: 600; font-size: 14px; }
+
+  .whatif { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .whatif label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--text-faint); font-weight: 600; display: block; margin-bottom: 3px; }
+  .whatif input { width: 100%; font-family: "IBM Plex Mono"; font-weight: 600; font-size: 14px; }
+  .results { margin-top: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .res { background: var(--surface-2); border-radius: 8px; padding: 8px 10px; }
+  .res .k { font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--text-faint); font-weight: 600; }
+  .res .v { font-family: "IBM Plex Mono"; font-weight: 700; font-size: 16px; }
+  .res .v.pos { color: var(--pos); } .res .v.neg { color: var(--neg); }
+  .res .sub { font-size: 11px; color: var(--text-faint); }
+
+  .log { display: flex; align-items: flex-end; gap: 5px; height: 84px; margin-top: 4px; }
+  .log .b { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; min-width: 0; }
+  .log .bar { width: 100%; border-radius: 3px 3px 0 0; min-height: 2px; }
+  .log .bar.hit { background: var(--pos); } .log .bar.miss { background: var(--bar); }
+  .log .t { font-size: 9px; color: var(--text-faint); font-family: "IBM Plex Mono"; margin-top: 2px; white-space: nowrap; }
+  .log .n { font-size: 10px; font-family: "IBM Plex Mono"; margin-bottom: 1px; color: var(--text-dim); }
+  table.books { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  table.books th { text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: .07em; color: var(--text-faint); padding: 3px 0; }
+  table.books td { padding: 4px 0; border-top: 1px solid var(--border); font-family: "IBM Plex Mono"; }
+  table.books td:first-child { font-family: "IBM Plex Sans"; }
+  .note { font-size: 12px; color: var(--text-faint); margin-top: 8px; }
+  .foot { padding: 0 0 50px; color: var(--text-faint); font-size: 12.5px; max-width: 860px; }
+  .foot p { margin: 0 0 8px; }
+  .foot strong { color: var(--text-dim); }
+
+  @media (max-width: 860px) {
+    .cols { display: none; }
+    .row-head { grid-template-columns: 1fr auto; row-gap: 7px; }
+    .row-head .caret { display: none; }
+    .row-head .mk { grid-column: 1; display: flex; gap: 8px; align-items: baseline; }
+    .row-head .model { grid-column: 1; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+    .row-head .edge { text-align: left; }
+    .row-head .pick { grid-column: 1; }
+    .row-head .ev { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
+    .detail { grid-template-columns: 1fr; }
+    .stats { margin-left: 0; width: 100%; }
+    .stat { flex: 1; min-width: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) { .caret { transition: none; } }
+</style>
+
+<div class="topbar">
+  <div class="wrap">
+    <div class="brand">
+      <h1><span class="accent">Props</span> Simulator</h1>
+      <div class="meta" id="meta"></div>
+    </div>
+    <div class="stats" id="stats"></div>
+  </div>
+</div>
+<div class="demo-banner" id="demo" hidden><div class="wrap">Demo lines &mdash; these prices were generated from the model itself to show the layout. They are not real sportsbook lines and any &ldquo;edge&rdquo; here is meaningless.</div></div>
+
+<div class="wrap controls">
+  <div class="ctl-row"><div class="chips" id="market-chips" role="group" aria-label="Markets"></div></div>
+  <div class="ctl-row">
+    <div class="seg" id="pos-seg" role="group" aria-label="Position">
+      <button class="active" data-pos="">All</button><button data-pos="QB">QB</button><button data-pos="RB">RB</button><button data-pos="WR">WR</button><button data-pos="TE">TE</button>
+    </div>
+    <select class="field" id="game" aria-label="Game"><option value="">All games</option></select>
+    <input class="field" id="q" type="search" placeholder="Search a player&hellip;" aria-label="Search a player">
+    <label class="check"><input type="checkbox" id="only-ev"> Model +EV only</label>
+    <label class="check"><input type="checkbox" id="hide-thin"> Hide thin samples</label>
+    <select class="field spacer" id="sort" aria-label="Sort">
+      <option value="ev">Sort: best EV</option><option value="edge">Sort: biggest edge</option>
+      <option value="name">Sort: player</option><option value="time">Sort: kickoff</option>
+    </select>
+  </div>
+</div>
+
+<div class="wrap list">
+  <div class="cols"><div>Player</div><div>Line</div><div>Model</div><div class="r">Edge</div><div>Best price</div><div class="r">EV / $1</div><div></div></div>
+  <div id="rows"></div>
+</div>
+
+<div class="wrap foot" id="foot"></div>
+
+<script>
+const DATA = __PROPS_JSON__;
+const P = DATA.props.map((p, i) => Object.assign(p, { id: i }));
+
+/* ---------- helpers ---------- */
+const $ = id => document.getElementById(id);
+const pct = (x, d = 0) => (x * 100).toFixed(d) + "%";
+const price = a => a == null ? "—" : (a > 0 ? "+" + a : String(a));
+const dec = a => 1 + (a > 0 ? a / 100 : 100 / -a);
+const evOf = (win, lose, a) => win * (dec(a) - 1) - lose;
+const signed = (x, d = 1) => (x > 0 ? "+" : "") + x.toFixed(d);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const sideName = (p, side) => side === "over" ? (p.kind === "td" ? "YES" : "OVER") : "UNDER";
+const fmtLine = p => p.kind === "td" ? "Any TD" : String(p.line);
+
+/* P(over / push / under) at ANY line, read back off the exported distribution */
+function probsAt(p, line) {
+  if (p.dist.pmf) {
+    const pmf = p.dist.pmf; let over = 0, push = 0;
+    pmf.forEach((m, k) => { if (k > line) over += m; else if (k === line) push += m; });
+    return { over, push, under: Math.max(0, 1 - over - push) };
+  }
+  const q = p.dist.q;                                    // 0..100th percentiles
+  let F;
+  if (line <= q[0]) F = 0;
+  else if (line >= q[100]) F = 1;
+  else {
+    let i = 0; while (q[i + 1] < line) i++;
+    F = (i + (q[i + 1] === q[i] ? 0 : (line - q[i]) / (q[i + 1] - q[i]))) / 100;
+  }
+  return { over: 1 - F, push: 0, under: F };
+}
+
+/* ---------- header ---------- */
+function renderHeader() {
+  const when = new Date(DATA.generated);
+  $("meta").textContent = `Week ${DATA.week}, ${DATA.season} · ${DATA.n_games} games · lines pulled ${when.toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })}`;
+  $("demo").hidden = !DATA.sample;
+  const gaps = P.filter(p => p.edge != null && Math.abs(p.edge) >= 5 && !p.thin).length;
+  $("stats").innerHTML = [
+    ["Props", P.length.toLocaleString(), ""], ["Edges 5+ pt", gaps.toLocaleString(), "hi"], ["Games", DATA.n_games, ""],
+  ].map(([k, v, c]) => `<div class="stat ${c}"><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
+  $("foot").innerHTML = `
+    <p><strong>How it works.</strong> Each prop is simulated 20,000 times from the player's last 17 games (recent games weigh more), scaled for how the opposing defense treats that position. Counts (receptions, TDs) use Poisson / negative-binomial draws; yardage uses a skewed gamma. Anytime TD rates are pulled toward the position average so a scoreless streak doesn't read as impossible.</p>
+    <p><strong>Edge</strong> is model P(over) minus the market's no-vig P(over), averaged across books. <strong>EV / $1</strong> uses the best price on the recommended side. Anytime TD has no &ldquo;under&rdquo; to remove the vig with, so its market number includes the vig.</p>
+    <p><strong>Read big edges skeptically.</strong> The market knows about injuries, role changes, weather and game script; this model does not, and simulates every player independently. A 15-point edge is usually the model missing something, not a mispriced line. Thin samples (fewer than 6 games) are tagged.</p>
+    <p>${DATA.credits ? esc(DATA.credits) + " · " : ""}Distributions are simulated from nflverse play data; lines from The Odds API.</p>`;
+}
+
+/* ---------- filters + list ---------- */
+const S = { markets: new Set(), pos: "", game: "", q: "", sort: "ev", onlyEv: false, hideThin: false, limit: 80, open: null };
+
+function buildControls() {
+  const labels = [...new Map(P.map(p => [p.market, p.label]))];
+  $("market-chips").innerHTML = labels.map(([m, l]) => `<button class="chip-btn" aria-pressed="false" data-m="${m}">${esc(l)}</button>`).join("");
+  const games = [...new Map(P.map(p => [p.game, p.commence]))].sort((a, b) => a[1].localeCompare(b[1]));
+  $("game").innerHTML += games.map(([g]) => `<option>${esc(g)}</option>`).join("");
+}
+
+function visible() {
+  const q = S.q.trim().toLowerCase();
+  let rows = P.filter(p =>
+    (!S.markets.size || S.markets.has(p.market)) && (!S.pos || p.pos === S.pos) && (!S.game || p.game === S.game) &&
+    (!q || p.player.toLowerCase().includes(q)) && (!S.onlyEv || (p.pick_ev != null && p.pick_ev > 0)) && (!S.hideThin || !p.thin));
+  const key = { ev: p => -(p.pick_ev ?? -9), edge: p => -Math.abs(p.edge ?? 0), name: p => p.player, time: p => p.commence + p.player }[S.sort];
+  return rows.sort((a, b) => { const x = key(a), y = key(b); return x < y ? -1 : x > y ? 1 : 0; });
+}
+
+function rowHTML(p) {
+  const e = p.edge, ec = e == null ? "flat" : e > 1 ? "pos" : e < -1 ? "neg" : "flat";
+  const pick = p.pick ? p[p.pick === "over" ? "best_over" : "best_under"] : null;
+  const evc = p.pick_ev == null ? "flat" : p.pick_ev > 0.005 ? "pos" : p.pick_ev < -0.005 ? "neg" : "flat";
+  const big = e != null && Math.abs(e) >= 12;
+  return `<div class="row ${S.open === p.id ? "open" : ""}" data-id="${p.id}">
+    <div class="row-head" role="button" tabindex="0" aria-expanded="${S.open === p.id}">
+      <div class="who"><div class="name">${esc(p.player)}</div>
+        <div class="sub"><span>${p.team} ${p.home ? "vs" : "@"} ${p.opp}</span><span class="tag">${p.pos}</span>
+          ${p.injury ? `<span class="tag warn">${esc(p.injury)}</span>` : ""}${p.thin ? `<span class="tag warn">${p.n_games} games</span>` : ""}${big ? `<span class="tag warn">big gap</span>` : ""}</div></div>
+      <div class="mk"><div class="lbl">${esc(p.label)}</div><div class="line">${fmtLine(p)}</div></div>
+      <div class="model"><div class="mean">${p.kind === "td" ? pct(p.over) : "μ " + p.mean}</div>
+        <div class="pair">${p.kind === "td" ? "model P(TD)" : `P(over) ${pct(p.over)}`}${p.market_over != null ? ` · mkt ${pct(p.market_over)}${p.fair_over == null ? "*" : ""}` : ""}</div></div>
+      <div class="edge ${ec}">${e == null ? "—" : signed(e) + " pt"}</div>
+      <div class="pick">${pick ? `<div class="side ${p.pick}">${sideName(p, p.pick)} <span class="num">${price(pick.price)}</span></div><div class="book">${esc(pick.book)}</div>` : "—"}</div>
+      <div class="ev ${evc} num">${p.pick_ev == null ? "—" : signed(p.pick_ev * 100, 1) + "%"}</div>
+      <div class="caret" aria-hidden="true">›</div>
+    </div>
+    ${S.open === p.id ? `<div class="detail" id="detail-${p.id}"></div>` : ""}
+  </div>`;
+}
+
+function renderList() {
+  const rows = visible(), shown = rows.slice(0, S.limit);
+  $("rows").innerHTML = rows.length
+    ? shown.map(rowHTML).join("") + (rows.length > shown.length ? `<button class="more" id="more">Show ${Math.min(80, rows.length - shown.length)} more (${rows.length - shown.length} hidden)</button>` : "")
+    : `<div class="empty">No props match these filters.</div>`;
+  if (S.open != null && $("detail-" + S.open)) renderDetail(P[S.open]);
+}
+
+/* ---------- detail ---------- */
+function chartSVG(p, line) {
+  const W = 600, H = 150, pad = 18, base = H - 22, top = 8;
+  let bars = [];                                          // [x0label, mass, x0, x1]
+  if (p.dist.pmf) {
+    p.dist.pmf.forEach((m, k) => bars.push({ lo: k - 0.5, hi: k + 0.5, m, over: k > line }));
+  } else {
+    const q = p.dist.q, hiX = q[99] * 1.03 || 1, n = 36;
+    for (let i = 0; i < n; i++) {
+      const a = hiX * i / n, b = hiX * (i + 1) / n;
+      const m = (1 - probsAt(p, a).over) - (1 - probsAt(p, b).over);
+      bars.push({ lo: a, hi: b, m: Math.max(0, m), over: (a + b) / 2 > line });
+    }
+  }
+  const xmin = bars[0].lo, xmax = bars[bars.length - 1].hi, sx = x => pad + (x - xmin) / (xmax - xmin) * (W - 2 * pad);
+  const mmax = Math.max(...bars.map(b => b.m)) || 1;
+  const rects = bars.map(b => {
+    const h = (b.m / mmax) * (base - top), x = sx(b.lo), w = Math.max(1, sx(b.hi) - sx(b.lo) - 1.5);
+    return `<rect x="${x.toFixed(1)}" y="${(base - h).toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="1.5" fill="${b.over ? "var(--gold)" : "var(--bar)"}" opacity="${b.over ? 0.9 : 1}"/>`;
+  }).join("");
+  const lx = sx(Math.min(Math.max(line, xmin), xmax)), mx = sx(Math.min(Math.max(p.mean, xmin), xmax));
+  let tickVals;
+  if (p.dist.pmf) { const step = Math.max(1, Math.ceil(p.dist.pmf.length / 7)); tickVals = p.dist.pmf.map((_, k) => k).filter(k => k % step === 0); }
+  else tickVals = [0, 0.25, 0.5, 0.75, 1].map(f => Math.round(Math.max(0, xmin + f * (xmax - xmin))));
+  const ticks = tickVals.map(v => `<text x="${sx(v).toFixed(1)}" y="${H - 6}" text-anchor="middle">${v}</text>`).join("");
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Simulated distribution with the line marked">
+    ${rects}<line x1="${mx.toFixed(1)}" x2="${mx.toFixed(1)}" y1="${top}" y2="${base}" stroke="var(--text-dim)" stroke-width="1" stroke-dasharray="3 3"/>
+    <line x1="${lx.toFixed(1)}" x2="${lx.toFixed(1)}" y1="${top - 4}" y2="${base}" stroke="var(--text)" stroke-width="2"/>
+    <line x1="${pad}" x2="${W - pad}" y1="${base}" y2="${base}" stroke="var(--border)"/>${ticks}</svg>`;
+}
+
+function renderDetail(p) {
+  const el = $("detail-" + p.id);
+  const bo = p.best_over, bu = p.best_under;
+  const log = p.log.slice();
+  const maxv = Math.max(1, ...log.map(g => g[3]));
+  el.innerHTML = `
+    <div class="panel">
+      <h3>Simulated outcomes (20,000 games)</h3>
+      <div id="chart-${p.id}"></div>
+      <div class="legend"><span><i style="background:var(--gold)"></i>${p.kind === "td" ? "scores" : "over the line"}</span><span><i style="background:var(--bar)"></i>${p.kind === "td" ? "no TD" : "at or under"}</span><span>line = solid · model mean = dashed</span></div>
+      <div class="facts">
+        <div class="fact"><div class="k">Model mean</div><div class="v">${p.mean}</div></div>
+        <div class="fact"><div class="k">Std dev</div><div class="v">${p.sd}</div></div>
+        <div class="fact"><div class="k">Opp. adj</div><div class="v">×${p.opp_mult.toFixed(2)}</div></div>
+      </div>
+      <h3 style="margin-top:18px">Last ${log.length} games${p.kind === "td" ? " (rush + rec TDs)" : ""}</h3>
+      <div class="log" id="log-${p.id}"></div>
+      <div class="note" id="hit-${p.id}"></div>
+    </div>
+    <div class="panel">
+      <h3>Your line &amp; odds</h3>
+      <div class="whatif">
+        <div><label for="wl-${p.id}">Line</label><input class="field" id="wl-${p.id}" type="number" step="0.5" value="${p.line}" ${p.kind === "td" ? "disabled" : ""}></div>
+        <div><label for="wo-${p.id}">${p.kind === "td" ? "Yes" : "Over"} price</label><input class="field" id="wo-${p.id}" type="number" step="5" value="${bo ? bo.price : -110}"></div>
+        <div><label for="wu-${p.id}">Under price</label><input class="field" id="wu-${p.id}" type="number" step="5" value="${bu ? bu.price : -110}" ${p.kind === "td" ? "disabled" : ""}></div>
+      </div>
+      <div class="results" id="res-${p.id}"></div>
+      <div class="note">Change the line or price to match your book. The chart and probabilities re-read the simulated distribution; the market comparison only applies at the posted line.</div>
+      <h3 style="margin-top:18px">Books at ${fmtLine(p)}</h3>
+      <table class="books"><thead><tr><th>Book</th><th>${p.kind === "td" ? "Yes" : "Over"}</th><th>${p.kind === "td" ? "" : "Under"}</th></tr></thead>
+        <tbody>${p.books.map(b => `<tr><td>${esc(b.book)}</td><td>${price(b.over)}</td><td>${p.kind === "td" ? "" : price(b.under)}</td></tr>`).join("")}</tbody></table>
+    </div>`;
+
+  const upd = () => {
+    const line = p.kind === "td" ? 0.5 : parseFloat($("wl-" + p.id).value);
+    if (Number.isNaN(line)) return;
+    const po = parseInt($("wo-" + p.id).value, 10), pu = parseInt($("wu-" + p.id).value, 10);
+    const r = probsAt(p, line);
+    $("chart-" + p.id).innerHTML = chartSVG(p, line);
+    const evO = Number.isNaN(po) ? null : evOf(r.over, r.under, po), evU = Number.isNaN(pu) || p.kind === "td" ? null : evOf(r.under, r.over, pu);
+    const cell = (k, v, ev, sub) => `<div class="res"><div class="k">${k}</div><div class="v ${ev == null ? "" : ev > 0 ? "pos" : "neg"}">${v}</div><div class="sub">${sub}</div></div>`;
+    $("res-" + p.id).innerHTML =
+      cell(p.kind === "td" ? "P(TD)" : "P(over)", pct(r.over, 1), null, r.push > 0.0005 ? `push ${pct(r.push, 1)}` : (p.kind === "td" ? "model" : "no push at this line")) +
+      cell(p.kind === "td" ? "EV on Yes" : "EV on over", evO == null ? "—" : signed(evO * 100, 1) + "%", evO, "per $1 at " + price(po)) +
+      (p.kind === "td" ? "" : cell("P(under)", pct(r.under, 1), null, "") + cell("EV on under", evU == null ? "—" : signed(evU * 100, 1) + "%", evU, "per $1 at " + price(pu)));
+    $("log-" + p.id).innerHTML = log.map(g => {
+      const hit = g[3] > line;
+      return `<div class="b" title="${g[0]} wk ${g[1]} vs ${g[2]}: ${g[3]}"><div class="n">${Math.round(g[3])}</div><div class="bar ${hit ? "hit" : "miss"}" style="height:${Math.max(3, g[3] / maxv * 58)}px"></div><div class="t">${g[2]}</div></div>`;
+    }).join("");
+    const hits = log.filter(g => g[3] > line).length;
+    $("hit-" + p.id).textContent = `Went over ${line} in ${hits} of ${log.length} recent games (green bars).`;
+  };
+  ["wl-", "wo-", "wu-"].forEach(k => $(k + p.id).addEventListener("input", upd));
+  upd();
+}
+
+/* ---------- wiring ---------- */
+$("market-chips").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  const m = b.dataset.m, on = !S.markets.has(m);
+  on ? S.markets.add(m) : S.markets.delete(m);
+  b.setAttribute("aria-pressed", on); S.limit = 80; renderList();
+});
+$("pos-seg").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  document.querySelectorAll("#pos-seg button").forEach(x => x.classList.toggle("active", x === b));
+  S.pos = b.dataset.pos; S.limit = 80; renderList();
+});
+$("game").addEventListener("change", e => { S.game = e.target.value; S.limit = 80; renderList(); });
+$("q").addEventListener("input", e => { S.q = e.target.value; S.limit = 80; renderList(); });
+$("sort").addEventListener("change", e => { S.sort = e.target.value; renderList(); });
+$("only-ev").addEventListener("change", e => { S.onlyEv = e.target.checked; S.limit = 80; renderList(); });
+$("hide-thin").addEventListener("change", e => { S.hideThin = e.target.checked; S.limit = 80; renderList(); });
+$("rows").addEventListener("click", e => {
+  if (e.target.id === "more") { S.limit += 80; renderList(); return; }
+  const head = e.target.closest(".row-head"); if (!head) return;
+  const id = +head.parentElement.dataset.id; S.open = S.open === id ? null : id; renderList();
+});
+$("rows").addEventListener("keydown", e => {
+  if ((e.key === "Enter" || e.key === " ") && e.target.classList.contains("row-head")) { e.preventDefault(); e.target.click(); }
+});
+
+renderHeader(); buildControls(); renderList();
+</script>
