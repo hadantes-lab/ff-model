@@ -101,6 +101,22 @@
   .cols { padding: 0 16px 6px; font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-faint); font-weight: 600; }
   .cols .r, .row-head .r { text-align: right; }
   .row { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 6px; }
+  .game-card { padding: 14px 16px; margin-bottom: 10px; }
+  .game-head { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+  .game-head .teams { font-family: "Barlow Condensed"; font-weight: 700; text-transform: uppercase; letter-spacing: .02em; font-size: 17px; }
+  .game-body { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1.6fr); gap: 16px; }
+  .game-proj { display: flex; flex-direction: column; gap: 3px; justify-content: center; }
+  .game-proj .side { display: flex; justify-content: space-between; gap: 10px; font-size: 14.5px; }
+  .game-proj .side b { font-family: "IBM Plex Mono"; }
+  .mk-row { display: grid; grid-template-columns: 74px 90px minmax(0,1fr) auto; gap: 10px; align-items: center; padding: 7px 0; border-top: 1px solid var(--border); }
+  .mk-row:first-child { border-top: none; }
+  .mk-row .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-faint); font-weight: 600; }
+  .mk-row .line { font-family: "IBM Plex Mono"; font-weight: 600; }
+  .mk-row .probs { font-size: 13px; }
+  .mk-row .probs .raw { color: var(--text-faint); font-size: 11.5px; margin-left: 4px; }
+  .mk-row .pick { text-align: right; font-size: 12.5px; }
+  .mk-row .pick .side-name { font-weight: 700; }
+  @media (max-width: 720px) { .game-body { grid-template-columns: 1fr; } .mk-row { grid-template-columns: 1fr 1fr; row-gap: 4px; } .mk-row .pick { grid-column: 1 / -1; text-align: left; } }
   .row.open { border-color: var(--gold-dim); }
   .row-head { width: 100%; padding: 11px 16px; cursor: pointer; background: none; border: none; text-align: left; }
   .who .name { font-weight: 600; line-height: 1.25; }
@@ -196,6 +212,7 @@
 <div class="wrap" style="padding-top:16px;">
   <div class="seg" id="view-tabs" role="group" aria-label="View">
     <button class="active" data-view="week">This Week</button>
+    <button data-view="games">Game Lines</button>
     <button data-view="history">Player History</button>
   </div>
 </div>
@@ -225,6 +242,10 @@
   <div class="cols"><div>Player</div><div>Line</div><div>Model</div><div class="r">Edge</div><div>Best price</div><div class="r">EV / $1</div><div></div></div>
   <div id="rows"></div>
 </div>
+</div>
+
+<div class="wrap" id="games-view" hidden style="padding-top:18px; padding-bottom:60px;">
+  <div id="games-list"></div>
 </div>
 
 <div class="wrap" id="history-view" hidden style="padding-top:18px; padding-bottom:60px;">
@@ -500,14 +521,65 @@ function renderHistoryDetail() {
   });
 }
 
+/* ---------- game lines ---------- */
+function marketRow(label, line, probA, nameA, probB, nameB, rawA, pickInfo) {
+  const pick = pickInfo.pick;   // "home"/"away" (spread) or "over"/"under" (total)
+  const isA = pick === "home" || pick === "over";
+  const pickHtml = pick == null ? "—" : `<span class="side-name">${isA ? esc(nameA) : esc(nameB)}</span> <span class="num">${price(pickInfo.price.price)}</span> <span style="color:var(--text-faint); font-size:11px;">${esc(pickInfo.price.book)}</span>
+    <div class="ev ${pickInfo.ev > 0.005 ? "pos" : pickInfo.ev < -0.005 ? "neg" : "flat"}" style="display:inline-block; margin-left:6px;">${signed(pickInfo.ev * 100, 1)}%</div>`;
+  return `<div class="mk-row">
+    <div class="lbl">${label}</div>
+    <div class="line num">${line}</div>
+    <div class="probs">${esc(nameA)} ${pct(probA, 1)}${rawA != null ? `<span class="raw">raw ${pct(rawA, 1)}</span>` : ""} &middot; ${esc(nameB)} ${pct(probB, 1)}</div>
+    <div class="pick">${pickHtml}</div>
+  </div>`;
+}
+
+function gameCardHTML(g) {
+  const spreadLine = g.home_spread <= 0 ? `${g.home} ${g.home_spread}` : `${g.away} ${-g.home_spread}`;
+  const spreadPickInfo = { pick: g.spread_pick, price: g.spread_pick_price, ev: g.spread_pick_ev };
+  const totalPickInfo = { pick: g.total_pick, price: g.total_pick_price, ev: g.total_pick_ev };
+  const trustNote = g.trust < 0.1
+    ? `Early-season sample (n_eff ${g.n_eff}) -- only ${pct(g.trust)} of the model's own view is trusted here; the rest defers to the market.`
+    : `n_eff ${g.n_eff} across ${g.n_players} simulated players -- ${pct(g.trust)} of the model's disagreement with the market is trusted.`;
+  return `<div class="row game-card">
+    <div class="game-head">
+      <div class="teams">${esc(g.away)} @ ${esc(g.home)}</div>
+      <div class="sub" style="color:var(--text-faint); font-size:12px;">${new Date(g.commence).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })}</div>
+    </div>
+    <div class="game-body">
+      <div class="game-proj">
+        <div class="side"><span>${esc(g.home)}</span><b class="num">${g.proj_home}</b></div>
+        <div class="side"><span>${esc(g.away)}</span><b class="num">${g.proj_away}</b></div>
+        <div class="sub" style="color:var(--text-faint); font-size:12px; margin-top:4px;">Margin ${signed(g.proj_margin, 1)} &middot; Total ${g.proj_total}</div>
+      </div>
+      <div>
+        ${marketRow("Spread", spreadLine, g.home_cover, g.home + " cover", g.away_cover, g.away + " cover", g.model_home_cover, spreadPickInfo)}
+        ${marketRow("Total", g.total, g.over, "Over", g.under, "Under", g.model_over, totalPickInfo)}
+      </div>
+    </div>
+    <div class="note" style="margin-top:10px;">${trustNote}</div>
+  </div>`;
+}
+
+function renderGames() {
+  const el = $("games-list");
+  const games = DATA.games || [];
+  el.innerHTML = games.length
+    ? games.map(gameCardHTML).join("")
+    : `<div class="empty">No games priced this run${DATA.sample ? " (demo mode has no real game lines to price against)" : " -- game lines may not have been available from the Odds API."}</div>`;
+}
+
 /* ---------- wiring ---------- */
 $("view-tabs").addEventListener("click", e => {
   const b = e.target.closest("button"); if (!b) return;
   document.querySelectorAll("#view-tabs button").forEach(x => x.classList.toggle("active", x === b));
-  const isHistory = b.dataset.view === "history";
-  $("week-view").hidden = isHistory;
-  $("history-view").hidden = !isHistory;
-  if (isHistory) { renderHistoryList(); renderHistoryDetail(); }
+  const view = b.dataset.view;
+  $("week-view").hidden = view !== "week";
+  $("games-view").hidden = view !== "games";
+  $("history-view").hidden = view !== "history";
+  if (view === "games") renderGames();
+  if (view === "history") { renderHistoryList(); renderHistoryDetail(); }
 });
 $("hist-search").addEventListener("input", renderHistoryList);
 $("hist-list").addEventListener("click", e => {

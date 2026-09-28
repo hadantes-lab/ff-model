@@ -83,6 +83,28 @@ def log_predictions(snapshot: dict) -> int:
             "pick": p.get("pick"), "pick_price": pick_price, "pick_ev": p.get("pick_ev"),
             "logged_at": now, "actual": np.nan, "result": np.nan, "graded_at": np.nan,
         })
+    for g in snapshot.get("games", []):
+        # Spread picks are logged in the same over/under/push vocabulary as everything else,
+        # with "over" standing for "home covers" -- so grading, ROI, and calibration need no
+        # special case for games at all (the page itself still shows "home"/"away").
+        spread_pick = {"home": "over", "away": "under"}.get(g.get("spread_pick"))
+        for market, key, line, model_over, model_under, pick, pick_price_obj, pick_ev in (
+            ("game_spread", "spread", g["home_spread"], g["model_home_cover"], 1 - g["model_home_cover"],
+             spread_pick, g.get("spread_pick_price"), g.get("spread_pick_ev")),
+            ("game_total", "total", g["total"], g["model_over"], 1 - g["model_over"],
+             g.get("total_pick"), g.get("total_pick_price"), g.get("total_pick_ev")),
+        ):
+            rows.append({
+                "season": snapshot["season"], "week": snapshot["week"],
+                "player_id": f"GAME_{g['home']}_{g['away']}_{key}",
+                "market": market, "player": g["game"], "team": g["home"], "opp": g["away"],
+                "pos": "GAME", "game": g["game"], "commence": g["commence"], "kind": key,
+                "line": line, "model_over": model_over, "model_under": model_under,
+                "market_over": g.get("fair_home_cover") if key == "spread" else g.get("fair_over"),
+                "gap": None, "trust": g.get("trust"),
+                "pick": pick, "pick_price": pick_price_obj["price"] if pick_price_obj else None, "pick_ev": pick_ev,
+                "logged_at": now, "actual": np.nan, "result": np.nan, "graded_at": np.nan,
+            })
     if not rows:
         return 0
     new = pd.DataFrame(rows)
@@ -96,6 +118,16 @@ def log_predictions(snapshot: dict) -> int:
 # ---- grading ----------------------------------------------------------------
 def _actual_stat(stats_row, market) -> float:
     return float(sum(stats_row.get(c, 0.0) or 0.0 for c in MARKETS[market].cols))
+
+
+def _grade_over_under(df, i, actual, now):
+    df.at[i, "actual"] = actual
+    line = df.at[i, "line"]
+    if df.at[i, "kind"] == "td":
+        df.at[i, "result"] = "over" if actual >= 1 else "under"
+    else:
+        df.at[i, "result"] = "over" if actual > line else ("push" if actual == line else "under")
+    df.at[i, "graded_at"] = now
 
 
 def grade_pending(delay_hours=GRADE_DELAY_HOURS) -> int:
@@ -120,21 +152,40 @@ def grade_pending(delay_hours=GRADE_DELAY_HOURS) -> int:
         if not stats.empty:
             stats = stats[(stats["season"] == season) & (stats["week"] == week) & (stats["season_type"] == "REG")]
         by_pid = {r["player_id"]: r for _, r in stats.iterrows()} if not stats.empty else {}
+
+        final = {}
+        if df.loc[idx, "market"].isin(("game_spread", "game_total")).any():
+            sched = nfl.load_schedules([int(season)]).to_pandas()
+            sched = sched[sched["week"] == week] if not sched.empty else sched
+            final = {(r["home_team"], r["away_team"]): (r["home_score"], r["away_score"])
+                    for _, r in sched.iterrows() if pd.notna(r["home_score"])} if not sched.empty else {}
+
         for i in idx:
-            pid, market = df.at[i, "player_id"], df.at[i, "market"]
-            row = by_pid.get(pid)
+            market = df.at[i, "market"]
+            if market in ("game_spread", "game_total"):
+                score = final.get((df.at[i, "team"], df.at[i, "opp"]))   # team/opp = home/away for game rows
+                if score is None:
+                    continue   # game hasn't finished yet even though kickoff has passed -- try again later
+                home_score, away_score = score
+                if market == "game_total":
+                    _grade_over_under(df, i, float(home_score + away_score), now)
+                else:
+                    # home_spread < 0 means home favored; home covers iff margin > -home_spread.
+                    # The stored "line" is the natural home_spread value (e.g. "-2.5"), so this
+                    # can't reuse _grade_over_under's plain `actual > line` -- grade directly.
+                    margin = float(home_score - away_score)
+                    threshold = -df.at[i, "line"]
+                    df.at[i, "actual"] = margin
+                    df.at[i, "result"] = "over" if margin > threshold else ("push" if margin == threshold else "under")
+                    df.at[i, "graded_at"] = now
+                graded_now += 1
+                continue
+            row = by_pid.get(df.at[i, "player_id"])
             if row is None:
                 df.at[i, "result"] = "dnp"           # inactive, bye, or a name/id mismatch
                 df.at[i, "graded_at"] = now
                 continue
-            actual = _actual_stat(row, market)
-            df.at[i, "actual"] = actual
-            line = df.at[i, "line"]
-            if df.at[i, "kind"] == "td":
-                df.at[i, "result"] = "over" if actual >= 1 else "under"
-            else:
-                df.at[i, "result"] = "over" if actual > line else ("push" if actual == line else "under")
-            df.at[i, "graded_at"] = now
+            _grade_over_under(df, i, _actual_stat(row, market), now)
             graded_now += 1
     _save(df)
     return graded_now
@@ -236,7 +287,7 @@ def print_week_review(g: pd.DataFrame, season, week):
 def build_player_history(min_games=1) -> dict:
     """{player_id: {player, team, pos, markets: {market: {label, kind, games: [...]}}}} from graded history."""
     df = _load()
-    g = df[df["result"].notna() & (df["result"] != "dnp")].copy()
+    g = df[(df["pos"] != "GAME") & df["result"].notna() & (df["result"] != "dnp")].copy()
     if g.empty:
         return {}
     out = {}

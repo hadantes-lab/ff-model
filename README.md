@@ -150,6 +150,26 @@ Two limits: there are no historical *prop lines* to score edges against, only ou
 model's agreement with the market can't be validated yet; and anytime TD is opt-in
 (`--markets player_anytime_td`) because long shots are mostly noise.
 
+**Game sides and totals.** `game_odds.py` rolls the same per-player projections up into team point
+totals, to price spreads and totals the identical bottom-up way: simulate the players (with a
+shared per-team "game script" factor so a team's players move together, not independently), sum
+to a score, compare to the market's posted line. Team points are a real fitted formula, not a
+guess -- regressed on 2021-25 team-games:
+```
+points = 2.09 + 0.0297*rush_yds + 0.0156*pass_yds + 5.60*off_td + noise
+```
+(R² = 0.81, MAE 3.35 points; `noise` matches the real residual's shape). What it does not
+model -- defense/special-teams scores, kicking, 2-point tries -- is the unexplained ~19%.
+Early in a season, summing many small-sample player TD rates can overstate a hot team's total
+(caught by comparing a real roster's simulated total to the actual league-average score before
+this shipped), so the simulated probability is shrunk toward the market's own price-implied
+probability, more so with less history behind the roster (`GAME_LAMBDA_MAX` in `game_odds.py`
+-- a judgment call, like the player-prop blend, pending real tracked results). This needs no
+extra Odds API credits: it reuses the same bulk game-lines call the environment adjustment
+above already makes. `export_props.py` adds a `games` list to the snapshot automatically; the
+page's "Game Lines" tab shows it, and `props_tracker.py` logs and grades these picks the exact
+same way it does player props (against final scores, not player stats).
+
 **Tracking real results.** That second limit is closed over time by `props_tracker.py`: every real
 (non-sample) run logs each prop's line and probabilities, then once a game is a few hours old,
 grades it against the actual stat:

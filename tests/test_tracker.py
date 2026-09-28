@@ -27,6 +27,16 @@ def _snapshot(sample=False, props=None):
     ]}
 
 
+def _game_snapshot(spread_pick="home", games=None):
+    return {"season": 2026, "week": 3, "sample": False, "props": [], "games": games if games is not None else [
+        {"game": "KC @ BUF", "home": "BUF", "away": "KC", "commence": PAST_KICKOFF,
+         "home_spread": -2.5, "total": 47.5, "model_home_cover": 0.63, "model_over": 0.55,
+         "fair_home_cover": 0.52, "fair_over": 0.49, "trust": 0.2,
+         "spread_pick": spread_pick, "spread_pick_price": {"price": -108, "book": "FanDuel"}, "spread_pick_ev": 0.045,
+         "total_pick": "over", "total_pick_price": {"price": -105, "book": "BetMGM"}, "total_pick_ev": 0.028},
+    ]}
+
+
 class TestLogging(unittest.TestCase):
     def setUp(self):
         self.tmp = pd.io.common.get_handle  # unused; just isolate LOG_FILE per test
@@ -76,9 +86,10 @@ class TestGrading(unittest.TestCase):
             pt.LOG_FILE.unlink()
         pt.LOG_FILE = self._orig
 
-    def _fake_nfl(self, rows):
-        mod = types.SimpleNamespace(load_player_stats=lambda seasons: types.SimpleNamespace(
-            to_pandas=lambda: pd.DataFrame(rows)))
+    def _fake_nfl(self, rows, schedule_rows=None):
+        mod = types.SimpleNamespace(
+            load_player_stats=lambda seasons: types.SimpleNamespace(to_pandas=lambda: pd.DataFrame(rows)),
+            load_schedules=lambda seasons: types.SimpleNamespace(to_pandas=lambda: pd.DataFrame(schedule_rows or [])))
         return mock.patch.dict(sys.modules, {"nflreadpy": mod})
 
     def test_grades_a_finished_game_as_over_or_under(self):
@@ -116,6 +127,96 @@ class TestGrading(unittest.TestCase):
                               "rushing_tds": 1.0, "receiving_tds": 0.0}]):
             pt.grade_pending(delay_hours=0)
         self.assertEqual(pt._load().set_index("player_id").loc["p3", "result"], "over")
+
+
+class TestGameTracking(unittest.TestCase):
+    def setUp(self):
+        self._orig = pt.LOG_FILE
+        pt.LOG_FILE = pt.LOG_FILE.parent / "_test_props_log.csv"
+
+    def tearDown(self):
+        if pt.LOG_FILE.exists():
+            pt.LOG_FILE.unlink()
+        pt.LOG_FILE = self._orig
+
+    def _fake_nfl(self, schedule_rows):
+        mod = types.SimpleNamespace(
+            load_player_stats=lambda seasons: types.SimpleNamespace(to_pandas=lambda: pd.DataFrame([])),
+            load_schedules=lambda seasons: types.SimpleNamespace(to_pandas=lambda: pd.DataFrame(schedule_rows)))
+        return mock.patch.dict(sys.modules, {"nflreadpy": mod})
+
+    def test_logs_both_spread_and_total_with_over_under_vocabulary(self):
+        n = pt.log_predictions(_game_snapshot(spread_pick="home"))
+        self.assertEqual(n, 2)
+        df = pt._load().set_index("market")
+        self.assertEqual(df.loc["game_spread", "pick"], "over")     # "home" translates to "over"
+        self.assertEqual(df.loc["game_spread", "line"], -2.5)
+        self.assertEqual(df.loc["game_total", "pick"], "over")
+        self.assertEqual(df.loc["game_total", "line"], 47.5)
+
+    def test_away_pick_translates_to_under(self):
+        pt.log_predictions(_game_snapshot(spread_pick="away"))
+        self.assertEqual(pt._load().set_index("market").loc["game_spread", "pick"], "under")
+
+    def test_spread_grading_uses_the_correct_sign(self):
+        # BUF (home) favored by 2.5 (home_spread -2.5); BUF wins by 10 -> comfortably covers -> "over"
+        pt.log_predictions(_game_snapshot())
+        rows = [{"home_team": "BUF", "away_team": "KC", "week": 3, "home_score": 27, "away_score": 17}]
+        with self._fake_nfl(rows):
+            n = pt.grade_pending(delay_hours=0)
+        self.assertEqual(n, 2)
+        df = pt._load().set_index("market")
+        self.assertEqual(df.loc["game_spread", "result"], "over")
+        self.assertEqual(df.loc["game_spread", "actual"], 10.0)
+
+    def test_spread_grading_when_favorite_wins_but_doesnt_cover(self):
+        # BUF favored by 2.5, wins by only 1 -> does NOT cover -> "under"
+        pt.log_predictions(_game_snapshot())
+        rows = [{"home_team": "BUF", "away_team": "KC", "week": 3, "home_score": 21, "away_score": 20}]
+        with self._fake_nfl(rows):
+            pt.grade_pending(delay_hours=0)
+        self.assertEqual(pt._load().set_index("market").loc["game_spread", "result"], "under")
+
+    def test_spread_push_at_the_exact_margin(self):
+        pt.log_predictions(_game_snapshot())
+        rows = [{"home_team": "BUF", "away_team": "KC", "week": 3, "home_score": 22.5, "away_score": 20.0}]
+        with self._fake_nfl(rows):
+            pt.grade_pending(delay_hours=0)
+        self.assertEqual(pt._load().set_index("market").loc["game_spread", "result"], "push")
+
+    def test_total_grading(self):
+        pt.log_predictions(_game_snapshot())  # total line 47.5
+        rows = [{"home_team": "BUF", "away_team": "KC", "week": 3, "home_score": 30, "away_score": 24}]  # 54 total
+        with self._fake_nfl(rows):
+            pt.grade_pending(delay_hours=0)
+        df = pt._load().set_index("market")
+        self.assertEqual(df.loc["game_total", "result"], "over")
+        self.assertEqual(df.loc["game_total", "actual"], 54.0)
+
+    def test_unfinished_game_is_left_pending_not_marked_dnp(self):
+        # the game market's actual result requires a *final score*, unlike a player prop, which
+        # has an unambiguous "he didn't play" fallback -- an in-progress game must wait, not fail
+        pt.log_predictions(_game_snapshot())
+        with self._fake_nfl([{"home_team": "BUF", "away_team": "KC", "week": 3, "home_score": None, "away_score": None}]):
+            n = pt.grade_pending(delay_hours=0)
+        self.assertEqual(n, 0)
+        self.assertTrue(pd.isna(pt._load().iloc[0]["result"]))
+
+    def test_player_grading_is_unaffected_when_no_games_are_pending(self):
+        # regression check: grading pure player props must not require load_schedules at all
+        pt.log_predictions(_snapshot())
+        mod = types.SimpleNamespace(load_player_stats=lambda seasons: types.SimpleNamespace(
+            to_pandas=lambda: pd.DataFrame([{"player_id": "p1", "season": 2026, "week": 3,
+                                            "season_type": "REG", "rushing_yards": 80.0}])))
+        with mock.patch.dict(sys.modules, {"nflreadpy": mod}):
+            n = pt.grade_pending(delay_hours=0)   # would raise AttributeError if load_schedules were called
+        self.assertEqual(n, 1)
+
+    def test_game_rows_are_excluded_from_player_history(self):
+        pt.log_predictions(_game_snapshot())
+        with self._fake_nfl([{"home_team": "BUF", "away_team": "KC", "week": 3, "home_score": 27, "away_score": 17}]):
+            pt.grade_pending(delay_hours=0)
+        self.assertEqual(pt.build_player_history(), {})
 
 
 class TestReport(unittest.TestCase):

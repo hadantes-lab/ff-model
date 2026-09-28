@@ -186,6 +186,54 @@ def consensus_game_lines(games):
     return out
 
 
+def consensus_game_prices(games):
+    """
+    Fuller version of consensus_game_lines: per-game fair (vig-free) probability and best
+    price for the home side and the over, from the SAME bulk response -- no extra API cost.
+    {event_id: {"total", "home_spread", "fair_home_cover", "fair_over",
+                "best_home": {price, book}, "best_away": {...}, "best_over": {...}, "best_under": {...}}}
+    """
+    out = {}
+    for g in games:
+        home, away = g["home_team"], g["away_team"]
+        line = consensus_game_lines([g])[g["id"]]
+        home_book, away_book, over_book, under_book = {}, {}, {}, {}
+        for bk in g.get("bookmakers", []):
+            for mk in bk.get("markets", []):
+                for o in mk.get("outcomes", []):
+                    if o.get("point") is None:
+                        continue
+                    if mk["key"] == "spreads" and o["name"] == home and o["point"] == line["home_spread"]:
+                        home_book[bk["title"]] = o["price"]
+                    elif mk["key"] == "spreads" and o["name"] == away and -o["point"] == line["home_spread"]:
+                        away_book[bk["title"]] = o["price"]
+                    elif mk["key"] == "totals" and o["name"] == "Over" and o["point"] == line["total"]:
+                        over_book[bk["title"]] = o["price"]
+                    elif mk["key"] == "totals" and o["name"] == "Under" and o["point"] == line["total"]:
+                        under_book[bk["title"]] = o["price"]
+
+        def fair(book_a, book_b):
+            fairs = []
+            for bk in set(book_a) & set(book_b):
+                pa, pb = american_to_prob(book_a[bk]), american_to_prob(book_b[bk])
+                fairs.append(pa / (pa + pb))
+            return round(sum(fairs) / len(fairs), 4) if fairs else None
+
+        def best(book):
+            if not book:
+                return None
+            name = max(book, key=lambda b: american_to_decimal(book[b]))
+            return {"price": book[name], "book": name}
+
+        out[g["id"]] = {
+            "total": line["total"], "home_spread": line["home_spread"],
+            "fair_home_cover": fair(home_book, away_book), "fair_over": fair(over_book, under_book),
+            "best_home": best(home_book), "best_away": best(away_book),
+            "best_over": best(over_book), "best_under": best(under_book),
+        }
+    return out
+
+
 # ---- parsing ------------------------------------------------------------
 def american_to_decimal(odds):
     return 1 + (odds / 100 if odds > 0 else 100 / -odds)

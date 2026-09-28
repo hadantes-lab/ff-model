@@ -23,6 +23,7 @@ import numpy as np
 import nflreadpy as nfl
 
 import game_context as gc
+import game_odds as go
 import odds_api
 from matchups import CoverageModel, load_coverage_targets
 from props_model import (
@@ -212,6 +213,51 @@ def build_prop(event, home, away, player_row, market, cons, fit, mult, inj, matc
     }
 
 
+def build_game(event, home, away, home_fits, away_fits, line, prices):
+    """Sides and totals, priced the same bottom-up way as player props: simulate, sum, compare."""
+    rng = rng_for(event["id"], "game")
+    home_pts, away_pts = go.simulate_game_scores(home_fits, away_fits, rng)
+    raw = go.spread_total_probs(home_pts, away_pts, line["home_spread"], line["total"])
+    n_eff = go.fits_n_eff(home_fits, away_fits)
+
+    home_cover = go.blend_game_prob(raw["home_cover"], prices.get("fair_home_cover"), n_eff)
+    over = go.blend_game_prob(raw["over"], prices.get("fair_over"), n_eff)
+    away_cover = max(0.0, 1 - home_cover - raw["home_push"])
+    under = max(0.0, 1 - over - raw["total_push"])
+
+    def pick_side(p_a, price_a, name_a, p_b, price_b, name_b):
+        sides = []
+        if price_a:
+            sides.append((ev_per_dollar(p_a, 1 - p_a, price_a["price"]), name_a, price_a))
+        if price_b:
+            sides.append((ev_per_dollar(p_b, 1 - p_b, price_b["price"]), name_b, price_b))
+        return max(sides) if sides else (None, None, None)
+
+    spread_ev, spread_pick, spread_price = pick_side(
+        home_cover, prices.get("best_home"), "home", away_cover, prices.get("best_away"), "away")
+    total_ev, total_pick, total_price = pick_side(
+        over, prices.get("best_over"), "over", under, prices.get("best_under"), "under")
+
+    return {
+        "game": f"{away} @ {home}", "home": home, "away": away, "commence": event["commence_time"],
+        "home_spread": line["home_spread"], "total": line["total"],
+        "proj_home": round(raw["proj_home"], 1), "proj_away": round(raw["proj_away"], 1),
+        "proj_margin": round(raw["proj_margin"], 1), "proj_total": round(raw["proj_total"], 1),
+        "n_players": len(home_fits) + len(away_fits), "n_eff": round(n_eff, 1),
+        "trust": round(go.GAME_LAMBDA_MAX * min(1.0, n_eff / go.GAME_LAMBDA_FULL_N), 3),
+        "home_cover": round(home_cover, 4), "away_cover": round(away_cover, 4),
+        "model_home_cover": round(raw["home_cover"], 4), "fair_home_cover": prices.get("fair_home_cover"),
+        "over": round(over, 4), "under": round(under, 4),
+        "model_over": round(raw["over"], 4), "fair_over": prices.get("fair_over"),
+        "best_home": prices.get("best_home"), "best_away": prices.get("best_away"),
+        "best_over": prices.get("best_over"), "best_under": prices.get("best_under"),
+        "spread_pick": spread_pick, "spread_pick_price": spread_price,
+        "spread_pick_ev": None if spread_ev is None else round(spread_ev, 4),
+        "total_pick": total_pick, "total_pick_price": total_price,
+        "total_pick_ev": None if total_ev is None else round(total_ev, 4),
+    }
+
+
 # ---- main ---------------------------------------------------------------
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -248,6 +294,11 @@ def main():
         log("Loading man/zone coverage tags (2024-25) for receiver matchups...")
         coverage = CoverageModel(load_coverage_targets())
     priors = {m: position_priors(history, MARKETS[m]) for m in markets if MARKETS[m].kind != "yards"}
+    # needed to roll players up into team totals for game sides/totals, regardless of which
+    # prop markets were actually requested from the Odds API
+    for m in ("player_pass_yds", "player_rush_yds", "player_anytime_td"):
+        mults.setdefault(m, opponent_multipliers(history, MARKETS[m]))
+    priors.setdefault("player_anytime_td", position_priors(history, MARKETS["player_anytime_td"]))
 
     credits = None
     if args.sample:
@@ -268,16 +319,20 @@ def main():
             f"{len(events) * len(markets) * regions} credits ({len(events)} games x {len(markets)} markets x "
             f"{regions} region(s); only markets that return data are charged, cached games cost 0). {credits}")
 
-    # this week's game totals and spreads: schedule lines for the demo, one bulk Odds API call otherwise
+    # this week's game totals and spreads: schedule lines for the demo, one bulk Odds API call
+    # otherwise (also used below to price game sides/totals -- no extra credit cost)
+    game_prices = {}
     if args.sample:
         gl = {r["game_id"]: {"total": r["total_line"], "home_spread": -r["spread_line"]}
               for _, r in nfl.load_schedules([season]).to_pandas().iterrows()
               if r["total_line"] == r["total_line"] and r["spread_line"] == r["spread_line"]}
     else:
         try:
-            gl = odds_api.consensus_game_lines(odds_api.fetch_game_lines(key)[0])
+            raw_game_lines = odds_api.fetch_game_lines(key)[0]
+            gl = odds_api.consensus_game_lines(raw_game_lines)
+            game_prices = odds_api.consensus_game_prices(raw_game_lines)
         except odds_api.OddsApiError as e:
-            log(f"  no game lines ({e}); game environment adjustment skipped")
+            log(f"  no game lines ({e}); game environment adjustment and game odds skipped")
             gl = {}
 
     props, unmatched, skipped = [], set(), 0
@@ -324,10 +379,25 @@ def main():
     if unmatched:
         log("  unmatched: " + ", ".join(sorted(unmatched)[:12]) + (" ..." if len(unmatched) > 12 else ""))
 
+    games = []
+    for ev in events:
+        home, away = odds_api.TEAM_ABBR[ev["home_team"]], odds_api.TEAM_ABBR[ev["away_team"]]
+        line = gl.get(ev["id"], {})
+        if line.get("total") is None or line.get("home_spread") is None:
+            continue   # no real line to compare a simulated score to
+        home_fits = go.build_team_fits(history, home, away, mults, priors, calibration,
+                                       line["total"], -line["home_spread"])
+        away_fits = go.build_team_fits(history, away, home, mults, priors, calibration,
+                                       line["total"], line["home_spread"])
+        if not home_fits or not away_fits:
+            continue
+        games.append(build_game(ev, home, away, home_fits, away_fits, line, game_prices.get(ev["id"], {})))
+    log(f"{len(games)} games priced for sides/totals.")
+
     snapshot = {
         "generated": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
         "season": int(season), "week": int(week), "sample": bool(args.sample),
-        "credits": credits, "markets": markets, "n_games": len(events), "props": props,
+        "credits": credits, "markets": markets, "n_games": len(events), "props": props, "games": games,
     }
     OUT.parent.mkdir(exist_ok=True)
     OUT.write_text(json.dumps(snapshot, separators=(",", ":")), encoding="utf-8")
