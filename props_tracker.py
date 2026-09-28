@@ -9,13 +9,18 @@ Stores only our own numbers (line, our probabilities, the one price used for the
 never a book-by-book odds board -- so this is an analytical record of this tool's own
 performance, not a redistribution of the underlying market data.
 
-    python props_tracker.py log       # called by export_props.py after a real (non-sample) run
-    python props_tracker.py grade     # fills in results for games that finished 5+ hours ago
-    python props_tracker.py report    # prints the calibration/accuracy report
-    python props_tracker.py report --json   # also writes web/track_record.json for the page
+    python props_tracker.py log                  # called by export_props.py after a real (non-sample) run
+    python props_tracker.py grade                # fills in results for games that finished 5+ hours ago
+    python props_tracker.py review               # audit the most recently graded week
+    python props_tracker.py review --week 4       # audit a specific week (--season to disambiguate)
+    python props_tracker.py report                # prints the calibration/accuracy report
+    python props_tracker.py report --json          # also writes web/track_record.json and
+                                                    # web/player_history.json for the page
 
 tracking/props_log.csv is the persistent record. GitHub Actions runs are ephemeral, so the
-workflow commits this file back to the repo after each run.
+workflow commits this file back to the repo after each run. The "line" it stores is whatever
+was live when that run pulled it -- the closing line only if a run happened to land right
+before kickoff, so treat it as "last line seen," not a guaranteed close.
 """
 
 import argparse
@@ -31,6 +36,7 @@ from props_model import MARKETS
 
 LOG_FILE = pathlib.Path(__file__).parent / "tracking" / "props_log.csv"
 REPORT_FILE = pathlib.Path(__file__).parent / "web" / "track_record.json"
+HISTORY_FILE = pathlib.Path(__file__).parent / "web" / "player_history.json"
 GRADE_DELAY_HOURS = 5      # a game is assumed final this long after kickoff
 KEY = ["season", "week", "player_id", "market"]
 
@@ -187,6 +193,71 @@ def build_report(min_n=1) -> dict:
     }
 
 
+def week_review(season=None, week=None):
+    """
+    All logged props for one week, graded or not, for manual review. Defaults to the most
+    recently GRADED week so `--week` can be left off day-to-day. -> (DataFrame, season, week).
+    """
+    df = _load()
+    if df.empty:
+        return df, season, week
+    graded = df[df["result"].notna()]
+    if week is None:
+        pool = graded if not graded.empty else df
+        if season is not None:
+            pool = pool[pool["season"] == season]
+        if pool.empty:
+            return pool, season, week
+        season = int(pool["season"].max()) if season is None else season
+        week = int(pool[pool["season"] == season]["week"].max())
+    elif season is None:
+        season = int(df["season"].max())
+    g = df[(df["season"] == season) & (df["week"] == week)].copy()
+    g["hit_pick"] = np.where(g["pick"].isna() | g["result"].isna(), np.nan, (g["result"] == g["pick"]).astype(float))
+    return g.sort_values(["market", "player"]), season, week
+
+
+def print_week_review(g: pd.DataFrame, season, week):
+    if g is None or g.empty:
+        print(f"No props logged for {season or '?'} week {week or '?'} yet.")
+        return
+    ungraded = int(g["result"].isna().sum())
+    dnp = int((g["result"] == "dnp").sum())
+    print(f"Week {week}, {season} -- {len(g)} props logged"
+          + (f", {ungraded} not yet graded" if ungraded else "") + (f", {dnp} dnp" if dnp else ""))
+    cols = ["player", "market", "line", "actual", "result", "pick", "model_over", "market_over"]
+    with pd.option_context("display.width", 140, "display.max_rows", None):
+        print(g[cols].to_string(index=False, na_rep="—"))
+    picks = g[g["pick"].notna() & g["result"].notna() & (g["result"] != "dnp")]
+    if len(picks):
+        print(f"\nPicks graded: {len(picks)}  win rate {float((picks['result'] == picks['pick']).mean()):.1%}")
+
+
+def build_player_history(min_games=1) -> dict:
+    """{player_id: {player, team, pos, markets: {market: {label, kind, games: [...]}}}} from graded history."""
+    df = _load()
+    g = df[df["result"].notna() & (df["result"] != "dnp")].copy()
+    if g.empty:
+        return {}
+    out = {}
+    for pid, pg in g.sort_values(["season", "week"]).groupby("player_id"):
+        markets = {}
+        for m, mg in pg.groupby("market"):
+            if len(mg) < min_games or m not in MARKETS:
+                continue
+            spec = MARKETS[m]
+            markets[m] = {"label": spec.label, "kind": spec.kind, "games": [
+                {"season": int(r.season), "week": int(r.week), "opp": r.opp,
+                 "line": float(r.line), "actual": float(r.actual), "result": r.result,
+                 "model_over": None if pd.isna(r.model_over) else float(r.model_over)}
+                for r in mg.itertuples()
+            ]}
+        if markets:
+            last = pg.iloc[-1]
+            out[pid] = {"player": last["player"], "team": last["team"], "pos": last["pos"], "markets": markets}
+    return out
+
+
 def print_report(rep: dict):
     if not rep["n_graded"]:
         print("No graded props yet. Run `python props_tracker.py grade` after some games have finished.")
@@ -207,8 +278,10 @@ def print_report(rep: dict):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("cmd", choices=["log", "grade", "report"])
-    ap.add_argument("--json", action="store_true", help="with report: also write web/track_record.json")
+    ap.add_argument("cmd", choices=["log", "grade", "report", "review"])
+    ap.add_argument("--json", action="store_true", help="with report: also write web/track_record.json and web/player_history.json")
+    ap.add_argument("--week", type=int, help="with review: which week (default: most recently graded)")
+    ap.add_argument("--season", type=int, help="with review: which season (default: current)")
     args = ap.parse_args()
 
     if args.cmd == "log":
@@ -219,12 +292,16 @@ def main():
     elif args.cmd == "grade":
         n = grade_pending()
         print(f"Graded {n} props.", file=sys.stderr)
+    elif args.cmd == "review":
+        g, season, week = week_review(args.season, args.week)
+        print_week_review(g, season, week)
     elif args.cmd == "report":
         rep = build_report()
         print_report(rep)
         if args.json:
             REPORT_FILE.write_text(json.dumps(rep, separators=(",", ":")), encoding="utf-8")
-            print(f"\nWrote {REPORT_FILE}", file=sys.stderr)
+            HISTORY_FILE.write_text(json.dumps(build_player_history(), separators=(",", ":")), encoding="utf-8")
+            print(f"\nWrote {REPORT_FILE} and {HISTORY_FILE}", file=sys.stderr)
 
 
 if __name__ == "__main__":

@@ -150,6 +150,24 @@ Two limits: there are no historical *prop lines* to score edges against, only ou
 model's agreement with the market can't be validated yet; and anytime TD is opt-in
 (`--markets player_anytime_td`) because long shots are mostly noise.
 
+**Tracking real results.** That second limit is closed over time by `props_tracker.py`: every real
+(non-sample) run logs each prop's line and probabilities, then once a game is a few hours old,
+grades it against the actual stat:
+```
+python props_tracker.py grade              # fills in results for finished games
+python props_tracker.py review             # audit the most recently graded week
+python props_tracker.py review --week 4     # a specific week
+python props_tracker.py report              # pick win rate, ROI, and calibration
+python props_tracker.py report --json        # + writes web/track_record.json and web/player_history.json
+```
+`tracking/props_log.csv` is the record; the scheduled workflow runs `grade` and `report --json`
+before each week's pull and commits it back to the repo, since Actions runs don't persist state
+otherwise. Only our own numbers are stored -- never a sportsbook odds board -- consistent with
+the Odds API's terms. The props page shows the aggregate as a "Track record" panel, and a
+"Player History" tab lets you pick any tracked player and see a chart of the line recorded each
+week against what actually happened, for the current season. Early on this will be a small,
+noisy sample; give it a few weeks before reading much into it.
+
 How the model works, and what it can't see: `props_model.py`. It does not know
 about injuries, role changes, weather, or game script, and it simulates players
 independently. Treat large model-vs-market gaps as "the model is missing

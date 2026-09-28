@@ -154,6 +154,52 @@ class TestReport(unittest.TestCase):
         rep = pt.build_report()
         self.assertEqual(rep["roi_per_dollar"], 0.0)
 
+    def test_week_review_returns_everything_logged_for_that_week_graded_or_not(self):
+        self._graded_df([
+            {"player_id": "1", "player": "A", "season": 2026, "week": 3, "pick": "over", "pick_price": -110, "result": "over"},
+            {"player_id": "2", "player": "B", "season": 2026, "week": 3, "pick": None, "pick_price": None, "result": "dnp"},
+            {"player_id": "3", "player": "C", "season": 2026, "week": 3, "pick": "under", "pick_price": -110, "result": float("nan")},
+            {"player_id": "4", "player": "D", "season": 2026, "week": 4, "pick": "over", "pick_price": -110, "result": "under"},
+        ])
+        g, season, week = pt.week_review(2026, 3)
+        self.assertEqual(season, 2026)
+        self.assertEqual(week, 3)
+        self.assertEqual(set(g["player_id"]), {"1", "2", "3"})
+        row1 = g.set_index("player_id").loc["1"]
+        self.assertEqual(row1["hit_pick"], 1.0)
+
+    def test_week_review_defaults_to_the_latest_graded_week(self):
+        self._graded_df([
+            {"player_id": "1", "player": "A", "season": 2026, "week": 3, "pick": "over", "pick_price": -110, "result": "over"},
+            {"player_id": "2", "player": "B", "season": 2026, "week": 5, "pick": None, "pick_price": None, "result": float("nan")},
+        ])
+        g, season, week = pt.week_review()
+        self.assertEqual(week, 3)          # week 5's only row is ungraded, so it's not "the latest graded week"
+
+    def test_week_review_on_an_empty_log_does_not_crash(self):
+        g, season, week = pt.week_review()
+        self.assertTrue(g.empty)
+        pt.print_week_review(g, season, week)   # should just print a message, not raise
+
+    def test_player_history_groups_by_player_and_market_and_drops_dnp(self):
+        self._graded_df([
+            {"player_id": "1", "player": "A", "team": "AAA", "pos": "WR", "opp": "X", "market": "player_reception_yds",
+             "season": 2026, "week": 1, "line": 50.5, "actual": 62.0, "result": "over"},
+            {"player_id": "1", "player": "A", "team": "AAA", "pos": "WR", "opp": "Y", "market": "player_reception_yds",
+             "season": 2026, "week": 2, "line": 48.5, "actual": 40.0, "result": "under"},
+            {"player_id": "1", "player": "A", "team": "AAA", "pos": "WR", "opp": "Z", "market": "player_reception_yds",
+             "season": 2026, "week": 3, "line": 55.5, "actual": None, "result": "dnp"},
+        ])
+        hist = pt.build_player_history()
+        self.assertEqual(set(hist), {"1"})
+        m = hist["1"]["markets"]["player_reception_yds"]
+        self.assertEqual(m["label"], "Rec Yds")
+        self.assertEqual(len(m["games"]), 2)              # the dnp week is excluded
+        self.assertEqual([g["week"] for g in m["games"]], [1, 2])   # sorted chronologically
+
+    def test_player_history_on_an_empty_log_is_an_empty_dict(self):
+        self.assertEqual(pt.build_player_history(), {})
+
     def test_calibration_table_sums_to_roughly_all_rows(self):
         # model_over is always a real probability in [0, 1] in production
         self._graded_df([{"player_id": str(i), "pick": None, "pick_price": None,

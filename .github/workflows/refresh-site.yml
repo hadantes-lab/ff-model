@@ -78,14 +78,15 @@ jobs:
         id: deploy
         uses: actions/deploy-pages@v4
 
-      # tracking/props_log.csv and web/track_record.json are this workflow's memory: Actions
-      # runs are ephemeral, so they only persist by being committed back to the repo. This
+      # tracking/props_log.csv, web/track_record.json and web/player_history.json are this
+      # workflow's memory: Actions runs are ephemeral, so they only persist by being committed
+      # back to the repo. This
       # holds our own logged predictions and results, never a sportsbook's odds board.
       - name: Commit the props tracking log
         if: steps.key.outputs.have_key == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add tracking/props_log.csv web/track_record.json
+          git add tracking/props_log.csv web/track_record.json web/player_history.json
           git diff --cached --quiet && echo "No tracker changes." || git commit -m "Update props tracking log [skip ci]"
           git push

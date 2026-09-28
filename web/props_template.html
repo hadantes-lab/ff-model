@@ -157,6 +157,8 @@
   .log .bar.hit { background: var(--pos); } .log .bar.miss { background: var(--bar); }
   .log .t { font-size: 9px; color: var(--text-faint); font-family: "IBM Plex Mono"; margin-top: 2px; white-space: nowrap; }
   .log .n { font-size: 10px; font-family: "IBM Plex Mono"; margin-bottom: 1px; color: var(--text-dim); }
+  .log .bar { position: relative; overflow: visible; }
+  .log .line-mark { position: absolute; left: -1px; right: -1px; height: 2px; background: var(--text); }
   table.books { width: 100%; border-collapse: collapse; font-size: 12.5px; }
   table.books th { text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: .07em; color: var(--text-faint); padding: 3px 0; }
   table.books td { padding: 4px 0; border-top: 1px solid var(--border); font-family: "IBM Plex Mono"; }
@@ -191,6 +193,14 @@
     <div class="stats" id="stats"></div>
   </div>
 </div>
+<div class="wrap" style="padding-top:16px;">
+  <div class="seg" id="view-tabs" role="group" aria-label="View">
+    <button class="active" data-view="week">This Week</button>
+    <button data-view="history">Player History</button>
+  </div>
+</div>
+
+<div id="week-view">
 <div class="wrap" id="track-record" hidden></div>
 <div class="demo-banner" id="demo" hidden><div class="wrap">Demo lines &mdash; these prices were generated from the model itself to show the layout. They are not real sportsbook lines and any &ldquo;edge&rdquo; here is meaningless.</div></div>
 
@@ -215,12 +225,20 @@
   <div class="cols"><div>Player</div><div>Line</div><div>Model</div><div class="r">Edge</div><div>Best price</div><div class="r">EV / $1</div><div></div></div>
   <div id="rows"></div>
 </div>
+</div>
+
+<div class="wrap" id="history-view" hidden style="padding-top:18px; padding-bottom:60px;">
+  <input class="field" id="hist-search" type="search" placeholder="Search a player&hellip;" style="width:260px; margin-bottom:12px;" aria-label="Search a player's history">
+  <div id="hist-list" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:18px;"></div>
+  <div id="hist-detail"></div>
+</div>
 
 <div class="wrap foot" id="foot"></div>
 
 <script>
 const DATA = __PROPS_JSON__;
 const TRACK = __TRACK_RECORD_JSON__;
+const PLAYER_HISTORY = __PLAYER_HISTORY_JSON__;
 const P = DATA.props.map((p, i) => Object.assign(p, { id: i }));
 
 /* ---------- helpers ---------- */
@@ -431,7 +449,74 @@ function renderDetail(p) {
   upd();
 }
 
+/* ---------- player history ---------- */
+const HS = { pid: null, market: null };
+
+function historyChartHTML(games, kind) {
+  const H = 58;
+  const maxv = Math.max(1, ...games.map(g => Math.max(g.actual, g.line)));
+  return `<div class="log">` + games.map(g => {
+    const barH = Math.max(3, g.actual / maxv * H);
+    const lineY = Math.min(H + 20, g.line / maxv * H);
+    const cls = g.result === "over" ? "hit" : g.result === "under" ? "miss" : "";
+    const n = kind === "yards" ? Math.round(g.actual) : g.actual;
+    return `<div class="b" title="Week ${g.week} vs ${g.opp}: actual ${g.actual}, line ${g.line} (${g.result})">
+      <div class="n">${n}</div>
+      <div class="bar ${cls}" style="height:${barH}px"><div class="line-mark" style="bottom:${lineY}px"></div></div>
+      <div class="t">W${g.week}</div>
+    </div>`;
+  }).join("") + `</div>`;
+}
+
+function renderHistoryList() {
+  const q = ($("hist-search").value || "").trim().toLowerCase();
+  const entries = Object.entries(PLAYER_HISTORY)
+    .filter(([, h]) => !q || h.player.toLowerCase().includes(q))
+    .sort((a, b) => a[1].player.localeCompare(b[1].player));
+  $("hist-list").innerHTML = entries.length
+    ? entries.map(([id, h]) => `<button class="chip-btn" data-pid="${id}" aria-pressed="${HS.pid === id}">${esc(h.player)} <span style="opacity:.65">${h.team}</span></button>`).join("")
+    : `<div class="empty">No tracked history yet${q ? " for that search" : ""}. This fills in once props have been logged and graded for a few weeks.</div>`;
+}
+
+function renderHistoryDetail() {
+  const el = $("hist-detail");
+  const h = PLAYER_HISTORY[HS.pid];
+  if (!h) { el.innerHTML = ""; return; }
+  const markets = Object.keys(h.markets);
+  if (!HS.market || !markets.includes(HS.market)) HS.market = markets[0];
+  const seasonGames = h.markets[HS.market].games.filter(g => g.season === DATA.season);
+  el.innerHTML = `<div class="row" style="padding:16px;">
+    <div style="display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:10px; margin-bottom:10px;">
+      <div><div style="font-size:19px; font-weight:700;">${esc(h.player)}</div><div class="sub" style="color:var(--text-faint); font-size:13px;">${h.team} &middot; ${h.pos}</div></div>
+      <div class="seg" id="hist-market-seg">${markets.map(m => `<button data-m="${m}" class="${m === HS.market ? "active" : ""}">${esc(h.markets[m].label)}</button>`).join("")}</div>
+    </div>
+    ${seasonGames.length ? historyChartHTML(seasonGames, h.markets[HS.market].kind) : '<div class="empty">No graded games yet this season for this market.</div>'}
+    ${seasonGames.length ? '<div class="note" style="margin-top:8px;">Bar height = actual result; the horizontal mark = the line recorded when it was last pulled (the closing line only if a run happened to land right before kickoff). Green = went over, gray = under or push. Hover a bar for the exact numbers.</div>' : ""}
+  </div>`;
+  const seg = $("hist-market-seg");
+  if (seg) seg.addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    HS.market = b.dataset.m; renderHistoryDetail();
+  });
+}
+
 /* ---------- wiring ---------- */
+$("view-tabs").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  document.querySelectorAll("#view-tabs button").forEach(x => x.classList.toggle("active", x === b));
+  const isHistory = b.dataset.view === "history";
+  $("week-view").hidden = isHistory;
+  $("history-view").hidden = !isHistory;
+  if (isHistory) { renderHistoryList(); renderHistoryDetail(); }
+});
+$("hist-search").addEventListener("input", renderHistoryList);
+$("hist-list").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  HS.pid = b.dataset.pid; HS.market = null;
+  renderHistoryList();
+  renderHistoryDetail();
+});
+
 $("market-chips").addEventListener("click", e => {
   const b = e.target.closest("button"); if (!b) return;
   const m = b.dataset.m, on = !S.markets.has(m);
