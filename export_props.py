@@ -22,12 +22,15 @@ import sys
 import numpy as np
 import nflreadpy as nfl
 
+import depth_chart as dc
 import game_context as gc
 import game_odds as go
 import odds_api
+import props_tracker
 from matchups import CoverageModel, load_coverage_targets
 from props_model import (
-    MARKETS, CORE_MARKETS, MIN_GAMES, blend_toward_market, environment_effect, load_calibration, market_weight, build_history, distribution_summary, draw, fit_player,
+    MARKETS, CORE_MARKETS, MIN_GAMES, blend_toward_market, environment_effect, fair_line, load_calibration,
+    market_weight, build_history, distribution_summary, draw, fit_player,
     line_probs, normalize_name, opponent_multipliers, position_priors, rng_for,
 )
 
@@ -105,16 +108,14 @@ def sample_event_odds(event, history, idx, rng, priors, markets):
                 line = None
                 base_p = 1 - np.exp(-fit["mean"])
             else:
-                # books post a line that makes the over ~a coin flip: the *median*, which for
-                # skewed stats sits below the mean
                 d = draw(spec.kind, fit["mean"], fit["var"], rng, 4000)
+                fair = fair_line(spec.kind, d)
                 if spec.kind == "yards":
-                    line = float(np.floor(np.median(d) * rng.normal(1.0, 0.05) * 2 + 0.5) / 2)
+                    # nudge the model's own fair line by book-to-book noise, for demo realism
+                    line = float(np.floor(fair * rng.normal(1.0, 0.05) * 2 + 0.5) / 2)
                     line = line + 0.5 if line == int(line) else line
                 else:
-                    k = int(np.floor(np.median(d)))
-                    line = min((k - 0.5, k + 0.5), key=lambda c: abs(float((d > c).mean()) - 0.5))
-                    line = max(0.5, line)
+                    line = fair
                     if abs(float((d > line).mean()) - 0.5) > 0.2:
                         continue        # no realistic coin-flip line for a near-zero role
             for i, book in enumerate(["DemoBook A", "DemoBook B", "DemoBook C"]):
@@ -152,13 +153,19 @@ def ev_per_dollar(win_prob, lose_prob, american):
     return win_prob * (odds_api.american_to_decimal(american) - 1) - lose_prob
 
 
-def build_prop(event, home, away, player_row, market, cons, fit, mult, inj, matchup=None):
+def build_prop(event, home, away, player_row, market, cons, fit, mult, inj, matchup=None, promo=1.0,
+               lambda_override=None):
     env = fit.get("env")
     spec = MARKETS[market]
     line = cons["point"]
     rng = rng_for(player_row["player_id"], market)
     draws = draw(spec.kind, fit["mean"], fit["var"], rng)
     p = line_probs(draws, line)
+
+    # The model's own "prediction line" -- computed from the simulated distribution alone, with
+    # no knowledge of where the book set the real line -- checked against it once pulled.
+    predicted_line = fair_line(spec.kind, draws)
+    line_gap = None if predicted_line is None else round(predicted_line - line, 2)
 
     market_over = cons["fair_over"]
     if market_over is None and cons["best_over"]:
@@ -168,7 +175,7 @@ def build_prop(event, home, away, player_row, market, cons, fit, mult, inj, matc
     # downstream (edge, EV, the pick) uses the model shrunk toward the market. Raw stays visible.
     raw = dict(p)
     if market_over is not None:
-        adj_over = blend_toward_market(p["over"], market_over, fit["n_eff"])
+        adj_over = blend_toward_market(p["over"], market_over, fit["n_eff"], lambda_override)
         p = {"over": adj_over, "push": p["push"], "under": max(0.0, 1.0 - p["push"] - adj_over)}
 
     ev_o = ev_per_dollar(p["over"], p["under"], cons["best_over"]["price"]) if cons["best_over"] else None
@@ -191,12 +198,15 @@ def build_prop(event, home, away, player_row, market, cons, fit, mult, inj, matc
         "game": f"{away} @ {home}", "commence": event["commence_time"],
         "market": market, "label": spec.label, "kind": spec.kind, "line": line,
         "mean": round(fit["mean"], 2), "sd": round(float(np.sqrt(fit["var"])), 2),
-        "opp_mult": round(mult, 3), "n_games": fit["n_games"], "thin": fit["n_games"] < THIN_GAMES,
+        "predicted_line": predicted_line, "line_gap": line_gap,
+        "opp_mult": round(mult, 3), "promoted": round(promo, 3) if promo > 1.001 else None,
+        "n_games": fit["n_games"], "thin": fit["n_games"] < THIN_GAMES,
         "injury": inj,
         "over": round(p["over"], 4), "push": round(p["push"], 4), "under": round(p["under"], 4),
         "model_over": round(raw["over"], 4), "model_under": round(raw["under"], 4),
         "gap": None if market_over is None else round((raw["over"] - market_over) * 100, 1),
-        "trust": round(market_weight(fit["n_eff"]), 3),
+        "trust": round(market_weight(fit["n_eff"], lambda_override) if lambda_override is not None
+                      else market_weight(fit["n_eff"]), 3),
         "fair_over": cons["fair_over"], "market_over": None if market_over is None else round(market_over, 4),
         "edge": None if market_over is None else round((p["over"] - market_over) * 100, 1),
         "best_over": cons["best_over"], "best_under": cons["best_under"],
@@ -213,15 +223,25 @@ def build_prop(event, home, away, player_row, market, cons, fit, mult, inj, matc
     }
 
 
-def build_game(event, home, away, home_fits, away_fits, line, prices):
+def build_game(event, home, away, home_fits, away_fits, line, prices, live_weights=None):
     """Sides and totals, priced the same bottom-up way as player props: simulate, sum, compare."""
     rng = rng_for(event["id"], "game")
     home_pts, away_pts = go.simulate_game_scores(home_fits, away_fits, rng)
     raw = go.spread_total_probs(home_pts, away_pts, line["home_spread"], line["total"])
     n_eff = go.fits_n_eff(home_fits, away_fits)
 
-    home_cover = go.blend_game_prob(raw["home_cover"], prices.get("fair_home_cover"), n_eff)
-    over = go.blend_game_prob(raw["over"], prices.get("fair_over"), n_eff)
+    # The model's own "prediction line" from the raw simulation alone, in the same sign
+    # convention as the real posted line, checked against it once pulled.
+    predicted_spread = round(-raw["proj_margin"] * 2) / 2
+    predicted_total = round(raw["proj_total"] * 2) / 2
+    spread_gap = round(predicted_spread - line["home_spread"], 2)
+    total_gap = round(predicted_total - line["total"], 2)
+
+    live_weights = live_weights or {}
+    spread_override = (live_weights.get("game_spread") or {}).get("suggested_weight")
+    total_override = (live_weights.get("game_total") or {}).get("suggested_weight")
+    home_cover = go.blend_game_prob(raw["home_cover"], prices.get("fair_home_cover"), n_eff, spread_override)
+    over = go.blend_game_prob(raw["over"], prices.get("fair_over"), n_eff, total_override)
     away_cover = max(0.0, 1 - home_cover - raw["home_push"])
     under = max(0.0, 1 - over - raw["total_push"])
 
@@ -243,8 +263,13 @@ def build_game(event, home, away, home_fits, away_fits, line, prices):
         "home_spread": line["home_spread"], "total": line["total"],
         "proj_home": round(raw["proj_home"], 1), "proj_away": round(raw["proj_away"], 1),
         "proj_margin": round(raw["proj_margin"], 1), "proj_total": round(raw["proj_total"], 1),
+        "predicted_spread": predicted_spread, "predicted_total": predicted_total,
+        "spread_gap": spread_gap, "total_gap": total_gap,
         "n_players": len(home_fits) + len(away_fits), "n_eff": round(n_eff, 1),
-        "trust": round(go.GAME_LAMBDA_MAX * min(1.0, n_eff / go.GAME_LAMBDA_FULL_N), 3),
+        "spread_trust": round((go.GAME_LAMBDA_MAX if spread_override is None else spread_override)
+                              * min(1.0, n_eff / go.GAME_LAMBDA_FULL_N), 3),
+        "total_trust": round((go.GAME_LAMBDA_MAX if total_override is None else total_override)
+                             * min(1.0, n_eff / go.GAME_LAMBDA_FULL_N), 3),
         "home_cover": round(home_cover, 4), "away_cover": round(away_cover, 4),
         "model_home_cover": round(raw["home_cover"], 4), "fair_home_cover": prices.get("fair_home_cover"),
         "over": round(over, 4), "under": round(under, 4),
@@ -286,6 +311,10 @@ def main():
     history = gc.attach_context(history, gc.load_game_lines([season - 1, season]))   # totals/spreads of past games
     calibration = load_calibration()
     log("Calibration: " + ("loaded" if calibration else "NOT FOUND (run tune_props.py --write) -- using raw projections"))
+    live_weights = props_tracker.load_live_calibration()
+    if live_weights:
+        log(f"Live calibration: refined trust weight for {len(live_weights)} market(s) "
+            f"from tracked results ({', '.join(live_weights)})")
     idx = build_roster_index(history)
     inj = injury_map(season)
     mults = {m: opponent_multipliers(history, MARKETS[m]) for m in markets}
@@ -326,14 +355,21 @@ def main():
         gl = {r["game_id"]: {"total": r["total_line"], "home_spread": -r["spread_line"]}
               for _, r in nfl.load_schedules([season]).to_pandas().iterrows()
               if r["total_line"] == r["total_line"] and r["spread_line"] == r["spread_line"]}
+        game_events = events
     else:
         try:
             raw_game_lines = odds_api.fetch_game_lines(key)[0]
             gl = odds_api.consensus_game_lines(raw_game_lines)
             game_prices = odds_api.consensus_game_prices(raw_game_lines)
+            # the whole week's games, not just the --days window player props are limited to --
+            # this bulk call costs the same flat few credits no matter how many games it covers,
+            # so pricing every upcoming game (and being able to spot a Monday-vs-later-pull line
+            # move on it) is free.
+            game_events = raw_game_lines
         except odds_api.OddsApiError as e:
             log(f"  no game lines ({e}); game environment adjustment and game odds skipped")
             gl = {}
+            game_events = []
 
     props, unmatched, skipped = [], set(), 0
     for ev in events:
@@ -366,13 +402,15 @@ def main():
             matchup = None
             if coverage is not None and market == "player_reception_yds":
                 matchup = coverage.for_receiver(row["player_id"], opp)     # scheme fit, on top of defense strength
+            promo = dc.promotion_multiplier(history, row["team"], row["position"], row["player_id"], inj)
             fit = fit_player(history, row["player_id"], MARKETS[market],
-                             mult * (matchup["mult"] if matchup else 1.0), priors.get(market),
+                             mult * (matchup["mult"] if matchup else 1.0) * promo, priors.get(market),
                              (calibration or {}).get("calibration", {}).get(market), env_fn)
             if fit is None:
                 skipped += 1
                 continue
-            props.append(build_prop(ev, home, away, row, market, c, fit, mult, status, matchup))
+            lambda_override = (live_weights.get(market) or {}).get("suggested_weight")
+            props.append(build_prop(ev, home, away, row, market, c, fit, mult, status, matchup, promo, lambda_override))
 
     log(f"{len(props)} props simulated; {skipped} skipped (out/doubtful or under {MIN_GAMES} games); "
         f"{len(unmatched)} names not matched to a player.")
@@ -380,18 +418,18 @@ def main():
         log("  unmatched: " + ", ".join(sorted(unmatched)[:12]) + (" ..." if len(unmatched) > 12 else ""))
 
     games = []
-    for ev in events:
+    for ev in game_events:
         home, away = odds_api.TEAM_ABBR[ev["home_team"]], odds_api.TEAM_ABBR[ev["away_team"]]
         line = gl.get(ev["id"], {})
         if line.get("total") is None or line.get("home_spread") is None:
             continue   # no real line to compare a simulated score to
         home_fits = go.build_team_fits(history, home, away, mults, priors, calibration,
-                                       line["total"], -line["home_spread"])
+                                       line["total"], -line["home_spread"], inj_status=inj)
         away_fits = go.build_team_fits(history, away, home, mults, priors, calibration,
-                                       line["total"], line["home_spread"])
+                                       line["total"], line["home_spread"], inj_status=inj)
         if not home_fits or not away_fits:
             continue
-        games.append(build_game(ev, home, away, home_fits, away_fits, line, game_prices.get(ev["id"], {})))
+        games.append(build_game(ev, home, away, home_fits, away_fits, line, game_prices.get(ev["id"], {}), live_weights))
     log(f"{len(games)} games priced for sides/totals.")
 
     snapshot = {
@@ -404,7 +442,6 @@ def main():
     log(f"Wrote {OUT}")
 
     if not args.sample:
-        import props_tracker
         n = props_tracker.log_predictions(snapshot)
         log(f"Tracker: logged/updated {n} props for later grading (tracking/props_log.csv)")
 

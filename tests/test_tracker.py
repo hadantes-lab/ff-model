@@ -10,6 +10,7 @@ import types
 import unittest
 from unittest import mock
 
+import numpy as np
 import pandas as pd
 
 import props_tracker as pt
@@ -73,6 +74,46 @@ class TestLogging(unittest.TestCase):
     def test_props_without_a_player_id_are_skipped_not_crashed(self):
         bad = _snapshot(props=[{"market": "player_rush_yds", "player": "No Id"}])
         self.assertEqual(pt.log_predictions(bad), 0)
+
+    def test_opening_line_is_set_on_first_pull_and_kept_on_later_pulls(self):
+        pt.log_predictions(_snapshot())                   # line 60.5 the first time
+        df = pt._load()
+        self.assertEqual(df.iloc[0]["opening_line"], 60.5)
+        self.assertEqual(df.iloc[0]["line_move"], 0.0)
+
+        snap2 = _snapshot()
+        snap2["props"][0]["line"] = 65.5                   # a later run sees a different line
+        pt.log_predictions(snap2)
+        df = pt._load()
+        self.assertEqual(df.iloc[0]["opening_line"], 60.5)   # unchanged
+        self.assertEqual(df.iloc[0]["line"], 65.5)           # the latest value
+        self.assertEqual(df.iloc[0]["line_move"], 5.0)
+
+        snap3 = _snapshot()
+        snap3["props"][0]["line"] = 63.5                   # and a third pull moves it back partway
+        pt.log_predictions(snap3)
+        df = pt._load()
+        self.assertEqual(df.iloc[0]["opening_line"], 60.5)   # still the original
+        self.assertEqual(df.iloc[0]["line_move"], 3.0)
+
+    def test_significant_moves_filters_by_a_kind_appropriate_threshold(self):
+        pt.log_predictions(_snapshot())                    # yards; threshold is 3.0
+        small = _snapshot()
+        small["props"][0]["line"] = 62.0                    # a 1.5-pt move: below threshold
+        pt.log_predictions(small)
+        self.assertTrue(pt.significant_moves().empty)
+
+        big = _snapshot()
+        big["props"][0]["line"] = 70.0                       # a 9.5-pt move from the opening: above threshold
+        pt.log_predictions(big)
+        moves = pt.significant_moves()
+        self.assertEqual(len(moves), 1)
+        self.assertEqual(moves.iloc[0]["line_move"], 9.5)
+
+    def test_no_move_logged_when_the_line_hasnt_changed(self):
+        pt.log_predictions(_snapshot())
+        pt.log_predictions(_snapshot())    # identical line both times
+        self.assertTrue(pt.significant_moves().empty)
 
 
 class TestGrading(unittest.TestCase):
@@ -219,6 +260,82 @@ class TestGameTracking(unittest.TestCase):
         self.assertEqual(pt.build_player_history(), {})
 
 
+class TestRefinement(unittest.TestCase):
+    def setUp(self):
+        self._orig = pt.LOG_FILE
+        pt.LOG_FILE = pt.LOG_FILE.parent / "_test_props_log.csv"
+        self._orig_live = pt.LIVE_CALIBRATION_FILE
+        pt.LIVE_CALIBRATION_FILE = pt.LIVE_CALIBRATION_FILE.parent / "_test_live_calibration.json"
+
+    def tearDown(self):
+        if pt.LOG_FILE.exists():
+            pt.LOG_FILE.unlink()
+        if pt.LIVE_CALIBRATION_FILE.exists():
+            pt.LIVE_CALIBRATION_FILE.unlink()
+        pt.LOG_FILE = self._orig
+        pt.LIVE_CALIBRATION_FILE = self._orig_live
+
+    def _rows(self, n, raw, market, actual_prob, market_col="game_spread"):
+        """n graded rows where the RAW model is much better calibrated than the market."""
+        rng = np.random.default_rng(0)
+        out = []
+        for i in range(n):
+            hit = rng.random() < actual_prob
+            out.append({"player": f"p{i}", "market": market_col, "model_over": raw,
+                       "market_over": market, "result": "over" if hit else "under"})
+        return out
+
+    def test_market_beats_raw_model_by_default_with_too_little_data(self):
+        # raw=0.9 almost always right (actual_prob=0.85), but n is below REFINE_MIN_N
+        pt._save(pd.DataFrame(self._rows(20, 0.90, 0.50, 0.85)))
+        self.assertEqual(pt.refine_trust_weights(), {})
+
+    def test_a_clearly_better_calibrated_raw_model_earns_a_higher_weight(self):
+        # raw=0.85 is close to the true 0.85 hit rate; market says 0.50 (uninformative) -- with
+        # enough data the refit should prefer trusting the model a lot more than the 0.15 default
+        rows = self._rows(200, 0.85, 0.50, 0.85)
+        pt._save(pd.DataFrame(rows))
+        out = pt.refine_trust_weights(min_n=50, current_weight=0.15)
+        self.assertIn("game_spread", out)
+        self.assertGreater(out["game_spread"]["suggested_weight"], 0.15)
+        self.assertLessEqual(out["game_spread"]["suggested_weight"], pt.REFINE_WEIGHT_BOUNDS[1])
+
+    def test_a_market_that_is_already_right_keeps_the_low_default(self):
+        # market=0.85 matches the true rate; raw=0.50 (model has no idea) -- the refit should NOT
+        # move away from a low weight just because n is large
+        rows = self._rows(200, 0.50, 0.85, 0.85)
+        pt._save(pd.DataFrame(rows))
+        out = pt.refine_trust_weights(min_n=50, current_weight=0.15)
+        # either no override (market already wins at the default) or a low one -- never high
+        if "game_spread" in out:
+            self.assertLess(out["game_spread"]["suggested_weight"], 0.3)
+
+    def test_a_tiny_improvement_does_not_trigger_an_override(self):
+        # raw and market are both mediocre and nearly identical -- no clear winner
+        rows = self._rows(200, 0.52, 0.50, 0.50)
+        pt._save(pd.DataFrame(rows))
+        out = pt.refine_trust_weights(min_n=50, current_weight=0.15)
+        self.assertEqual(out, {})
+
+    def test_write_and_load_round_trip(self):
+        rows = self._rows(200, 0.85, 0.50, 0.85)
+        pt._save(pd.DataFrame(rows))
+        written = pt.write_live_calibration(min_n=50)
+        self.assertIn("game_spread", written)
+        loaded = pt.load_live_calibration()
+        self.assertEqual(loaded["game_spread"]["suggested_weight"], written["game_spread"]["suggested_weight"])
+
+    def test_load_live_calibration_missing_file_is_not_fatal(self):
+        self.assertEqual(pt.load_live_calibration(), {})
+
+    def test_rows_without_a_market_probability_are_excluded(self):
+        # a pick'em-only prop, or a sample-mode row, never has market_over -- must not crash
+        # and must not be treated as agreeing with anything
+        rows = [{"player": "p", "market": "game_spread", "model_over": 0.8, "market_over": None, "result": "over"}] * 60
+        pt._save(pd.DataFrame(rows))
+        self.assertEqual(pt.refine_trust_weights(min_n=50), {})
+
+
 class TestReport(unittest.TestCase):
     def setUp(self):
         self._orig = pt.LOG_FILE
@@ -230,7 +347,8 @@ class TestReport(unittest.TestCase):
         pt.LOG_FILE = self._orig
 
     def _graded_df(self, rows):
-        base = {"season": 2026, "week": 3, "kind": "yards", "model_over": 0.5, "market": "player_rush_yds"}
+        base = {"season": 2026, "week": 3, "kind": "yards", "model_over": 0.5, "market": "player_rush_yds",
+               "player": "Test Player", "opening_line": None, "line": None, "line_move": None}
         pt._save(pd.DataFrame([{**base, **r} for r in rows]))
 
     def test_empty_log_reports_zero_gracefully(self):

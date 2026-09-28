@@ -188,10 +188,50 @@ the Odds API's terms. The props page shows the aggregate as a "Track record" pan
 week against what actually happened, for the current season. Early on this will be a small,
 noisy sample; give it a few weeks before reading much into it.
 
-How the model works, and what it can't see: `props_model.py`. It does not know
-about injuries, role changes, weather, or game script, and it simulates players
-independently. Treat large model-vs-market gaps as "the model is missing
-something" until proven otherwise.
+**Prediction lines: the model's own opinion, independent of the market.** Every prop and game
+also gets a "prediction line" (`predicted_line` for props, `predicted_spread`/`predicted_total`
+for games) computed from the simulated distribution alone, before comparing to anything the
+Odds API returns -- the half-point line where the model's own simulation is closest to a coin
+flip (`props_model.fair_line`). Once the real line is pulled, the page shows both side by side
+with the gap between them. This is a second, more direct way to see how far the model's own
+view sits from the market's, separate from the probability-level edge.
+
+**Backup players and role changes.** `depth_chart.py` catches the case a game log alone misses:
+a backup who is about to play a starter's snaps because the real starter is out. It compares a
+player's own recent usage (pass attempts, carries, targets) to his team's, and if a more-used
+teammate at his position is Out/Doubtful/IR this week, scales his volume projection up toward
+what the *offense* -- not him personally -- has recently done there (never his per-touch
+efficiency, which still comes from his own history). Verified against a real slate before
+shipping (Chicago's Tyson Bagent correctly promoted 2.4x with Caleb Williams out); a first version
+also mis-flagged a healthy RB committee's lead back and starting WRs as "promoted" because it
+used a fixed share-of-team-usage threshold, which works for a QB's near-monopoly on attempts
+but not for positions that split touches more evenly -- fixed by requiring an actual injured,
+more-used teammate to exist, no threshold needed.
+
+**Refining the market-blend weight from real results, not just history.** `tune_props.py`
+validates the projection engine against 2023-25 *stats*; there's no way to check its agreement
+with the *market* that way, since no historical prop lines exist. `props_tracker.py refine`
+closes that gap using props_tracker's own tracked outcomes: once a market has 50+ graded, priced
+picks, it grid-searches the trust weight (see `blend_toward_market` above) that would have
+minimized Brier score against what actually happened, and only overrides the static default if
+that clearly beats it (`REFINE_MIN_N`, `REFINE_MIN_IMPROVEMENT` in `props_tracker.py` --
+deliberately conservative, so a mediocre early sample can't swing the weight around). The
+scheduled workflow runs this before each week's pull, writing `live_calibration.json` fresh each
+time (not committed -- cheap to regenerate from the already-persisted tracking log).
+
+**Line movement.** Every logged prop/game keeps its `opening_line` (set once, never overwritten)
+alongside the latest `line`, so a later pull that differs from an earlier one is visible as
+`line_move`, not silently overwritten. `python props_tracker.py moves` lists moves past a
+per-kind threshold (`BIG_MOVE` in `props_tracker.py`); the biggest ones also show in the page's
+Track Record panel. In practice this mostly populates for games: player props are pulled once
+under the `--days 1` schedule, but game lines are pulled every run for the whole week's slate at
+a flat ~2-credit cost regardless of how many games it covers (see `game_odds.py` below), so the
+same game genuinely does get re-priced Sunday, Monday, and Thursday.
+
+How the model works, and what it still can't see: `props_model.py`. It does not know about
+weather or in-game injuries, and it simulates players independently of each other (aside from
+the shared game-script factor `game_odds.py` uses for team totals). Treat large model-vs-market
+gaps as "the model is missing something" until proven otherwise.
 
 ## What to add next (natural extensions)
 

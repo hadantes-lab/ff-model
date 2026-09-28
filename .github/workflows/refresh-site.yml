@@ -50,12 +50,16 @@ jobs:
           python export_snapshot.py > web/snapshot.json
           python web/build_page.py
 
-      # Grade props logged on earlier runs against now-final results, before pulling this
-      # week's lines, so the report reflects everything finished so far.
-      - name: Grade previous props and build the track record
+      # Grade props logged on earlier runs against now-final results, refit the market-blend
+      # trust weight per market from those real tracked outcomes (live_calibration.json --
+      # conservative: only markets with 50+ graded picks and a clear improvement get an
+      # override, so most weeks this changes nothing), then build the track record -- all
+      # before pulling this week's lines, so export_props.py picks up today's refined weights.
+      - name: Grade previous props, refine calibration, build the track record
         if: steps.key.outputs.have_key == 'true'
         run: |
           python props_tracker.py grade
+          python props_tracker.py refine
           python props_tracker.py report --json
 
       # Only games starting in the next 24 hours: about one slate of API credits per run.
@@ -80,8 +84,9 @@ jobs:
 
       # tracking/props_log.csv, web/track_record.json and web/player_history.json are this
       # workflow's memory: Actions runs are ephemeral, so they only persist by being committed
-      # back to the repo. This
-      # holds our own logged predictions and results, never a sportsbook's odds board.
+      # back to the repo. This holds our own logged predictions and results, never a
+      # sportsbook's odds board. live_calibration.json is NOT committed -- it's cheaply
+      # regenerated from the tracking log every run, so there's nothing to persist.
       - name: Commit the props tracking log
         if: steps.key.outputs.have_key == 'true'
         run: |

@@ -114,6 +114,11 @@ class TestMarketBlend(unittest.TestCase):
         self.assertGreater(high, low)
         self.assertLessEqual(go.blend_game_prob(0.70, 0.50, n_eff=10_000), 0.50 + go.GAME_LAMBDA_MAX * 0.20)
 
+    def test_lambda_max_override_replaces_the_static_default(self):
+        default = go.blend_game_prob(0.90, 0.50, n_eff=100)
+        overridden = go.blend_game_prob(0.90, 0.50, n_eff=100, lambda_max=0.40)
+        self.assertGreater(overridden, default)
+
     def test_no_market_probability_leaves_the_model_unchanged(self):
         self.assertEqual(go.blend_game_prob(0.63, None, n_eff=50), 0.63)
 
@@ -127,10 +132,11 @@ class TestRosterSelection(unittest.TestCase):
     def _history(self):
         rows = []
         for w in range(1, 9):
-            rows.append(dict(player_id="qb1", team="AAA", position="QB", attempts=32, carries=3, targets=0, week=w))
-            rows.append(dict(player_id="rb1", team="AAA", position="RB", attempts=0, carries=18, targets=3, week=w))
-            rows.append(dict(player_id="rb2", team="AAA", position="RB", attempts=0, carries=4, targets=1, week=w))
-            rows.append(dict(player_id="wr_new", team="AAA", position="WR", attempts=0, carries=0, targets=6, week=w if w > 6 else None))
+            rows.append(dict(player_id="qb1", team="AAA", position="QB", season=2026, attempts=32, carries=3, targets=0, week=w))
+            rows.append(dict(player_id="qb2", team="AAA", position="QB", season=2026, attempts=8, carries=1, targets=0, week=w))
+            rows.append(dict(player_id="rb1", team="AAA", position="RB", season=2026, attempts=0, carries=18, targets=3, week=w))
+            rows.append(dict(player_id="rb2", team="AAA", position="RB", season=2026, attempts=0, carries=4, targets=1, week=w))
+            rows.append(dict(player_id="wr_new", team="AAA", position="WR", season=2026, attempts=0, carries=0, targets=6, week=w if w > 6 else None))
         return pd.DataFrame([r for r in rows if r["week"] is not None])
 
     def test_picks_the_right_positions_by_usage(self):
@@ -142,6 +148,45 @@ class TestRosterSelection(unittest.TestCase):
         # wr_new only has 2 games of history -- below MIN_USAGE_GAMES
         picks = go.select_offense(self._history(), "AAA")
         self.assertNotIn("wr_new", picks)
+
+    def test_inactive_player_is_excluded_so_the_backup_is_selected_instead(self):
+        picks = go.select_offense(self._history(), "AAA", inactive_ids={"qb1"})
+        self.assertNotIn("qb1", picks)
+        self.assertIn("qb2", picks)
+
+    def test_without_the_exclusion_the_backup_would_not_be_picked(self):
+        # sanity check that the fixture actually needs the exclusion to matter
+        picks = go.select_offense(self._history(), "AAA")
+        self.assertIn("qb1", picks)
+        self.assertNotIn("qb2", picks)   # ROSTER_SLOTS takes only 1 QB, and qb1 outranks qb2
+
+
+class TestBuildTeamFitsWithInjuries(unittest.TestCase):
+    def _history(self):
+        rows = []
+        for w in range(1, 11):
+            rows.append(dict(player_id="starter", team="AAA", position="QB", season=2026, week=w,
+                             opponent_team="XXX", attempts=34, carries=2, targets=0, passing_yards=240,
+                             rushing_yards=10, rushing_tds=0.1, receiving_tds=0.0))
+            rows.append(dict(player_id="backup", team="AAA", position="QB", season=2026, week=w,
+                             opponent_team="XXX", attempts=6, carries=1, targets=0, passing_yards=35,
+                             rushing_yards=2, rushing_tds=0.0, receiving_tds=0.0))
+        return pd.DataFrame(rows)
+
+    def test_inactive_starter_is_not_in_the_simulated_roster(self):
+        h = self._history()
+        fits = go.build_team_fits(h, "AAA", "BBB", {}, {}, inj_status={"starter": "Out"})
+        # only the backup's pass_yd fit should be present, scaled up toward the team's own rate
+        pass_means = [pf["pass_yd"]["mean"] for pf in fits if pf.get("pass_yd")]
+        self.assertEqual(len(pass_means), 1)
+        self.assertGreater(pass_means[0], 35)   # boosted well above his own backup-level rate
+
+    def test_healthy_starter_is_not_boosted(self):
+        h = self._history()
+        fits = go.build_team_fits(h, "AAA", "BBB", {}, {}, inj_status={})
+        pass_means = [pf["pass_yd"]["mean"] for pf in fits if pf.get("pass_yd")]
+        self.assertEqual(len(pass_means), 1)
+        self.assertAlmostEqual(pass_means[0], 240, delta=5)
 
 
 class TestGamePriceConsensus(unittest.TestCase):

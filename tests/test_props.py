@@ -12,7 +12,8 @@ import pandas as pd
 import odds_api
 import game_context as gc
 from props_model import (
-    LAMBDA_MAX, environment_effect, load_calibration, MARKETS, blend_toward_market, distribution_summary, draw, fit_moments, fit_player,
+    LAMBDA_MAX, environment_effect, fair_line, load_calibration, MARKETS, blend_toward_market, distribution_summary,
+    draw, fit_moments, fit_player,
     line_probs, market_weight, normalize_name, opponent_multipliers, position_priors, recency_weights, rng_for,
 )
 
@@ -64,6 +65,48 @@ class TestMarketBlend(unittest.TestCase):
     def test_agreement_is_unchanged_and_thin_samples_defer_to_the_market(self):
         self.assertAlmostEqual(blend_toward_market(0.5, 0.5, 20), 0.5)
         self.assertLess(abs(blend_toward_market(0.8, 0.5, 2) - 0.5), abs(blend_toward_market(0.8, 0.5, 20) - 0.5))
+
+    def test_lambda_override_replaces_the_static_default(self):
+        # a market that props_tracker.py's weekly refinement has earned more trust for
+        default = blend_toward_market(0.90, 0.50, 50)
+        overridden = blend_toward_market(0.90, 0.50, 50, lambda_max=0.40)
+        self.assertGreater(overridden, default)
+        self.assertEqual(market_weight(50, lambda_max=0.40), 0.40)
+
+    def test_no_override_falls_back_to_the_static_default(self):
+        self.assertEqual(blend_toward_market(0.9, 0.5, 50), blend_toward_market(0.9, 0.5, 50, lambda_max=None))
+
+
+class TestFairLine(unittest.TestCase):
+    def test_td_has_no_line(self):
+        self.assertIsNone(fair_line("td", np.array([0, 1, 2])))
+
+    def test_yards_line_is_never_a_whole_number(self):
+        rng = np.random.default_rng(0)
+        for mean in (20, 55, 90, 130):
+            d = draw("yards", mean, (mean * 0.4) ** 2, rng, 20000)
+            line = fair_line("yards", d)
+            self.assertNotEqual(line % 1, 0.0)
+
+    def test_yards_line_is_close_to_a_coin_flip(self):
+        rng = np.random.default_rng(1)
+        d = draw("yards", 65, 25 ** 2, rng, 40000)
+        line = fair_line("yards", d)
+        self.assertAlmostEqual(float((d > line).mean()), 0.5, delta=0.05)
+
+    def test_count_line_is_a_half_point_and_never_negative(self):
+        rng = np.random.default_rng(2)
+        for mean in (0.3, 1.0, 4.5, 8.0):
+            d = draw("count", mean, mean * 1.3, rng, 20000)
+            line = fair_line("count", d)
+            self.assertNotEqual(line % 1, 0.0)
+            self.assertGreaterEqual(line, 0.5)
+
+    def test_count_line_is_close_to_a_coin_flip(self):
+        rng = np.random.default_rng(3)
+        d = draw("count", 5.0, 8.0, rng, 40000)
+        line = fair_line("count", d)
+        self.assertAlmostEqual(float((d > line).mean()), 0.5, delta=0.15)   # coarser grid than yards
 
 
 class TestLineProbs(unittest.TestCase):

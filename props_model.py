@@ -209,14 +209,19 @@ def position_priors(history: pd.DataFrame, spec: Spec) -> dict:
     return stat_series(df, spec).groupby(df["position"]).mean().to_dict()
 
 
-def market_weight(n_eff: float) -> float:
-    """Share of the model's disagreement with the market that is trusted; thinner history -> less."""
-    return LAMBDA_MAX * min(1.0, max(0.0, n_eff) / LAMBDA_FULL_N)
+def market_weight(n_eff: float, lambda_max: float = LAMBDA_MAX) -> float:
+    """
+    Share of the model's disagreement with the market that is trusted; thinner history -> less.
+    `lambda_max` (the ceiling at full history) defaults to the static LAMBDA_MAX but can be
+    overridden per market once props_tracker.py's weekly refinement has enough real tracked
+    outcomes to justify a different ceiling (see live_calibration.json).
+    """
+    return lambda_max * min(1.0, max(0.0, n_eff) / LAMBDA_FULL_N)
 
 
-def blend_toward_market(model_p: float, market_p: float, n_eff: float) -> float:
+def blend_toward_market(model_p: float, market_p: float, n_eff: float, lambda_max: float = None) -> float:
     """Shrink a model probability toward the market's: market + w * (model - market)."""
-    return market_p + market_weight(n_eff) * (model_p - market_p)
+    return market_p + market_weight(n_eff, LAMBDA_MAX if lambda_max is None else lambda_max) * (model_p - market_p)
 
 
 def fit_player(history: pd.DataFrame, player_id: str, spec: Spec, opp_mult: float = 1.0, priors=None,
@@ -288,6 +293,24 @@ def draw(kind: str, mean: float, var: float, rng: np.random.Generator, n: int = 
         return rng.negative_binomial(r, p, n).astype(float)
     k = mean ** 2 / max(var, 1e-9)           # gamma: skewed yardage
     return rng.gamma(k, var / mean, n)
+
+
+def fair_line(kind: str, draws: np.ndarray):
+    """
+    The model's OWN "prediction line" -- the half-point line where its simulated distribution
+    alone is closest to a coin flip -- computed independently of any market line, so it can be
+    checked against the real posted line once one is pulled. None for "td" (a yes/no
+    probability, not a line).
+    """
+    if kind == "td":
+        return None
+    if kind == "yards":
+        median = float(np.median(draws))
+        line = float(np.floor(median * 2 + 0.5) / 2)
+        return line + 0.5 if line == int(line) else line
+    k = int(np.floor(np.median(draws)))
+    candidates = (max(0.5, k - 0.5), k + 0.5)
+    return min(candidates, key=lambda c: abs(float((draws > c).mean()) - 0.5))
 
 
 def line_probs(draws: np.ndarray, line: float) -> dict:

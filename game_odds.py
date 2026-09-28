@@ -41,6 +41,7 @@ so that check accumulates over time.
 
 import numpy as np
 
+import depth_chart
 import game_context as gc
 from props_model import MARKETS, environment_effect, fit_player
 
@@ -117,11 +118,15 @@ def fits_n_eff(*fit_lists):
     return float(np.mean(vals)) if vals else 0.0
 
 
-def blend_game_prob(model_p, market_p, n_eff):
-    """Shrink a simulated probability toward the market's, trusted more with more history behind it."""
+def blend_game_prob(model_p, market_p, n_eff, lambda_max=None):
+    """
+    Shrink a simulated probability toward the market's, trusted more with more history behind
+    it. `lambda_max` overrides GAME_LAMBDA_MAX once props_tracker.py's weekly refinement has
+    enough real graded game picks to justify a different ceiling for this market.
+    """
     if market_p is None:
         return model_p
-    weight = GAME_LAMBDA_MAX * min(1.0, max(0.0, n_eff) / GAME_LAMBDA_FULL_N)
+    weight = (GAME_LAMBDA_MAX if lambda_max is None else lambda_max) * min(1.0, max(0.0, n_eff) / GAME_LAMBDA_FULL_N)
     return market_p + weight * (model_p - market_p)
 
 
@@ -145,12 +150,16 @@ def spread_total_probs(home_pts, away_pts, home_spread, total_line):
 
 
 # ---- roster selection + fitting --------------------------------------------------------
-def select_offense(history, team, min_games=MIN_USAGE_GAMES):
+def select_offense(history, team, min_games=MIN_USAGE_GAMES, inactive_ids=()):
     """
     This team's likely contributors this week, by recent usage. -> [player_id, ...].
-    `history` must have the columns build_history() produces.
+    `history` must have the columns build_history() produces. `inactive_ids` (Out/Doubtful/IR
+    this week) are excluded before ranking, so a hurt starter's history doesn't crowd out the
+    healthy backup actually playing -- without this, select_offense would keep picking last
+    week's starter by usage alone even after he's ruled out.
     """
-    recent = history[history["team"] == team].groupby("player_id", as_index=False).tail(4)
+    recent = history[(history["team"] == team) & (~history["player_id"].isin(inactive_ids))]
+    recent = recent.groupby("player_id", as_index=False).tail(4)
     usage = recent.groupby(["player_id", "position"]).agg(
         attempts=("attempts", "mean"), carries=("carries", "mean"), targets=("targets", "mean"),
         games=("attempts", "size")).reset_index()
@@ -162,7 +171,8 @@ def select_offense(history, team, min_games=MIN_USAGE_GAMES):
     return picks
 
 
-def build_team_fits(history, team, opp, mults, priors, calibration=None, game_total=None, team_margin=None):
+def build_team_fits(history, team, opp, mults, priors, calibration=None, game_total=None, team_margin=None,
+                    inj_status=None):
     """
     Fit each selected player's rush_yd / pass_yd / td distributions -- opponent-adjusted,
     market-calibrated, and game-environment-adjusted using EACH market's own fitted
@@ -179,12 +189,15 @@ def build_team_fits(history, team, opp, mults, priors, calibration=None, game_to
             return None
         return lambda g, w, e=eff, t=game_total, m=team_margin: gc.env_multiplier(g, w, t, m, e)
 
+    inj_status = inj_status or {}
+    inactive_ids = {pid for pid, status in inj_status.items() if status in depth_chart.OUT_STATUSES}
     fits = []
-    for pid in select_offense(history, team):
+    for pid in select_offense(history, team, inactive_ids=inactive_ids):
         row = history[history["player_id"] == pid]
         if row.empty:
             continue
         pos = row["position"].iloc[-1]
+        promo = depth_chart.promotion_multiplier(history, team, pos, pid, inj_status)
         block = {}
         for market, key, eligible in [
             ("player_pass_yds", "pass_yd", pos == "QB"),
@@ -194,9 +207,9 @@ def build_team_fits(history, team, opp, mults, priors, calibration=None, game_to
                 continue
             m = mults.get(market, {}).get((opp, pos), 1.0)
             calib = (calibration or {}).get("calibration", {}).get(market)
-            block[key] = fit_player(history, pid, MARKETS[market], m, None, calib, env_fn_for(market))
+            block[key] = fit_player(history, pid, MARKETS[market], m * promo, None, calib, env_fn_for(market))
         m = mults.get("player_anytime_td", {}).get((opp, pos), 1.0)
-        block["td"] = fit_player(history, pid, MARKETS["player_anytime_td"], m, priors.get("player_anytime_td"))
+        block["td"] = fit_player(history, pid, MARKETS["player_anytime_td"], m * promo, priors.get("player_anytime_td"))
         if any(block.values()):
             fits.append(block)
     return fits

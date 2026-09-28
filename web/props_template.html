@@ -305,6 +305,8 @@ function renderTrackRecord() {
       <div><div class="k" style="font-size:10.5px; color:var(--text-faint);">ROI / $1</div><div class="num ev ${roiClass}" style="display:inline-block; font-size:16px;">${TRACK.roi_per_dollar == null ? "—" : signed(TRACK.roi_per_dollar * 100, 1) + "%"}</div></div>
     </div>
     <div class="note" style="margin-top:8px;">Flat $1-per-pick at the price recorded when logged, not a simulated bankroll -- and still a small, noisy sample this early. This is the model being checked against what actually happened, not a claim that it works.</div>
+    ${(TRACK.big_moves || []).length ? `<div class="note" style="margin-top:8px;"><strong>Notable line moves since first pulled:</strong> ${TRACK.big_moves.slice(0, 5).map(m =>
+      `${esc(m.player)} (${esc(m.market)}) ${m.opening_line} &rarr; ${m.line}`).join(" &middot; ")}</div>` : ""}
   </div>`;
 }
 
@@ -352,7 +354,7 @@ function rowHTML(p) {
     <div class="row-head" role="button" tabindex="0" aria-expanded="${S.open === p.id}">
       <div class="who"><div class="name">${esc(p.player)}</div>
         <div class="sub"><span>${p.team} ${p.home ? "vs" : "@"} ${p.opp}</span><span class="tag">${p.pos}</span>
-          ${p.injury ? `<span class="tag warn">${esc(p.injury)}</span>` : ""}${p.thin ? `<span class="tag warn">${p.n_games} games</span>` : ""}${p.env && Math.abs(p.env.mult - 1) >= 0.04 ? `<span class="tag" title="Game total ${p.env.total}, ${p.team} implied ${p.env.implied}: moves the projection ${signed((p.env.mult - 1) * 100, 1)}%">${p.env.total} total ${signed((p.env.mult - 1) * 100, 0)}%</span>` : ""}${p.dfs && p.dfs.some(d => d.gap !== 0) ? `<span class="tag">pick'em line differs</span>` : ""}${big ? `<span class="tag warn" title="The raw model is ${Math.abs(p.gap).toFixed(0)} points from the market, far more than a real edge usually is">model far from market</span>` : ""}</div></div>
+          ${p.injury ? `<span class="tag warn">${esc(p.injury)}</span>` : ""}${p.promoted ? `<span class="tag" title="A teammate ahead of him in usage is Out/Doubtful/IR; his volume is scaled x${p.promoted} toward the team's rate">backup starting</span>` : ""}${p.thin ? `<span class="tag warn">${p.n_games} games</span>` : ""}${p.env && Math.abs(p.env.mult - 1) >= 0.04 ? `<span class="tag" title="Game total ${p.env.total}, ${p.team} implied ${p.env.implied}: moves the projection ${signed((p.env.mult - 1) * 100, 1)}%">${p.env.total} total ${signed((p.env.mult - 1) * 100, 0)}%</span>` : ""}${p.dfs && p.dfs.some(d => d.gap !== 0) ? `<span class="tag">pick'em line differs</span>` : ""}${big ? `<span class="tag warn" title="The raw model is ${Math.abs(p.gap).toFixed(0)} points from the market, far more than a real edge usually is">model far from market</span>` : ""}</div></div>
       <div class="mk"><div class="lbl">${esc(p.label)}</div><div class="line">${fmtLine(p)}</div></div>
       <div class="model"><div class="mean">${p.kind === "td" ? pct(p.over, 1) : "μ " + p.mean}</div>
         <div class="pair">${p.kind === "td" ? "P(TD) adj" : "P(over) adj " + pct(p.over)} · raw ${pct(p.model_over)}${p.market_over != null ? ` · mkt ${pct(p.market_over)}${p.fair_over == null ? "*" : ""}` : ""}</div></div>
@@ -420,7 +422,10 @@ function renderDetail(p) {
         <div class="fact"><div class="k">Defense adj</div><div class="v">×${p.opp_mult.toFixed(2)}</div></div>
         <div class="fact"><div class="k">Game env adj</div><div class="v">${p.env ? "×" + p.env.mult.toFixed(3) : "—"}</div></div>
         <div class="fact"><div class="k">Coverage adj</div><div class="v">${p.matchup ? "×" + p.matchup.mult.toFixed(3) : "—"}</div></div>
+        <div class="fact"><div class="k">Model's own line</div><div class="v">${p.predicted_line == null ? "—" : p.predicted_line}</div></div>
       </div>
+      ${p.predicted_line != null ? `<div class="note"><strong>Prediction line.</strong> Computed from the simulated distribution alone, before knowing where the book set the real line: <strong>${p.predicted_line}</strong>, vs the posted <strong>${p.line}</strong> (${signed(p.line_gap, 1)}). This is the raw model's own opinion of a fair line, separate from the market-blended probability above.</div>` : ""}
+      ${p.promoted ? `<div class="note"><strong>Backup starting.</strong> A teammate ahead of him in recent usage is Out/Doubtful/IR, so his volume projection is scaled ×${p.promoted} toward what this offense (not him personally) has recently done at his position -- his own thin recent history alone would understate him.</div>` : ""}
       ${p.env ? `<div class="note"><strong>Game environment.</strong> Total ${p.env.total}, ${esc(p.team)} ${p.env.margin >= 0 ? "favored by " + p.env.margin : "underdogs by " + Math.abs(p.env.margin)} &rarr; implied ${esc(p.team)} ${p.env.implied}, ${esc(p.opp)} ${p.env.implied_opp}. This player's recent games averaged a ${p.env.avg_total} total and ${signed(p.env.avg_margin, 1)} margin, so this setup moves the projection &times;${p.env.mult.toFixed(3)}. The size of the effect per market was measured on 2023&ndash;25 games and shrunk by how well it held up out of sample.</div>` : ""}
       ${p.matchup ? `<div class="note"><strong>Coverage matchup.</strong> ${esc(p.opp)} played zone on about ${(p.matchup.opp_zone * 100).toFixed(0)}% of pass plays (league ${(p.matchup.league_zone * 100).toFixed(0)}%; 2024&ndash;25 tendencies, pulled toward the league because schemes only partly carry over).
         ${p.matchup.split ? `${esc(p.player)} averaged ${p.matchup.split.zone_ypt} yards/target against zone (${p.matchup.split.zone_n} targets) and ${p.matchup.split.man_ypt} against man (${p.matchup.split.man_n}); only ${(p.matchup.reliability * 100).toFixed(0)}% of that split is trusted, because a receiver's zone-vs-man gap barely repeats year to year. Net effect &times;${p.matchup.mult.toFixed(3)}.` : "No reliable zone/man split for this receiver, so no adjustment."}
@@ -537,11 +542,14 @@ function marketRow(label, line, probA, nameA, probB, nameB, rawA, pickInfo) {
 
 function gameCardHTML(g) {
   const spreadLine = g.home_spread <= 0 ? `${g.home} ${g.home_spread}` : `${g.away} ${-g.home_spread}`;
+  const predSpreadLine = g.predicted_spread <= 0 ? `${g.home} ${g.predicted_spread}` : `${g.away} ${-g.predicted_spread}`;
   const spreadPickInfo = { pick: g.spread_pick, price: g.spread_pick_price, ev: g.spread_pick_ev };
   const totalPickInfo = { pick: g.total_pick, price: g.total_pick_price, ev: g.total_pick_ev };
-  const trustNote = g.trust < 0.1
-    ? `Early-season sample (n_eff ${g.n_eff}) -- only ${pct(g.trust)} of the model's own view is trusted here; the rest defers to the market.`
-    : `n_eff ${g.n_eff} across ${g.n_players} simulated players -- ${pct(g.trust)} of the model's disagreement with the market is trusted.`;
+  const trust = Math.min(g.spread_trust, g.total_trust);
+  const trustNote = trust < 0.1
+    ? `Early-season sample (n_eff ${g.n_eff}) -- only up to ${pct(trust)} of the model's own view is trusted here; the rest defers to the market.`
+    : `n_eff ${g.n_eff} across ${g.n_players} simulated players -- spread trust ${pct(g.spread_trust)}, total trust ${pct(g.total_trust)}.`;
+  const predNote = `Model's own line (before seeing the market): <strong>${esc(predSpreadLine)}</strong> (${signed(g.spread_gap, 1)} vs posted) &middot; total <strong>${g.predicted_total}</strong> (${signed(g.total_gap, 1)} vs posted).`;
   return `<div class="row game-card">
     <div class="game-head">
       <div class="teams">${esc(g.away)} @ ${esc(g.home)}</div>
@@ -558,7 +566,8 @@ function gameCardHTML(g) {
         ${marketRow("Total", g.total, g.over, "Over", g.under, "Under", g.model_over, totalPickInfo)}
       </div>
     </div>
-    <div class="note" style="margin-top:10px;">${trustNote}</div>
+    <div class="note" style="margin-top:10px;">${predNote}</div>
+    <div class="note" style="margin-top:4px;">${trustNote}</div>
   </div>`;
 }
 

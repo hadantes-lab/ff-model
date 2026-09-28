@@ -7,3 +7,4 @@ web/auction_board.html
 web/cache/
 web/props.html
 web/props_snapshot.json
+live_calibration.json

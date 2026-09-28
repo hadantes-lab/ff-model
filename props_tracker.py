@@ -42,10 +42,12 @@ KEY = ["season", "week", "player_id", "market"]
 
 COLUMNS = KEY + [
     "player", "team", "opp", "pos", "game", "commence", "kind", "line",
+    "opening_line", "line_move",
     "model_over", "model_under", "market_over", "gap", "trust",
     "pick", "pick_price", "pick_ev",
     "logged_at", "actual", "result", "graded_at",
 ]
+BIG_MOVE = {"yards": 3.0, "count": 1.0, "spread": 1.5, "total": 2.0}  # per-kind threshold to flag a line move
 
 
 def _load() -> pd.DataFrame:
@@ -88,11 +90,11 @@ def log_predictions(snapshot: dict) -> int:
         # with "over" standing for "home covers" -- so grading, ROI, and calibration need no
         # special case for games at all (the page itself still shows "home"/"away").
         spread_pick = {"home": "over", "away": "under"}.get(g.get("spread_pick"))
-        for market, key, line, model_over, model_under, pick, pick_price_obj, pick_ev in (
+        for market, key, line, model_over, model_under, pick, pick_price_obj, pick_ev, trust in (
             ("game_spread", "spread", g["home_spread"], g["model_home_cover"], 1 - g["model_home_cover"],
-             spread_pick, g.get("spread_pick_price"), g.get("spread_pick_ev")),
+             spread_pick, g.get("spread_pick_price"), g.get("spread_pick_ev"), g.get("spread_trust")),
             ("game_total", "total", g["total"], g["model_over"], 1 - g["model_over"],
-             g.get("total_pick"), g.get("total_pick_price"), g.get("total_pick_ev")),
+             g.get("total_pick"), g.get("total_pick_price"), g.get("total_pick_ev"), g.get("total_trust")),
         ):
             rows.append({
                 "season": snapshot["season"], "week": snapshot["week"],
@@ -101,18 +103,50 @@ def log_predictions(snapshot: dict) -> int:
                 "pos": "GAME", "game": g["game"], "commence": g["commence"], "kind": key,
                 "line": line, "model_over": model_over, "model_under": model_under,
                 "market_over": g.get("fair_home_cover") if key == "spread" else g.get("fair_over"),
-                "gap": None, "trust": g.get("trust"),
+                "gap": None, "trust": trust,
                 "pick": pick, "pick_price": pick_price_obj["price"] if pick_price_obj else None, "pick_ev": pick_ev,
                 "logged_at": now, "actual": np.nan, "result": np.nan, "graded_at": np.nan,
             })
     if not rows:
         return 0
-    new = pd.DataFrame(rows)
+
+    # opening_line is set once and carried forward on every later pull, so a Monday line and a
+    # Thursday line for the same prop/game can be compared even though the row itself gets
+    # upserted (see the class docstring: only games/props that happen to be pulled more than
+    # once actually get this -- mainly games, whose bulk line call covers the whole week cheaply).
     old = _load()
+    opening_by_key = {}
+    if not old.empty:
+        for r in old.itertuples(index=False):
+            k = tuple(getattr(r, c) for c in KEY)
+            prior = getattr(r, "opening_line", None) if "opening_line" in old.columns else None
+            opening_by_key[k] = prior if prior == prior else r.line   # NaN-safe fallback to its own line
+    for row in rows:
+        k = tuple(row[c] for c in KEY)
+        row["opening_line"] = opening_by_key.get(k, row["line"])
+        row["line_move"] = (None if row["line"] is None or row["opening_line"] is None
+                            else round(row["line"] - row["opening_line"], 3))
+
+    new = pd.DataFrame(rows)
     combined = pd.concat([old, new], ignore_index=True)
     combined = combined.drop_duplicates(subset=KEY, keep="last")   # this run's numbers win
     _save(combined)
     return len(new)
+
+
+def significant_moves(min_by_kind=BIG_MOVE):
+    """Logged props/games whose line has moved more than a kind-appropriate threshold since
+    the first pull, largest move first. Mostly populated for games (see log_predictions);
+    player props typically get pulled only once under the --days-limited schedule."""
+    df = _load()
+    if df.empty or "line_move" not in df.columns:
+        return df
+    moved = df[df["line_move"].notna() & (df["line_move"] != 0)].copy()
+    if moved.empty:
+        return moved
+    threshold = moved["kind"].map(min_by_kind).fillna(1.0)
+    big = moved[moved["line_move"].abs() >= threshold].copy()
+    return big.reindex(big["line_move"].abs().sort_values(ascending=False).index)
 
 
 # ---- grading ----------------------------------------------------------------
@@ -215,6 +249,75 @@ def calibration_table(g: pd.DataFrame, col: str, bins=(0, 0.40, 0.50, 0.60, 1.01
     return out
 
 
+# ---- weekly calibration refinement ------------------------------------------
+LIVE_CALIBRATION_FILE = pathlib.Path(__file__).parent / "live_calibration.json"
+REFINE_MIN_N = 50          # graded, priced picks a market needs before its trust weight can be refit
+REFINE_MIN_IMPROVEMENT = 0.02   # the refit weight must beat the current default's Brier score by this much
+REFINE_WEIGHT_BOUNDS = (0.0, 0.5)   # a refined weight is always clamped into this range, however good the fit looks
+
+
+def _brier(pred, actual):
+    return float(np.mean((pred - actual) ** 2))
+
+
+def refine_trust_weights(min_n=REFINE_MIN_N, current_weight=0.15):
+    """
+    For each market with >= min_n graded, priced picks, grid-search the market-blend trust
+    weight (see props_model.blend_toward_market / game_odds.blend_game_prob) that would have
+    minimized Brier score against real tracked outcomes so far, and compare it to
+    `current_weight` (the static default currently in use). A market only gets a suggested
+    override if it clears REFINE_MIN_IMPROVEMENT over that default -- otherwise a handful of
+    close scores from a middling sample would flip the weight around for no real reason.
+
+    Needs BOTH the raw model probability and the market's own fair probability logged, which is
+    only true for props/games where a real market price existed (sample runs and pick'em-only
+    props are excluded automatically since those never populate market_over).
+    -> {market: {"n", "current_brier", "suggested_weight", "suggested_brier"}} for markets with
+    enough data to refine; markets below min_n are left out entirely (still use the static default).
+    """
+    df = _load()
+    g = df[df["result"].notna() & (df["result"] != "dnp") & df["market_over"].notna()
+          & df["model_over"].notna()].copy()
+    if g.empty:
+        return {}
+    out = {}
+    for m, gm in g.groupby("market"):
+        if len(gm) < min_n:
+            continue
+        actual = np.where(gm["result"] == "over", 1.0, np.where(gm["result"] == "push", 0.5, 0.0))
+        raw, mkt = gm["model_over"].to_numpy(float), gm["market_over"].to_numpy(float)
+        current_brier = _brier(mkt + current_weight * (raw - mkt), actual)
+        grid = np.linspace(*REFINE_WEIGHT_BOUNDS, 26)
+        scored = [(w, _brier(mkt + w * (raw - mkt), actual)) for w in grid]
+        best_w, best_brier = min(scored, key=lambda t: t[1])
+        if current_brier - best_brier < REFINE_MIN_IMPROVEMENT:
+            continue   # not a clear enough win over the default to trust yet
+        out[m] = {"n": int(len(gm)), "current_brier": round(current_brier, 4),
+                  "suggested_weight": round(float(best_w), 3), "suggested_brier": round(best_brier, 4)}
+    return out
+
+
+def write_live_calibration(min_n=REFINE_MIN_N):
+    refined = refine_trust_weights(min_n)
+    LIVE_CALIBRATION_FILE.write_text(json.dumps({
+        "updated": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
+        "min_n": min_n, "weights": refined,
+        "note": "Per-market override for the market-blend trust weight, refit weekly from "
+                "props_tracker.py's own tracked results (not the historical-stats backtest "
+                "tune_props.py uses). A market only appears once it has enough graded picks "
+                "and the refit clearly beats the static default; see REFINE_MIN_N/"
+                "REFINE_MIN_IMPROVEMENT in props_tracker.py.",
+    }, indent=1), encoding="utf-8")
+    return refined
+
+
+def load_live_calibration():
+    try:
+        return json.loads(LIVE_CALIBRATION_FILE.read_text(encoding="utf-8")).get("weights", {})
+    except (OSError, ValueError):
+        return {}
+
+
 def build_report(min_n=1) -> dict:
     df = _load()
     g = df[df["result"].notna() & (df["result"] != "dnp")].copy()
@@ -239,6 +342,11 @@ def build_report(min_n=1) -> dict:
         "roi_per_dollar": None if picks.empty else round(float(picks["profit"].mean()), 4),
         "by_market": by_market,
         "calibration_adjusted": calibration_table(g[g["kind"] != "td"], "model_over"),
+        "big_moves": [
+            {"player": r.player, "market": r.market, "opening_line": r.opening_line,
+             "line": r.line, "move": r.line_move}
+            for r in significant_moves().head(10).itertuples()
+        ],
         "note": "roi_per_dollar is flat $1-per-pick return at the price recorded when the pick was logged, "
                 "not a simulated bankroll. Small samples early on will be noisy.",
     }
@@ -325,11 +433,26 @@ def print_report(rep: dict):
     print(f"{'range':>10s} {'n':>6s} {'predicted':>10s} {'actual':>8s}")
     for c in rep["calibration_adjusted"]:
         print(f"{c['range']:>10s} {c['n']:6d} {c['predicted']:10.1%} {c['actual']:8.1%}")
+    if rep.get("big_moves"):
+        print("\nBiggest line moves since first pulled:")
+        for m in rep["big_moves"]:
+            print(f"  {m['player']:24s} {m['market']:16s} {m['opening_line']:>7.1f} -> {m['line']:<7.1f} ({m['move']:+.1f})")
+
+
+def print_moves(df: pd.DataFrame):
+    if df is None or df.empty:
+        print("No line moves logged yet (most props are only pulled once under the current schedule; "
+              "games are pulled every run, so check back after a couple of scheduled runs).")
+        return
+    print(f"{len(df)} prop(s)/game(s) with a notable line move since first pulled:")
+    cols = ["player", "market", "opening_line", "line", "line_move", "season", "week"]
+    with pd.option_context("display.width", 140, "display.max_rows", None):
+        print(df[cols].to_string(index=False, na_rep="—"))
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("cmd", choices=["log", "grade", "report", "review"])
+    ap.add_argument("cmd", choices=["log", "grade", "report", "review", "moves", "refine"])
     ap.add_argument("--json", action="store_true", help="with report: also write web/track_record.json and web/player_history.json")
     ap.add_argument("--week", type=int, help="with review: which week (default: most recently graded)")
     ap.add_argument("--season", type=int, help="with review: which season (default: current)")
@@ -346,6 +469,19 @@ def main():
     elif args.cmd == "review":
         g, season, week = week_review(args.season, args.week)
         print_week_review(g, season, week)
+    elif args.cmd == "moves":
+        print_moves(significant_moves())
+    elif args.cmd == "refine":
+        refined = write_live_calibration()
+        if not refined:
+            print(f"No market has {REFINE_MIN_N}+ graded, priced picks with a clear-enough "
+                  f"improvement yet -- keeping the static default everywhere.", file=sys.stderr)
+        else:
+            print(f"Refined trust weight for {len(refined)} market(s):", file=sys.stderr)
+            for m, r in refined.items():
+                print(f"  {m:28s} n={r['n']:4d}  weight -> {r['suggested_weight']:.2f}  "
+                      f"(brier {r['current_brier']:.4f} -> {r['suggested_brier']:.4f})", file=sys.stderr)
+        print(f"Wrote {LIVE_CALIBRATION_FILE}", file=sys.stderr)
     elif args.cmd == "report":
         rep = build_report()
         print_report(rep)
