@@ -139,8 +139,8 @@ def significant_moves(min_by_kind=BIG_MOVE):
     the first pull, largest move first. Mostly populated for games (see log_predictions);
     player props typically get pulled only once under the --days-limited schedule."""
     df = _load()
-    if df.empty or "line_move" not in df.columns:
-        return df
+    if df.empty or "line_move" not in df.columns or "opening_line" not in df.columns:
+        return df.iloc[0:0]
     moved = df[df["line_move"].notna() & (df["line_move"] != 0)].copy()
     if moved.empty:
         return moved
