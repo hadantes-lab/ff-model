@@ -198,6 +198,11 @@
     .stat { flex: 1; min-width: 0; }
   }
   @media (prefers-reduced-motion: reduce) { .caret { transition: none; } }
+  .profile { margin-top:10px; }
+  .profile summary { cursor:pointer; font-size:13px; color:var(--text-muted, inherit); }
+  .ptable { border-collapse:collapse; margin:8px 0; font-size:13px; width:100%; max-width:460px; }
+  .ptable th, .ptable td { text-align:right; padding:3px 8px; border-bottom:1px solid var(--border, rgba(128,128,128,.25)); }
+  .ptable th:first-child, .ptable td:first-child { text-align:left; }
 </style>
 
 <div class="topbar">
@@ -540,6 +545,26 @@ function marketRow(label, line, probA, nameA, probB, nameB, rawA, pickInfo) {
   </div>`;
 }
 
+function profileHTML(g) {
+  const pf = g.profile;
+  if (!pf) return "";
+  const v = (x, suf = "") => x == null ? "--" : x + suf;
+  const rows = [
+    ["Plays / game", "plays"], ["Yards / game", "yards"], ["Yards / play (off)", "ypp"],
+    ["Yards / play allowed (def)", "ypp_allowed"], ["First downs / game", "first_downs"],
+    ["3rd-down conv.", "third_rate", "%"], ["Neutral pass rate", "neutral_pass_rate", "%"],
+    ["Pass rate over expected", "proe"], ["Time of possession (min)", "top_min"],
+    ["Expected plays here", "exp_plays"], ["Expected yards / play here", "exp_ypp"], ["Expected yards here", "exp_yards"],
+  ];
+  return `<details class="profile"><summary>Team stats &amp; matchup (informational)</summary>
+    <table class="ptable"><thead><tr><th></th><th>${esc(g.away)}</th><th>${esc(g.home)}</th></tr></thead><tbody>
+    ${rows.map(([label, k, suf]) => `<tr><td>${label}</td><td class="num">${v(pf.away[k], suf)}</td><td class="num">${v(pf.home[k], suf)}</td></tr>`).join("")}
+    </tbody></table>
+    <div class="note">Expected combined: ${v(pf.exp_total_plays)} plays, ${v(pf.exp_total_yards)} yards. Recency-weighted over each team's last ${pf.home.games} games.
+    Tested over 2021-26: these stats track the posted total (r about 0.65) but do not predict whether it goes over or under, so they are context and not an input to the model's picks.</div>
+  </details>`;
+}
+
 function gameCardHTML(g) {
   const spreadLine = g.home_spread <= 0 ? `${g.home} ${g.home_spread}` : `${g.away} ${-g.home_spread}`;
   const predSpreadLine = g.predicted_spread <= 0 ? `${g.home} ${g.predicted_spread}` : `${g.away} ${-g.predicted_spread}`;
@@ -568,6 +593,7 @@ function gameCardHTML(g) {
     </div>
     <div class="note" style="margin-top:10px;">${predNote}</div>
     <div class="note" style="margin-top:4px;">${trustNote}</div>
+    ${profileHTML(g)}
   </div>`;
 }
 

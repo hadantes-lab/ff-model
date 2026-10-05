@@ -27,6 +27,7 @@ import game_context as gc
 import game_odds as go
 import odds_api
 import props_tracker
+import team_stats
 from matchups import CoverageModel, load_coverage_targets
 from props_model import (
     MARKETS, CORE_MARKETS, MIN_GAMES, blend_toward_market, environment_effect, fair_line, load_calibration,
@@ -417,6 +418,13 @@ def main():
     if unmatched:
         log("  unmatched: " + ", ".join(sorted(unmatched)[:12]) + (" ..." if len(unmatched) > 12 else ""))
 
+    profiles, lg_ypp, lg_plays = {}, 5.4, 62.0
+    try:   # informational matchup stats; a data hiccup here must never block the odds page
+        tg = team_stats.team_game_stats(team_stats.load_pbp(range(int(season) - 1, int(season) + 1)))
+        profiles, lg_ypp, lg_plays = team_stats.current_profiles(tg), float(tg["ypp"].mean()), float(tg["plays"].mean())
+    except Exception as e:
+        log(f"Team stat profiles unavailable ({e}); game cards will omit them.")
+
     games = []
     for ev in game_events:
         home, away = odds_api.TEAM_ABBR[ev["home_team"]], odds_api.TEAM_ABBR[ev["away_team"]]
@@ -429,7 +437,9 @@ def main():
                                        line["total"], line["home_spread"], inj_status=inj)
         if not home_fits or not away_fits:
             continue
-        games.append(build_game(ev, home, away, home_fits, away_fits, line, game_prices.get(ev["id"], {}), live_weights))
+        game = build_game(ev, home, away, home_fits, away_fits, line, game_prices.get(ev["id"], {}), live_weights)
+        game["profile"] = team_stats.matchup_profile(profiles, home, away, lg_ypp, lg_plays)
+        games.append(game)
     log(f"{len(games)} games priced for sides/totals.")
 
     snapshot = {

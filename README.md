@@ -228,6 +228,29 @@ under the `--days 1` schedule, but game lines are pulled every run for the whole
 a flat ~2-credit cost regardless of how many games it covers (see `game_odds.py` below), so the
 same game genuinely does get re-priced Sunday, Monday, and Thursday.
 
+**Team stats and what they say about the over/under.** `team_stats.py` builds one row per team per
+game from play-by-play: plays, yards, yards per play (offense, and the same figure *allowed* by the
+defense), first downs, third-down rate, neutral-state pass rate and pass rate over expected
+(tied or leading, quarters 1-3), and time of possession from the drive clocks. Each Game Lines card
+shows both teams' recency-weighted profile plus each side's expected plays, yards per play and yards
+for that matchup (offense yards per play adjusted by how the opposing defense differs from league
+average). `game_factors.py` tests every stat against the posted lines on 2021-26 games (1,374 with
+lines), using only each team's *prior* games so a result never leaks into its own features:
+```
+python game_factors.py            # correlations + walk-forward test
+python game_factors.py --json     # + writes web/game_factors.json
+```
+What it found, and it is a null result: the stats track the posted total closely (expected yards
+r = 0.68, yards per play r = 0.63, first downs r = 0.63) because the market already prices them in,
+and none of the 22 stats predicts how far a game lands from the line (strongest |r| = 0.06, about what
+chance gives across 22 tries). A walk-forward ridge model fit on earlier seasons and scored on the
+next had out-of-sample R^2 of -0.006 for totals and 0.000 for sides, and leaning over/under on it was
+right 51.1% of the time (95% CI 47.8-54.4%, break-even 52.4%). So the stats are shown as context and
+are deliberately *not* an input to the model's picks. Time of possession does move with plays
+(r = 0.73 within a game, 0.71 holding yards per play and third-down rate fixed), but seconds per
+play does not (r = -0.25 with plays), meaning possession mostly tracks how many snaps a team runs,
+not how fast it runs them.
+
 How the model works, and what it still can't see: `props_model.py`. It does not know about
 weather or in-game injuries, and it simulates players independently of each other (aside from
 the shared game-script factor `game_odds.py` uses for team totals). Treat large model-vs-market
