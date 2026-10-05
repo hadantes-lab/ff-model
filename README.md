@@ -127,7 +127,11 @@ Whether player props are included on a free plan is up to the Odds API, not this
 **Scheduled refresh.** `.github/workflows/refresh-site.yml` rebuilds the site every Sunday,
 Monday and Thursday morning (8 AM Central) and publishes it to GitHub Pages: the draft board
 at `/draft/` (always) and the props page at `/props/` (when the key below exists), using only
-games starting in the next 24 hours. Add the key as a repository secret:
+games starting in the next 24 hours. Each run shows only games starting in the next 24 hours, so Sunday's page is the Sunday slate,
+Monday's is Monday night's game, and Thursday's is Thursday night's. The game-lines call also
+returns next week's posted games; their week is read from the schedule (not assumed to be the
+current one), they are logged for line-movement tracking, and the Game Lines tab shows them only
+once they fall inside the window. Add the key as a repository secret:
 ```
 gh secret set ODDS_API_KEY
 ```

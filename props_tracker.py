@@ -62,6 +62,44 @@ def _save(df: pd.DataFrame):
 
 
 # ---- logging --------------------------------------------------------------
+def week_for_game(sched: pd.DataFrame, home: str, away: str, commence, default=None):
+    """
+    The NFL week a game belongs to, from the schedule: the row for this home/away pairing whose
+    date is closest to `commence` (a pairing can repeat in a season, e.g. a rematch). The Odds
+    API's bulk game-lines call returns every posted game, including NEXT week's, so a game's week
+    cannot be assumed to be the current one. -> `default` if the schedule has no such game.
+    """
+    if sched is None or sched.empty:
+        return default
+    m = sched[(sched["home_team"] == home) & (sched["away_team"] == away)]
+    if m.empty:
+        return default
+    when = pd.to_datetime(commence, utc=True, errors="coerce")
+    if pd.isna(when):
+        return int(m["week"].iloc[0]) if len(m) == 1 else default
+    days = (pd.to_datetime(m["gameday"], utc=True) - when).abs()
+    return int(m.loc[days.idxmin(), "week"])
+
+
+def relabel_game_weeks(sched: pd.DataFrame) -> int:
+    """One-time repair: re-derive each logged game row's week from the schedule (earlier versions
+    stamped every game with the current week). Moves rows between weeks only; never drops any.
+    -> rows changed."""
+    df = _load()
+    if df.empty:
+        return 0
+    changed = 0
+    for i in df.index[df["market"].isin(("game_spread", "game_total"))]:
+        wk = week_for_game(sched[sched["season"] == df.at[i, "season"]], df.at[i, "team"], df.at[i, "opp"],
+                           df.at[i, "commence"], default=df.at[i, "week"])
+        if wk != df.at[i, "week"]:
+            df.at[i, "week"] = wk
+            changed += 1
+    if changed:
+        _save(df.drop_duplicates(subset=KEY, keep="last"))
+    return changed
+
+
 def log_predictions(snapshot: dict) -> int:
     """Upsert every prop in a real (non-sample) snapshot into the log, keyed by KEY."""
     if snapshot.get("sample"):
@@ -97,7 +135,7 @@ def log_predictions(snapshot: dict) -> int:
              g.get("total_pick"), g.get("total_pick_price"), g.get("total_pick_ev"), g.get("total_trust")),
         ):
             rows.append({
-                "season": snapshot["season"], "week": snapshot["week"],
+                "season": snapshot["season"], "week": g.get("week", snapshot["week"]),
                 "player_id": f"GAME_{g['home']}_{g['away']}_{key}",
                 "market": market, "player": g["game"], "team": g["home"], "opp": g["away"],
                 "pos": "GAME", "game": g["game"], "commence": g["commence"], "kind": key,

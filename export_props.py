@@ -425,6 +425,14 @@ def main():
     except Exception as e:
         log(f"Team stat profiles unavailable ({e}); game cards will omit them.")
 
+    sched_now = None
+    if not args.sample:
+        try:
+            sched_now = nfl.load_schedules([season]).to_pandas()
+        except Exception as e:
+            log(f"Schedule unavailable ({e}); games will be tagged with the current week.")
+    window_end = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=args.days)
+
     games = []
     for ev in game_events:
         home, away = odds_api.TEAM_ABBR[ev["home_team"]], odds_api.TEAM_ABBR[ev["away_team"]]
@@ -438,6 +446,11 @@ def main():
         if not home_fits or not away_fits:
             continue
         game = build_game(ev, home, away, home_fits, away_fits, line, game_prices.get(ev["id"], {}), live_weights)
+        # the bulk game-lines call covers every posted game (next week's too), so the week comes
+        # from the schedule, and only games inside the --days window are shown on the page
+        game["week"] = props_tracker.week_for_game(sched_now, home, away, ev["commence_time"], default=int(week))
+        game["in_window"] = bool(args.sample or datetime.datetime.fromisoformat(
+            ev["commence_time"].replace("Z", "+00:00")) < window_end)
         game["profile"] = team_stats.matchup_profile(profiles, home, away, lg_ypp, lg_plays)
         games.append(game)
     log(f"{len(games)} games priced for sides/totals.")

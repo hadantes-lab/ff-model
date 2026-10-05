@@ -599,9 +599,11 @@ function gameCardHTML(g) {
 
 function renderGames() {
   const el = $("games-list");
-  const games = DATA.games || [];
+  const all = DATA.games || [];
+  const games = all.filter(g => g.in_window !== false);
+  const later = all.length - games.length;
   el.innerHTML = games.length
-    ? games.map(gameCardHTML).join("")
+    ? games.map(gameCardHTML).join("") + (later ? `<div class="note" style="margin-top:10px;">${later} later game${later > 1 ? "s" : ""} (next week's slate) are tracked for line movement and will appear here on their game day.</div>` : "")
     : `<div class="empty">No games priced this run${DATA.sample ? " (demo mode has no real game lines to price against)" : " -- game lines may not have been available from the Odds API."}</div>`;
 }
 

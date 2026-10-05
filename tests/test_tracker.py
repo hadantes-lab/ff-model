@@ -428,5 +428,57 @@ class TestReport(unittest.TestCase):
         self.assertEqual(sum(c["n"] for c in rep["calibration_adjusted"]), 20)
 
 
+class TestGameWeeks(unittest.TestCase):
+    """The bulk game-lines call returns next week's games too; each must land in its own week."""
+    SCHED = pd.DataFrame([
+        {"season": 2026, "week": 4, "gameday": "2026-10-05", "home_team": "NO", "away_team": "ATL"},
+        {"season": 2026, "week": 5, "gameday": "2026-10-09", "home_team": "DAL", "away_team": "TB"},
+        {"season": 2026, "week": 3, "gameday": "2026-09-20", "home_team": "BUF", "away_team": "KC"},
+        {"season": 2026, "week": 9, "gameday": "2026-11-15", "home_team": "BUF", "away_team": "KC"},   # a rematch
+    ])
+
+    def setUp(self):
+        self._orig = pt.LOG_FILE
+        pt.LOG_FILE = pt.LOG_FILE.parent / "_test_props_log.csv"
+
+    def tearDown(self):
+        if pt.LOG_FILE.exists():
+            pt.LOG_FILE.unlink()
+        pt.LOG_FILE = self._orig
+
+    def test_week_comes_from_the_schedule_not_the_current_week(self):
+        self.assertEqual(pt.week_for_game(self.SCHED, "DAL", "TB", "2026-10-09T00:15:00Z", default=4), 5)
+        self.assertEqual(pt.week_for_game(self.SCHED, "NO", "ATL", "2026-10-06T00:15:00Z", default=9), 4)
+
+    def test_rematch_picks_the_nearest_date(self):
+        self.assertEqual(pt.week_for_game(self.SCHED, "BUF", "KC", "2026-09-20T17:00:00Z"), 3)
+        self.assertEqual(pt.week_for_game(self.SCHED, "BUF", "KC", "2026-11-15T18:00:00Z"), 9)
+
+    def test_unknown_game_falls_back_to_default(self):
+        self.assertEqual(pt.week_for_game(self.SCHED, "XXX", "YYY", "2026-10-09T00:15:00Z", default=4), 4)
+        self.assertEqual(pt.week_for_game(pd.DataFrame(), "DAL", "TB", "2026-10-09T00:15:00Z", default=4), 4)
+
+    def test_logging_uses_the_games_own_week(self):
+        snap = _game_snapshot(games=[
+            {"game": "TB @ DAL", "home": "DAL", "away": "TB", "commence": PAST_KICKOFF, "week": 5,
+             "home_spread": -9.5, "total": 45.0, "model_home_cover": 0.6, "model_over": 0.5,
+             "fair_home_cover": 0.5, "fair_over": 0.5, "trust": 0.1, "spread_pick": None, "total_pick": None}])
+        pt.log_predictions(snap)                      # snapshot week is 3
+        self.assertEqual(set(pt._load()["week"]), {5})
+
+    def test_relabel_repairs_old_rows_without_losing_any(self):
+        snap = _game_snapshot(games=[
+            {"game": "TB @ DAL", "home": "DAL", "away": "TB", "commence": "2026-10-09T00:15:00Z",
+             "home_spread": -9.5, "total": 45.0, "model_home_cover": 0.6, "model_over": 0.5,
+             "fair_home_cover": 0.5, "fair_over": 0.5, "trust": 0.1, "spread_pick": None, "total_pick": None}])
+        pt.log_predictions(snap)                      # old behaviour: stamped with week 3
+        self.assertEqual(set(pt._load()["week"]), {3})
+        self.assertEqual(pt.relabel_game_weeks(self.SCHED), 2)
+        df = pt._load()
+        self.assertEqual(len(df), 2)
+        self.assertEqual(set(df["week"]), {5})
+        self.assertEqual(pt.relabel_game_weeks(self.SCHED), 0)       # idempotent
+
+
 if __name__ == "__main__":
     unittest.main()

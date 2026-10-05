@@ -63,6 +63,10 @@ jobs:
           python props_tracker.py report --json
 
       # Only games starting in the next 24 hours: about one slate of API credits per run.
+      # That window is what makes each day's page right: Sunday morning = the Sunday slate and
+      # Sunday night, Monday morning = Monday night's game alone, Thursday morning = Thursday
+      # night's. The game-lines call also returns next week's posted games; those are logged
+      # under their own week (for line-movement tracking) but not shown until their game day.
       # export_props.py logs every prop it prices to tracking/props_log.csv for future grading.
       - name: Rebuild props page
         if: steps.key.outputs.have_key == 'true'
