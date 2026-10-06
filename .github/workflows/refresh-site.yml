@@ -98,5 +98,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add tracking/props_log.csv web/track_record.json web/player_history.json
           git diff --cached --quiet && echo "No tracker changes." || git commit -m "Update props tracking log [skip ci]"
-          git pull --rebase origin main
+          git pull --rebase -X theirs origin main   # a concurrent run edited the same files: this run's rows win (upsert semantics)
           git push
