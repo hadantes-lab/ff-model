@@ -376,5 +376,28 @@ class TestGameLines(unittest.TestCase):
         self.assertEqual((team, opp), (26.5, 23.5))
 
 
+class TestStartedGames(unittest.TestCase):
+    def test_has_started_flips_at_kickoff(self):
+        ev = {"commence_time": "2026-10-06T00:15:00Z"}
+        kickoff = 1791245700            # 2026-10-06T00:15:00Z
+        self.assertFalse(odds_api.has_started(ev, now=kickoff - 60))
+        self.assertTrue(odds_api.has_started(ev, now=kickoff))
+        self.assertTrue(odds_api.has_started(ev, now=kickoff + 3600))      # in progress: lines are live, skip
+
+    def test_fetch_events_drops_started_games(self):
+        import time
+        fmt = lambda t: time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(t))
+        now = time.time()
+        evs = [{"id": "live", "commence_time": fmt(now - 600)}, {"id": "soon", "commence_time": fmt(now + 3600)},
+               {"id": "later", "commence_time": fmt(now + 5 * 86400)}]
+        orig = odds_api._get
+        odds_api._get = lambda *a, **k: (evs, {})
+        try:
+            keep, _ = odds_api.fetch_events("k", days_ahead=1)
+        finally:
+            odds_api._get = orig
+        self.assertEqual([e["id"] for e in keep], ["soon"])
+
+
 if __name__ == "__main__":
     unittest.main()

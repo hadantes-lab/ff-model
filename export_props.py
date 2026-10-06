@@ -366,7 +366,7 @@ def main():
             # this bulk call costs the same flat few credits no matter how many games it covers,
             # so pricing every upcoming game (and being able to spot a Monday-vs-later-pull line
             # move on it) is free.
-            game_events = raw_game_lines
+            game_events = [e for e in raw_game_lines if not odds_api.has_started(e)]   # never price live games
         except odds_api.OddsApiError as e:
             log(f"  no game lines ({e}); game environment adjustment and game odds skipped")
             gl = {}

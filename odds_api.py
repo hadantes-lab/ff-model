@@ -124,9 +124,16 @@ def fetch_events(key, days_ahead=7):
     """Upcoming/live games starting within `days_ahead` days. Free to call."""
     events, headers = _get(f"/sports/{SPORT}/events", {}, key)
     cutoff = time.time() + days_ahead * 86400
-    keep = [e for e in events
-            if calendar.timegm(time.strptime(e["commence_time"], "%Y-%m-%dT%H:%M:%SZ")) < cutoff]
+    keep = [e for e in events if not has_started(e) and
+            calendar.timegm(time.strptime(e["commence_time"], "%Y-%m-%dT%H:%M:%SZ")) < cutoff]
     return keep, headers
+
+
+def has_started(event, now=None) -> bool:
+    """True once kickoff has passed. The API also lists in-progress games, whose lines are LIVE
+    in-game numbers: pricing them would overwrite the pregame lines the tracker grades against."""
+    start = calendar.timegm(time.strptime(event["commence_time"], "%Y-%m-%dT%H:%M:%SZ"))
+    return start <= (time.time() if now is None else now)
 
 
 def fetch_event_props(key, event_id, markets, regions="us", bookmakers=None):
