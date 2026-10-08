@@ -299,7 +299,7 @@ on 538 Elo and QB-adjusted Elo, plus time, stadium, referee and Google Trends fe
 what `team_ratings.py` is; the QB adjustment was added (a game where a team lacks its usual QB moves results 2.4
 points against our rating, t = 4.0, but 0.1 against the market, which already prices it); Thursday games, rest
 gap, domes, wind, cold and turf were tested and none moved results beyond noise (all |t| < 1.7 against the
-rating, < 1.1 against the market). Referee, Google Trends and state betting legality were not adopted: they have
+rating, about 1 or less against the market). Referee, Google Trends and state betting legality were not adopted: they have
 no mechanism, the article drops two of them itself, and its train/test split is random rather than by date, which
 lets future games leak into training, so its accuracy figures aren't comparable to the walk-forward numbers here.
 
