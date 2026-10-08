@@ -203,6 +203,31 @@
   .ptable { border-collapse:collapse; margin:8px 0; font-size:13px; width:100%; max-width:460px; }
   .ptable th, .ptable td { text-align:right; padding:3px 8px; border-bottom:1px solid var(--border, rgba(128,128,128,.25)); }
   .ptable th:first-child, .ptable td:first-child { text-align:left; }
+  .row.top-pick { border-color: var(--gold-dim);
+    background: linear-gradient(90deg, rgba(217,164,65,0.13), rgba(217,164,65,0) 55%), var(--surface);
+    box-shadow: 0 0 0 1px rgba(217,164,65,0.18), 0 0 26px -8px var(--gold); }
+  .tag.gold { background: var(--gold); color: var(--gold-ink); }
+  .tag.ok { background: var(--pos-bg); color: var(--pos); }
+  .board { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 14px; }
+  .board h2 { font-size: 15px; margin-bottom: 2px; }
+  .board .note { margin: 0 0 8px; }
+  .brow { display: grid; grid-template-columns: 34px minmax(0,1.4fr) minmax(0,1.2fr) 64px minmax(0,1fr) 64px; gap: 10px; align-items: center;
+    padding: 7px 8px; border-top: 1px solid var(--border); font-size: 13px; }
+  .brow.head { border-top: none; color: var(--text-faint); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .brow .n { font-family: "IBM Plex Mono", monospace; font-weight: 600; color: var(--gold); }
+  .brow.glow { background: linear-gradient(90deg, rgba(217,164,65,0.12), rgba(217,164,65,0) 60%); border-radius: 8px; }
+  .brow button.lnk { background: none; border: none; color: inherit; text-align: left; cursor: pointer; padding: 0; font: inherit; }
+  .brow button.lnk:hover { text-decoration: underline; }
+  .ptbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .ptbl th, .ptbl td { padding: 6px 8px; text-align: right; border-top: 1px solid var(--border); white-space: nowrap; }
+  .ptbl th { color: var(--text-faint); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; border-top: none; }
+  .ptbl th:nth-child(2), .ptbl td:nth-child(2) { text-align: left; }
+  .ptbl .up { color: var(--pos); } .ptbl .down { color: var(--neg); }
+  .scroll-x { overflow-x: auto; }
+  @media (max-width: 720px) {
+    .brow { grid-template-columns: 28px 1fr 56px; row-gap: 2px; }
+    .brow > :nth-child(3), .brow > :nth-child(5), .brow > :nth-child(6) { grid-column: 2 / span 2; }
+  }
 </style>
 
 <div class="topbar">
@@ -218,12 +243,14 @@
   <div class="seg" id="view-tabs" role="group" aria-label="View">
     <button class="active" data-view="week">This Week</button>
     <button data-view="games">Game Lines</button>
+    <button data-view="power">Power Rankings</button>
     <button data-view="history">Player History</button>
   </div>
 </div>
 
 <div id="week-view">
 <div class="wrap" id="track-record" hidden></div>
+<div class="wrap" id="top-picks" hidden style="padding-top:16px;"></div>
 <div class="demo-banner" id="demo" hidden><div class="wrap">Demo lines &mdash; these prices were generated from the model itself to show the layout. They are not real sportsbook lines and any &ldquo;edge&rdquo; here is meaningless.</div></div>
 
 <div class="wrap controls">
@@ -252,6 +279,8 @@
 <div class="wrap" id="games-view" hidden style="padding-top:18px; padding-bottom:60px;">
   <div id="games-list"></div>
 </div>
+
+<div class="wrap" id="power-view" hidden style="padding-top:18px; padding-bottom:60px;"></div>
 
 <div class="wrap" id="history-view" hidden style="padding-top:18px; padding-bottom:60px;">
   <input class="field" id="hist-search" type="search" placeholder="Search a player&hellip;" style="width:260px; margin-bottom:12px;" aria-label="Search a player's history">
@@ -355,10 +384,10 @@ function rowHTML(p) {
   const pick = p.pick ? p[p.pick === "over" ? "best_over" : "best_under"] : null;
   const evc = p.pick_ev == null ? "flat" : p.pick_ev > 0.005 ? "pos" : p.pick_ev < -0.005 ? "neg" : "flat";
   const big = p.gap != null && Math.abs(p.gap) >= 12;
-  return `<div class="row ${S.open === p.id ? "open" : ""}" data-id="${p.id}">
+  return `<div class="row ${S.open === p.id ? "open" : ""} ${p.top_rank ? "top-pick" : ""}" data-id="${p.id}">
     <div class="row-head" role="button" tabindex="0" aria-expanded="${S.open === p.id}">
       <div class="who"><div class="name">${esc(p.player)}</div>
-        <div class="sub"><span>${p.team} ${p.home ? "vs" : "@"} ${p.opp}</span><span class="tag">${p.pos}</span>
+        <div class="sub"><span>${p.team} ${p.home ? "vs" : "@"} ${p.opp}</span><span class="tag">${p.pos}</span>${p.top_rank ? `<span class="tag gold" title="One of the week's 10 best prop picks by expected value">Top ${p.top_rank}</span>` : ""}
           ${p.injury ? `<span class="tag warn">${esc(p.injury)}</span>` : ""}${p.promoted ? `<span class="tag" title="A teammate ahead of him in usage is Out/Doubtful/IR; his volume is scaled x${p.promoted} toward the team's rate">backup starting</span>` : ""}${p.thin ? `<span class="tag warn">${p.n_games} games</span>` : ""}${p.env && Math.abs(p.env.mult - 1) >= 0.04 ? `<span class="tag" title="Game total ${p.env.total}, ${p.team} implied ${p.env.implied}: moves the projection ${signed((p.env.mult - 1) * 100, 1)}%">${p.env.total} total ${signed((p.env.mult - 1) * 100, 0)}%</span>` : ""}${p.dfs && p.dfs.some(d => d.gap !== 0) ? `<span class="tag">pick'em line differs</span>` : ""}${big ? `<span class="tag warn" title="The raw model is ${Math.abs(p.gap).toFixed(0)} points from the market, far more than a real edge usually is">model far from market</span>` : ""}</div></div>
       <div class="mk"><div class="lbl">${esc(p.label)}</div><div class="line">${fmtLine(p)}</div></div>
       <div class="model"><div class="mean">${p.kind === "td" ? pct(p.over, 1) : "μ " + p.mean}</div>
@@ -593,6 +622,7 @@ function gameCardHTML(g) {
     </div>
     <div class="note" style="margin-top:10px;">${predNote}</div>
     <div class="note" style="margin-top:4px;">${trustNote}</div>
+    ${rankLineHTML(g)}
     ${profileHTML(g)}
   </div>`;
 }
@@ -603,8 +633,78 @@ function renderGames() {
   const games = all.filter(g => g.in_window !== false);
   const later = all.length - games.length;
   el.innerHTML = games.length
-    ? games.map(gameCardHTML).join("") + (later ? `<div class="note" style="margin-top:10px;">${later} later game${later > 1 ? "s" : ""} (next week's slate) are tracked for line movement and will appear here on their game day.</div>` : "")
+    ? pickBoardHTML() + games.map(gameCardHTML).join("") + (later ? `<div class="note" style="margin-top:10px;">${later} later game${later > 1 ? "s" : ""} (next week's slate) are tracked for line movement and will appear here on their game day.</div>` : "")
     : `<div class="empty">No games priced this run${DATA.sample ? " (demo mode has no real game lines to price against)" : " -- game lines may not have been available from the Odds API."}</div>`;
+}
+
+/* ---------- top 10 props ---------- */
+function renderTopPicks() {
+  const top = P.filter(p => p.top_rank).sort((a, b) => a.top_rank - b.top_rank);
+  const el = $("top-picks");
+  el.hidden = !top.length;
+  if (!top.length) return;
+  el.innerHTML = `<div class="board"><h2>Top 10 prop picks this week</h2>
+    <div class="note">Ranked by expected value of the recommended side, using the model shrunk toward the market. Excluded: anytime TDs, thin samples, injured players, and props where the raw model is far from the market. One pick per player. Treat these as the model's strongest leanings, not sure things: see the track record above for how each market has actually done.</div>
+    <div class="brow head"><div>#</div><div>Player</div><div>Pick</div><div>Prob</div><div>Best price</div><div style="text-align:right;">EV / $1</div></div>
+    ${top.map(p => {
+      const side = p.pick, pr = p[side === "over" ? "best_over" : "best_under"];
+      return `<div class="brow glow"><div class="n">${p.top_rank}</div>
+        <div><button class="lnk" data-open="${p.id}"><strong>${esc(p.player)}</strong></button><div class="sub" style="color:var(--text-faint); font-size:12px;">${p.team} ${p.home ? "vs" : "@"} ${p.opp} &middot; ${esc(p.label)}</div></div>
+        <div>${sideName(p, side)}</div>
+        <div class="num">${pct(side === "over" ? p.over : p.under)}</div>
+        <div>${pr ? `<span class="num">${price(pr.price)}</span> <span style="color:var(--text-faint)">${esc(pr.book)}</span>` : "&mdash;"}</div>
+        <div class="num ev pos" style="text-align:right;">${signed(p.pick_ev * 100, 1)}%</div></div>`;
+    }).join("")}</div>`;
+}
+
+function openProp(id) {
+  S.markets.clear(); S.pos = ""; S.game = ""; S.q = ""; S.onlyEv = false; S.hideThin = false; S.limit = 1000; S.open = id;
+  document.querySelectorAll("#market-chips button").forEach(b => b.setAttribute("aria-pressed", "false"));
+  document.querySelectorAll("#pos-seg button").forEach(b => b.classList.toggle("active", b.dataset.pos === ""));
+  $("game").value = ""; $("q").value = ""; $("only-ev").checked = false; $("hide-thin").checked = false;
+  renderList();
+  const row = document.querySelector(`.row[data-id="${id}"]`);
+  if (row) row.scrollIntoView({ block: "center", behavior: "smooth" });
+}
+
+/* ---------- game pick board + power rankings ---------- */
+function pickBoardHTML() {
+  const picks = DATA.game_picks || [];
+  if (!picks.length) return "";
+  return `<div class="board"><h2>Game picks ranked by confidence</h2>
+    <div class="note">Confidence is the model's probability for the picked side after shrinking toward the market (so it stays close to 50%: that is deliberate, since the simulator has no proven edge over the line yet). "Rating agrees" means the power-ranking spread leans the same way.</div>
+    <div class="brow head"><div>#</div><div>Game</div><div>Pick</div><div>Conf.</div><div>Best price</div><div style="text-align:right;">EV / $1</div></div>
+    ${picks.map(e => `<div class="brow ${e.rank <= 3 ? "glow" : ""}"><div class="n">${e.rank}</div>
+      <div>${esc(e.game)}</div>
+      <div><strong>${esc(e.pick)}</strong> <span class="tag">${e.type}</span>${e.rank_agrees === true ? ` <span class="tag ok" title="The power-ranking spread leans the same way">rating agrees</span>` : e.rank_agrees === false ? ` <span class="tag warn" title="The power-ranking spread leans the other way">rating disagrees</span>` : ""}</div>
+      <div class="num">${pct(e.prob)}</div>
+      <div>${e.price ? `<span class="num">${price(e.price.price)}</span> <span style="color:var(--text-faint)">${esc(e.price.book)}</span>` : "&mdash;"}</div>
+      <div class="num ${e.ev == null ? "" : e.ev > 0.005 ? "ev pos" : "ev neg"}" style="text-align:right;">${e.ev == null ? "&mdash;" : signed(e.ev * 100, 1) + "%"}</div></div>`).join("")}</div>`;
+}
+
+function rankLineHTML(g) {
+  const r = g.rank;
+  if (!r) return "";
+  const spreadTxt = r.rank_spread <= 0 ? `${g.home} ${r.rank_spread}` : `${g.away} ${-r.rank_spread}`;
+  const qb = r.qb_adjust ? ` &middot; <span class="tag warn">${r.qb_adjust > 0 ? esc(g.away) : esc(g.home)} regular QB out: ${signed(r.qb_adjust, 1)} pts to ${r.qb_adjust > 0 ? esc(g.home) : esc(g.away)}</span>` : "";
+  return `<div class="note" style="margin-top:4px;">Power rankings: ${esc(g.home)} <strong>#${r.home_rank}</strong> vs ${esc(g.away)} <strong>#${r.away_rank}</strong> &rarr; rank spread <strong>${esc(spreadTxt)}</strong> (${signed(r.rank_gap, 1)} vs posted)${qb}</div>`;
+}
+
+function renderPower() {
+  const pw = DATA.power, el = $("power-view");
+  if (!pw || !pw.table || !pw.table.length) { el.innerHTML = `<div class="empty">Power rankings were not available this run.</div>`; return; }
+  const bt = DATA.rating_backtest;
+  const arrow = c => c == null || c === 0 ? `<span style="color:var(--text-faint)">&ndash;</span>` : c > 0 ? `<span class="up">&#9650;${c}</span>` : `<span class="down">&#9660;${-c}</span>`;
+  el.innerHTML = `<div class="board"><h2>Power rankings, 1st to 32nd</h2>
+    <div class="note">Each team's rating is fitted from every game it has played (recent games weigh more, last season fills in early on), solving all teams at once so beating a strong team counts for more: that is the strength-of-schedule adjustment. Refit every week. Points rule: the 15th team is neutral, the best team is 6 points better than the 15th (so #1 at #15 is -6, about ${(pw.per_rank).toFixed(2)} points per rank step); home field adds about ${pw.hfa} points.</div>
+    <div class="scroll-x"><table class="ptbl"><thead><tr><th>#</th><th>Team</th><th>Chg</th><th>Rating</th><th>Record</th><th>Pts diff/g</th><th>Sched. strength</th><th>Off EPA</th><th>Def EPA</th></tr></thead><tbody>
+    ${pw.table.map(r => `<tr><td class="num">${r.rank}</td><td><strong>${esc(r.team)}</strong></td><td>${arrow(r.change)}</td>
+      <td class="num">${signed(r.rating, 1)}</td><td class="num">${r.record}</td><td class="num">${r.pd_per_game == null ? "&mdash;" : signed(r.pd_per_game, 1)}</td>
+      <td class="num">${r.sos_rank ? "#" + r.sos_rank : "&mdash;"}</td><td class="num">${r.off_rank ? "#" + r.off_rank : "&mdash;"}</td><td class="num">${r.def_rank ? "#" + r.def_rank : "&mdash;"}</td></tr>`).join("")}
+    </tbody></table></div>
+    <div class="note">Sched. strength: #1 = hardest schedule so far. Off/Def EPA: expected points per play, #1 = best offense / best defense.</div>
+    ${bt ? `<div class="note"><strong>How well does it work?</strong> Walk-forward over ${bt.n.toLocaleString()} games (${esc(bt.seasons)}), each week predicted from earlier games only: the rank rule misses the final margin by ${bt.rank_rule_mae} points on average; the betting market misses by ${bt.market_mae}. Correlation of (rating minus market) with (result minus market) is ${bt.corr_edge_vs_miss}, i.e. the rankings carry no information the line doesn't already have. They are a clean way to compare teams and to sanity-check a spread, not a betting edge. Fitted slope: ${bt.fitted_points_per_rank} points per rank step. A missing regular QB moves a game ${bt.qb_change_points} points. Turnovers, rest, short weeks, roof, wind and surface were tested and did not help.</div>` : ""}
+  </div>`;
 }
 
 /* ---------- wiring ---------- */
@@ -615,8 +715,13 @@ $("view-tabs").addEventListener("click", e => {
   $("week-view").hidden = view !== "week";
   $("games-view").hidden = view !== "games";
   $("history-view").hidden = view !== "history";
+  $("power-view").hidden = view !== "power";
   if (view === "games") renderGames();
+  if (view === "power") renderPower();
   if (view === "history") { renderHistoryList(); renderHistoryDetail(); }
+});
+$("top-picks").addEventListener("click", e => {
+  const b = e.target.closest("[data-open]"); if (b) openProp(+b.dataset.open);
 });
 $("hist-search").addEventListener("input", renderHistoryList);
 $("hist-list").addEventListener("click", e => {
@@ -651,5 +756,5 @@ $("rows").addEventListener("keydown", e => {
   if ((e.key === "Enter" || e.key === " ") && e.target.classList.contains("row-head")) { e.preventDefault(); e.target.click(); }
 });
 
-renderHeader(); renderTrackRecord(); buildControls(); renderList();
+renderHeader(); renderTrackRecord(); renderTopPicks(); buildControls(); renderList();
 </script>

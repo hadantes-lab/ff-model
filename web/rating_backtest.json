@@ -1,0 +1,63 @@
+{
+ "n": 1423,
+ "seasons": "2021-2026",
+ "mae": 10.22,
+ "rank_rule_mae": 10.19,
+ "market_mae": 9.75,
+ "fitted_points_per_rank": 0.407,
+ "rule_points_per_rank": 0.429,
+ "home_field": 1.93,
+ "corr_edge_vs_miss": -0.019,
+ "targets": {
+  "points": {
+   "mae": 10.223,
+   "rank_mae": 10.195,
+   "corr_edge_vs_miss": -0.019
+  },
+  "epa": {
+   "mae": 10.39,
+   "rank_mae": 10.335,
+   "corr_edge_vs_miss": -0.031
+  },
+  "yards_per_play": {
+   "mae": 10.363,
+   "rank_mae": 10.417,
+   "corr_edge_vs_miss": -0.033
+  },
+  "points+epa": {
+   "mae": 10.236,
+   "rank_mae": 10.241,
+   "corr_edge_vs_miss": -0.026
+  },
+  "epa+turnovers": {
+   "mae": 10.507,
+   "rank_mae": 10.36,
+   "corr_edge_vs_miss": -0.022
+  },
+  "points+epa+turnovers": {
+   "mae": 10.261,
+   "rank_mae": 10.265,
+   "corr_edge_vs_miss": -0.025
+  }
+ },
+ "qb_change_points": 2.4,
+ "halflife_weeks": 8.0,
+ "context_vs_rating_t": {
+  "dqb": 4.04,
+  "rest_diff": 1.61,
+  "thursday": -1.49,
+  "dome": -1.21,
+  "windy": 0.06,
+  "cold": 0.53,
+  "turf": 0.32
+ },
+ "context_vs_market_t": {
+  "dqb": 0.18,
+  "rest_diff": 0.63,
+  "thursday": -1.08,
+  "dome": -0.94,
+  "windy": -0.11,
+  "cold": 0.25,
+  "turf": 0.36
+ }
+}

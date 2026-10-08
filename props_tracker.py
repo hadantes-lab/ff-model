@@ -38,6 +38,8 @@ LOG_FILE = pathlib.Path(__file__).parent / "tracking" / "props_log.csv"
 REPORT_FILE = pathlib.Path(__file__).parent / "web" / "track_record.json"
 HISTORY_FILE = pathlib.Path(__file__).parent / "web" / "player_history.json"
 GRADE_DELAY_HOURS = 5      # a game is assumed final this long after kickoff
+GAME_MARKETS = ("game_spread", "game_total", "game_rank_spread")   # game_rank_spread: the power-rating spread
+SPREAD_MARKETS = ("game_spread", "game_rank_spread")                  # graded on the margin vs the home spread
 KEY = ["season", "week", "player_id", "market"]
 
 COLUMNS = KEY + [
@@ -89,7 +91,7 @@ def relabel_game_weeks(sched: pd.DataFrame) -> int:
     if df.empty:
         return 0
     changed = 0
-    for i in df.index[df["market"].isin(("game_spread", "game_total"))]:
+    for i in df.index[df["market"].isin(GAME_MARKETS)]:
         wk = week_for_game(sched[sched["season"] == df.at[i, "season"]], df.at[i, "team"], df.at[i, "opp"],
                            df.at[i, "commence"], default=df.at[i, "week"])
         if wk != df.at[i, "week"]:
@@ -145,6 +147,22 @@ def log_predictions(snapshot: dict) -> int:
                 "pick": pick, "pick_price": pick_price_obj["price"] if pick_price_obj else None, "pick_ev": pick_ev,
                 "logged_at": now, "actual": np.nan, "result": np.nan, "graded_at": np.nan,
             })
+        rk = g.get("rank")
+        if rk and rk.get("rank_home_cover") is not None:
+            # The power-rating spread, logged as its own market so its real record can be judged
+            # next to the simulator's: "over" = home covers, same vocabulary as game_spread.
+            pick_obj = g.get("rank_pick_price")
+            rows.append({
+                "season": snapshot["season"], "week": g.get("week", snapshot["week"]),
+                "player_id": f"GAME_{g['home']}_{g['away']}_rankspread",
+                "market": "game_rank_spread", "player": g["game"], "team": g["home"], "opp": g["away"],
+                "pos": "GAME", "game": g["game"], "commence": g["commence"], "kind": "spread",
+                "line": g["home_spread"], "model_over": rk["rank_home_cover"], "model_under": 1 - rk["rank_home_cover"],
+                "market_over": g.get("fair_home_cover"), "gap": rk.get("rank_gap"), "trust": None,
+                "pick": {"home": "over", "away": "under"}.get(g.get("rank_pick")),
+                "pick_price": pick_obj["price"] if pick_obj else None, "pick_ev": g.get("rank_pick_ev"),
+                "logged_at": now, "actual": np.nan, "result": np.nan, "graded_at": np.nan,
+            })
     if not rows:
         return 0
 
@@ -179,7 +197,7 @@ def significant_moves(min_by_kind=BIG_MOVE):
     df = _load()
     if df.empty or "line_move" not in df.columns or "opening_line" not in df.columns:
         return df.iloc[0:0]
-    moved = df[df["line_move"].notna() & (df["line_move"] != 0)].copy()
+    moved = df[df["line_move"].notna() & (df["line_move"] != 0) & (df["market"] != "game_rank_spread")].copy()
     if moved.empty:
         return moved
     threshold = moved["kind"].map(min_by_kind).fillna(1.0)
@@ -226,7 +244,7 @@ def grade_pending(delay_hours=GRADE_DELAY_HOURS) -> int:
         by_pid = {r["player_id"]: r for _, r in stats.iterrows()} if not stats.empty else {}
 
         final = {}
-        if df.loc[idx, "market"].isin(("game_spread", "game_total")).any():
+        if df.loc[idx, "market"].isin(GAME_MARKETS).any():
             sched = nfl.load_schedules([int(season)]).to_pandas()
             sched = sched[sched["week"] == week] if not sched.empty else sched
             final = {(r["home_team"], r["away_team"]): (r["home_score"], r["away_score"])
@@ -234,7 +252,7 @@ def grade_pending(delay_hours=GRADE_DELAY_HOURS) -> int:
 
         for i in idx:
             market = df.at[i, "market"]
-            if market in ("game_spread", "game_total"):
+            if market in GAME_MARKETS:
                 score = final.get((df.at[i, "team"], df.at[i, "opp"]))   # team/opp = home/away for game rows
                 if score is None:
                     continue   # game hasn't finished yet even though kickoff has passed -- try again later

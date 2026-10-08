@@ -27,6 +27,7 @@ import game_context as gc
 import game_odds as go
 import odds_api
 import props_tracker
+import team_ratings
 import team_stats
 from matchups import CoverageModel, load_coverage_targets
 from props_model import (
@@ -284,6 +285,83 @@ def build_game(event, home, away, home_fits, away_fits, line, prices, live_weigh
     }
 
 
+# ---- ranking the picks ----------------------------------------------------
+TOP_PROPS = 10
+TOP_PROP_MAX_GAP = 12      # the page already flags |model - market| >= 12 as "model far from market"
+
+
+def rank_top_props(props, n=TOP_PROPS):
+    """
+    The week's best prop picks, stamped in place as `top_rank` 1..n (others get None).
+    Ranked by the EV of the recommended side, using the probabilities already shrunk toward the
+    market. Left out: anytime TDs (long shots, mostly noise), thin samples, injured players, and
+    props where the raw model sits far from the market (most likely model error, not edge). At most
+    one pick per player, so one hot player can't fill the list.
+    """
+    for p in props:
+        p["top_rank"] = None
+    ok = [p for p in props
+          if p.get("pick_ev") is not None and p["pick_ev"] > 0 and p.get("pick")
+          and p["kind"] != "td" and not p.get("thin") and not p.get("injury")
+          and (p.get("gap") is None or abs(p["gap"]) < TOP_PROP_MAX_GAP)]
+    seen, top = set(), []
+    for p in sorted(ok, key=lambda p: -p["pick_ev"]):
+        if p["player_id"] in seen:
+            continue
+        seen.add(p["player_id"])
+        top.append(p)
+        if len(top) == n:
+            break
+    for i, p in enumerate(top):
+        p["top_rank"] = i + 1
+    return top
+
+
+def game_pick_entries(g):
+    """The (up to) two picks for one game -- spread and total -- each with its win probability."""
+    out = []
+    # spread: the EV-best priced side if there is one, else whichever side the model likes more
+    side = g.get("spread_pick") or ("home" if g["home_cover"] >= g["away_cover"] else "away")
+    home = side == "home"
+    rk = g.get("rank") or {}
+    rank_side = None if rk.get("rank_home_cover") is None else ("home" if rk["rank_home_cover"] > 0.5 else "away")
+    out.append({"type": "Spread", "game": g["game"], "week": g.get("week"),
+                "pick": f"{g['home'] if home else g['away']} {(g['home_spread'] if home else -g['home_spread']):+g}",
+                "prob": g["home_cover"] if home else g["away_cover"],
+                "ev": g.get("spread_pick_ev") if g.get("spread_pick") else None,
+                "price": g.get("spread_pick_price") if g.get("spread_pick") else None,
+                "rank_agrees": None if rank_side is None else rank_side == side})
+    side = g.get("total_pick") or ("over" if g["over"] >= g["under"] else "under")
+    out.append({"type": "Total", "game": g["game"], "week": g.get("week"),
+                "pick": f"{side.title()} {g['total']:g}",
+                "prob": g["over"] if side == "over" else g["under"],
+                "ev": g.get("total_pick_ev") if g.get("total_pick") else None,
+                "price": g.get("total_pick_price") if g.get("total_pick") else None,
+                "rank_agrees": None})
+    return out
+
+
+def rank_game_picks(games):
+    """
+    Rank every spread and total pick on the page (in-window games) by confidence = the model's
+    probability for the picked side after shrinking toward the market. -> the ranked list; each
+    game also gets `pick_ranks` {"Spread": n, "Total": n}. `rank_agrees` marks spread picks the
+    power-rating spread also supports -- shown as a tag, not folded into the number, because the
+    backtest found the rating adds no information beyond the line.
+    """
+    entries = []
+    for g in games:
+        g["pick_ranks"] = {}
+        if g.get("in_window", True):
+            entries.extend(game_pick_entries(g))
+    entries.sort(key=lambda e: (-e["prob"], -(e["ev"] if e["ev"] is not None else -9)))
+    by_game = {g["game"]: g for g in games}
+    for i, e in enumerate(entries):
+        e["rank"] = i + 1
+        by_game[e["game"]]["pick_ranks"][e["type"]] = i + 1
+    return entries
+
+
 # ---- main ---------------------------------------------------------------
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -418,12 +496,17 @@ def main():
     if unmatched:
         log("  unmatched: " + ", ".join(sorted(unmatched)[:12]) + (" ..." if len(unmatched) > 12 else ""))
 
-    profiles, lg_ypp, lg_plays = {}, 5.4, 62.0
-    try:   # informational matchup stats; a data hiccup here must never block the odds page
-        tg = team_stats.team_game_stats(team_stats.load_pbp(range(int(season) - 1, int(season) + 1)))
+    profiles, lg_ypp, lg_plays, power = {}, 5.4, 62.0, None
+    try:   # informational matchup stats + power rankings; a data hiccup here must never block the odds page
+        tg = team_stats.team_game_stats(team_stats.load_pbp(range(int(season) - 2, int(season) + 1)))
         profiles, lg_ypp, lg_plays = team_stats.current_profiles(tg), float(tg["ypp"].mean()), float(tg["plays"].mean())
+        sched_all = nfl.load_schedules(list(range(int(season) - 2, int(season) + 1))).to_pandas()
+        rgames = team_ratings.build_games(tg, sched_all[sched_all["game_type"] == "REG"])
+        power = team_ratings.power_table(rgames, int(season), None)
+        log(f"Power rankings built from {len(rgames)} games (top: "
+            + ", ".join(f"{r['rank']}. {r['team']}" for r in power["table"][:3]) + ")")
     except Exception as e:
-        log(f"Team stat profiles unavailable ({e}); game cards will omit them.")
+        log(f"Team stat profiles / power rankings unavailable ({e}); game cards will omit them.")
 
     sched_now = None
     if not args.sample:
@@ -451,14 +534,35 @@ def main():
         game["week"] = props_tracker.week_for_game(sched_now, home, away, ev["commence_time"], default=int(week))
         game["in_window"] = bool(args.sample or datetime.datetime.fromisoformat(
             ev["commence_time"].replace("Z", "+00:00")) < window_end)
+        game["rank"] = None
+        if power is not None and home in power["ranks"] and away in power["ranks"]:
+            game["rank"] = team_ratings.project_game(
+                power, home, away, line["home_spread"], qb_out_home=dc.team_qb_out(history, home, inj),
+                qb_out_away=dc.team_qb_out(history, away, inj))
+            hc = game["rank"]["rank_home_cover"]
+            side = "home" if hc > 0.5 else "away"
+            price = game.get("best_home") if side == "home" else game.get("best_away")
+            game["rank_pick"], game["rank_pick_price"] = side, price
+            game["rank_pick_ev"] = None if not price else round(
+                ev_per_dollar(hc if side == "home" else 1 - hc, (1 - hc) if side == "home" else hc, price["price"]), 4)
         game["profile"] = team_stats.matchup_profile(profiles, home, away, lg_ypp, lg_plays)
         games.append(game)
     log(f"{len(games)} games priced for sides/totals.")
+    top = rank_top_props(props)
+    game_picks = rank_game_picks(games)
+    log(f"Top {len(top)} props and {len(game_picks)} ranked game picks.")
+    rating_backtest = None
+    bt = pathlib.Path(__file__).parent / "web" / "rating_backtest.json"
+    if bt.exists():
+        rating_backtest = json.loads(bt.read_text(encoding="utf-8"))
 
     snapshot = {
         "generated": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
         "season": int(season), "week": int(week), "sample": bool(args.sample),
         "credits": credits, "markets": markets, "n_games": len(events), "props": props, "games": games,
+        "game_picks": game_picks, "rating_backtest": rating_backtest,
+        "power": None if power is None else {"table": power["table"], "hfa": round(power["hfa"], 2),
+                                              "per_rank": round(team_ratings.PER_RANK, 3)},
     }
     OUT.parent.mkdir(exist_ok=True)
     OUT.write_text(json.dumps(snapshot, separators=(",", ":")), encoding="utf-8")

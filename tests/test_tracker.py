@@ -480,5 +480,54 @@ class TestGameWeeks(unittest.TestCase):
         self.assertEqual(pt.relabel_game_weeks(self.SCHED), 0)       # idempotent
 
 
+class TestRankSpreadMarket(unittest.TestCase):
+    """The power-rating spread is logged and graded as its own market next to the simulator's."""
+    def setUp(self):
+        self._orig = pt.LOG_FILE
+        pt.LOG_FILE = pt.LOG_FILE.parent / "_test_props_log.csv"
+
+    def tearDown(self):
+        if pt.LOG_FILE.exists():
+            pt.LOG_FILE.unlink()
+        pt.LOG_FILE = self._orig
+
+    def _snap(self):
+        g = _game_snapshot()["games"][0]
+        g.update({"rank": {"rank_home_cover": 0.62, "rank_gap": -2.5}, "rank_pick": "home",
+                  "rank_pick_price": {"price": -110, "book": "X"}, "rank_pick_ev": 0.04})
+        return {"season": 2026, "week": 3, "sample": False, "props": [], "games": [g]}
+
+    def test_logs_a_third_game_row_with_the_rank_probability(self):
+        self.assertEqual(pt.log_predictions(self._snap()), 3)
+        df = pt._load().set_index("market")
+        self.assertEqual(df.loc["game_rank_spread", "model_over"], 0.62)
+        self.assertEqual(df.loc["game_rank_spread", "pick"], "over")        # home covers
+        self.assertEqual(df.loc["game_rank_spread", "line"], -2.5)
+
+    def test_graded_on_the_margin_like_the_spread(self):
+        pt.log_predictions(self._snap())
+        rows = [{"home_team": "BUF", "away_team": "KC", "week": 3, "home_score": 27, "away_score": 17}]
+        mod = types.SimpleNamespace(
+            load_player_stats=lambda seasons: types.SimpleNamespace(to_pandas=lambda: pd.DataFrame([])),
+            load_schedules=lambda seasons: types.SimpleNamespace(to_pandas=lambda: pd.DataFrame(rows)))
+        with mock.patch.dict(sys.modules, {"nflreadpy": mod}):
+            self.assertEqual(pt.grade_pending(delay_hours=0), 3)
+        df = pt._load().set_index("market")
+        self.assertEqual(df.loc["game_rank_spread", "result"], "over")     # won by 10 vs -2.5
+        self.assertEqual(df.loc["game_rank_spread", "actual"], 10.0)
+
+    def test_derived_row_is_not_double_counted_as_a_line_move(self):
+        snap = self._snap()
+        pt.log_predictions(snap)
+        snap["games"][0]["home_spread"] = -4.5                              # line moves
+        pt.log_predictions(snap)
+        moved = pt.significant_moves()
+        self.assertNotIn("game_rank_spread", set(moved["market"]))
+        self.assertIn("game_spread", set(moved["market"]))
+
+    def test_snapshot_without_rank_data_still_logs_two_rows(self):
+        self.assertEqual(pt.log_predictions(_game_snapshot()), 2)
+
+
 if __name__ == "__main__":
     unittest.main()

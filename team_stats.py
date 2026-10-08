@@ -16,6 +16,9 @@ STATS (all per game, offense unless marked "allowed" = what the opponent's offen
                    offense is tied or leading, quarters 1-3 (the user's "neutral" definition, minus
                    the 4th quarter, when leading teams run the clock rather than playing a neutral game)
   proe             pass rate over expected, same neutral situations (percentage points)
+  epa_pp           expected points added per play (nflverse EPA), a down/distance/field-position-aware
+                   efficiency measure; giveaways = interceptions + lost fumbles (takeaways = the
+                   opponent's giveaways, i.e. `giveaways_allowed`)
   *_allowed        the same figures from the opponent's side of the ball (the defense's results)
 
 PRE-GAME FEATURES
@@ -39,8 +42,9 @@ ROLL_GAMES = 12
 ROLL_HALFLIFE = 4
 
 STAT_COLS = ["plays", "yards", "ypp", "first_downs", "third_att", "third_conv", "third_rate", "top_sec",
-             "sec_per_play", "neutral_plays", "neutral_pass_rate", "neutral_xpass", "proe", "pass_rate"]
-ALLOWED_FROM = ["plays", "yards", "ypp", "first_downs", "third_rate"]
+             "sec_per_play", "neutral_plays", "neutral_pass_rate", "neutral_xpass", "proe", "pass_rate",
+             "epa_pp", "giveaways"]
+ALLOWED_FROM = ["plays", "yards", "ypp", "first_downs", "third_rate", "epa_pp", "giveaways"]
 
 
 def _top_to_seconds(s):
@@ -57,7 +61,8 @@ def load_pbp(seasons) -> pd.DataFrame:
 
     cols = ["game_id", "season", "week", "season_type", "posteam", "defteam", "play_type", "pass", "rush", "sack",
             "yards_gained", "first_down", "down", "third_down_converted", "third_down_failed", "xpass",
-            "score_differential", "qtr", "drive", "drive_time_of_possession", "qb_kneel", "qb_spike"]
+            "score_differential", "qtr", "drive", "drive_time_of_possession", "qb_kneel", "qb_spike",
+            "epa", "interception", "fumble_lost"]
     pbp = nfl.load_pbp(list(seasons)).to_pandas()
     pbp = pbp[[c for c in cols if c in pbp.columns]]
     return pbp[pbp["season_type"] == "REG"].copy()
@@ -68,11 +73,16 @@ def team_game_stats(pbp: pd.DataFrame) -> pd.DataFrame:
     live = pbp[(pbp["play_type"].isin(["pass", "run"])) & pbp["posteam"].notna()].copy()
     live = live[(live["qb_kneel"].fillna(0) == 0) & (live["qb_spike"].fillna(0) == 0)]
     live["is_pass"] = (live["play_type"] == "pass").astype(float)
+    for c in ("epa", "interception", "fumble_lost"):          # absent from hand-built fixtures
+        if c not in live:
+            live[c] = np.nan
+    live["giveaway"] = live["interception"].fillna(0) + live["fumble_lost"].fillna(0)
     live["yards_gained"] = live["yards_gained"].fillna(0.0)
 
     g = live.groupby(["season", "week", "game_id", "posteam", "defteam"])
     agg = g.agg(plays=("play_type", "size"), yards=("yards_gained", "sum"),
-                first_downs=("first_down", "sum"), pass_rate=("is_pass", "mean")).reset_index()
+                first_downs=("first_down", "sum"), pass_rate=("is_pass", "mean"),
+                epa_pp=("epa", "mean"), giveaways=("giveaway", "sum")).reset_index()
 
     third = live[live["down"] == 3].groupby("game_id posteam".split()).agg(
         third_conv=("third_down_converted", "sum"), third_fail=("third_down_failed", "sum")).reset_index()

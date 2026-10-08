@@ -255,6 +255,54 @@ are deliberately *not* an input to the model's picks. Time of possession does mo
 play does not (r = -0.25 with plays), meaning possession mostly tracks how many snaps a team runs,
 not how fast it runs them.
 
+**Top picks, ranked game picks, and power rankings.** Three views built on top of the above, all on the
+props page:
+- *Top 10 prop picks.* The week's ten best by expected value of the recommended side, using the
+  market-shrunk probabilities, shown in a panel at the top of This Week and with a gold glow on the rows
+  below. Left out on purpose: anytime TDs, thin samples, injured players, and props where the raw model
+  sits far from the market (most likely model error). One pick per player (`rank_top_props` in `export_props.py`).
+- *Game picks ranked by confidence.* Every spread and total pick for the games in the refresh window,
+  ordered by the model's probability for the picked side (after shrinking toward the market, so values stay
+  near 50%), with a "rating agrees/disagrees" tag from the power rankings (`rank_game_picks`).
+- *Power rankings, 1st to 32nd* (`team_ratings.py`, a "Power Rankings" tab). Each team's rating is fitted
+  from every game it has played by recency-weighted ridge regression, all teams at once, so a win over a
+  strong team counts for more -- that is the strength-of-schedule adjustment -- and the fit is redone every
+  week from the latest results (the ridge pulls early-season ratings toward last season's). Ranks convert to
+  a spread with the rule *15th is neutral, the best team is 6 points better than the 15th*, linearly
+  (0.43 points per rank step; #1 at #15 is -6, #1 vs #32 about -13), plus a fitted home-field edge of ~1.9
+  points. A missing regular quarterback shifts a game 2.4 points. The table also shows record, point
+  differential, schedule strength and offense/defense EPA ranks, and each game card shows both teams' ranks
+  and the rank spread next to the posted line. The rank spread is also logged and graded as its own market
+  (`game_rank_spread`), so its real record builds up beside the simulator's.
+
+`python team_ratings.py` re-runs the backtest behind these choices (`--json` saves `web/rating_backtest.json`
+for the page). Predicting every game from 2021 on using only earlier games (n = 1,423):
+
+| | Mean miss on the final margin |
+|---|---|
+| Betting market | 9.75 points |
+| Power ratings, points-based | 10.22 |
+| 6-point rank rule | 10.19 |
+| EPA-based or yards-per-play ratings | 10.3-10.4 |
+| Ratings that include turnovers | 10.3-10.5 (worse) |
+
+The rankings are a good map of the league and a clean sanity check on a spread, but they are not a betting
+edge: the correlation between (rating minus market) and (result minus market) is -0.02, i.e. the line already
+contains everything the ratings know. The data prefers ~0.41 points per rank step, close to the 0.43 the
+6-point rule gives, so the rule is kept as specified.
+
+**What the two reference articles added, tested rather than assumed.** From the Samford model (opponent-adjusted
+regression on passing yards, rushing yards, takeaways and giveaways, simulated 10,000 times): this repo already
+simulates from opponent-adjusted yards and touchdowns, so the new piece was turnovers; adding them to the rating
+target made predictions *worse* (turnovers are mostly luck), so they are not used. From the Medium model (XGBoost
+on 538 Elo and QB-adjusted Elo, plus time, stadium, referee and Google Trends features): the Elo-style rating is
+what `team_ratings.py` is; the QB adjustment was added (a game where a team lacks its usual QB moves results 2.4
+points against our rating, t = 4.0, but 0.1 against the market, which already prices it); Thursday games, rest
+gap, domes, wind, cold and turf were tested and none moved results beyond noise (all |t| < 1.7 against the
+rating, < 1.1 against the market). Referee, Google Trends and state betting legality were not adopted: they have
+no mechanism, the article drops two of them itself, and its train/test split is random rather than by date, which
+lets future games leak into training, so its accuracy figures aren't comparable to the walk-forward numbers here.
+
 How the model works, and what it still can't see: `props_model.py`. It does not know about
 weather or in-game injuries, and it simulates players independently of each other (aside from
 the shared game-script factor `game_odds.py` uses for team totals). Treat large model-vs-market

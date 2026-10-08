@@ -120,3 +120,19 @@ def promotion_multiplier(history, team, position, player_id, inj_status_by_playe
         return 1.0
     ratio = min(team_rate / own_rate, PROMOTION_CAP)
     return float(max(1.0, 1 + PROMOTION_TRUST * (ratio - 1)))
+
+
+def team_qb_out(history, team, inj_status_by_player) -> bool:
+    """
+    True if the team's regular quarterback -- the one with the highest recency-weighted pass
+    attempts per game, with at least MIN_TEAMMATE_GAMES of history -- is Out/Doubtful/IR this
+    week. Feeds the power-rating QB adjustment (a backup QB costs a team ~2.4 points against its
+    rating; see team_ratings.QB_CHANGE_POINTS).
+    """
+    df = history[(history["team"] == team) & (history["position"] == "QB")]
+    best_id, best_rate = None, 0.0
+    for pid in df["player_id"].unique():
+        rate, n = player_usage_rate(history, pid, "QB")
+        if n >= MIN_TEAMMATE_GAMES and rate > best_rate:
+            best_id, best_rate = pid, rate
+    return best_id is not None and inj_status_by_player.get(best_id) in OUT_STATUSES
