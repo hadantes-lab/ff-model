@@ -204,5 +204,21 @@ class TestClosingMapFeedsTheChart(unittest.TestCase):
         self.assertEqual(lh.closing_map(pd.DataFrame(columns=lh.COLUMNS)), {})
 
 
+class TestPlanErrorMessage(unittest.TestCase):
+    def test_free_plan_401_is_explained_as_a_plan_limit_not_a_bad_key(self):
+        import io
+        import urllib.error
+        import odds_api
+
+        body = b'{"message":"Historical odds are only available on paid usage plans.","error_code":"HISTORICAL_UNAVAILABLE_ON_FREE_USAGE_PLAN"}'
+        err = urllib.error.HTTPError("u", 401, "Unauthorized", {}, io.BytesIO(body))
+        with mock.patch("urllib.request.urlopen", side_effect=err):
+            with self.assertRaises(odds_api.OddsApiError) as cm:
+                odds_api._get("/historical/x", {}, "secretkey")
+        self.assertIn("paid Odds API plan", str(cm.exception))
+        self.assertNotIn("rejected", str(cm.exception))
+        self.assertNotIn("secretkey", str(cm.exception))                          # the key never appears in errors
+
+
 if __name__ == "__main__":
     unittest.main()

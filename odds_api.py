@@ -99,6 +99,8 @@ def _get(path, params, key):
             422: "a requested market isn't available for this sport/plan",
             429: "rate limited or out of credits",
         }.get(e.code, "")
+        if "HISTORICAL_UNAVAILABLE" in body:        # the API answers 401 here, but the key is fine: the plan is the limit
+            hint = "historical data needs a paid Odds API plan (this key is on the free plan)"
         raise OddsApiError(f"Odds API HTTP {e.code} on {path}: {hint} {body}".strip()) from None
     except urllib.error.URLError as e:
         raise OddsApiError(f"Could not reach the Odds API: {e.reason}") from None
