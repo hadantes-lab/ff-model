@@ -37,7 +37,7 @@ MARKETS = {m: s for m, s in pm.MARKETS.items() if s.kind != "td"}
 def load(seasons):
     first = min(seasons) - 3
     ps = nfl.load_player_stats(list(range(first, max(seasons) + 1))).to_pandas()
-    hist = pm.build_history(ps)
+    hist = pm.build_history(ps, pm.load_longest(range(first, max(seasons) + 1)))
     hist = hist[hist["week"] <= 18]
     lines = gc.load_game_lines(range(first, max(seasons) + 1))
     h = gc.attach_context(hist, lines).dropna(subset=["total", "margin"])

@@ -99,6 +99,10 @@ MARKETS = {
     "player_reception_yds":      Spec("Rec Yds",       ("receiving_yards",), "yards"),
     "player_rush_reception_yds": Spec("Rush+Rec Yds",  ("rushing_yards", "receiving_yards"), "yards"),
     "player_anytime_td":         Spec("Anytime TD",    ("rushing_tds", "receiving_tds"), "td"),
+    # the longest single play in a game: not in nflverse's weekly stats, so built from play-by-play
+    # (see load_longest); a skewed positive quantity, modeled like yardage
+    "player_reception_longest":  Spec("Long Rec",      ("long_rec",), "yards"),
+    "player_rush_longest":       Spec("Long Rush",     ("long_rush",), "yards"),
 }
 
 # Minimum recent average for a player to count as a "regular" for a stat. Used when estimating
@@ -110,6 +114,7 @@ ROLE_FLOOR = {
     "player_pass_completions": 10.0, "player_pass_interceptions": 0.3,
     "player_rush_yds": 20.0, "player_rush_attempts": 5.0, "player_receptions": 2.0,
     "player_reception_yds": 20.0, "player_rush_reception_yds": 25.0, "player_anytime_td": 0.0,
+    "player_reception_longest": 12.0, "player_rush_longest": 7.0,
 }
 
 # cheapest useful set first: what most people mean by "player props"
@@ -117,6 +122,15 @@ CORE_MARKETS = [
     "player_pass_yds", "player_pass_tds", "player_rush_yds",
     "player_receptions", "player_reception_yds",
 ]   # anytime TD is a long shot dominated by noise, so it is opt-in (--markets / --all-markets)
+
+
+# Beyond the cheapest set: more markets per game, so more Odds API credits per run (see export_props.py
+# --extended). Pass attempts, completions, interceptions, rush attempts and rush+rec yards were already
+# modeled and calibrated; the two longest-play markets are new.
+EXTENDED_MARKETS = [
+    "player_pass_attempts", "player_pass_completions", "player_rush_attempts", "player_rush_reception_yds",
+    "player_reception_longest", "player_rush_longest",
+]
 
 
 def normalize_name(name: str) -> str:
@@ -127,10 +141,41 @@ def normalize_name(name: str) -> str:
 
 
 # ---- history ------------------------------------------------------------
-def build_history(player_stats: pd.DataFrame) -> pd.DataFrame:
-    """Regular-season offensive player-games in chronological order."""
+def load_longest(seasons) -> pd.DataFrame:
+    """
+    Each player's longest completed reception and longest rush in every regular-season game, from
+    play-by-play: columns season, week, player_id, long_rec, long_rush. A QB scramble counts as a
+    rush (sportsbooks settle it that way); kneels do not.
+    """
+    import nflreadpy as nfl
+
+    cols = ["season", "week", "season_type", "play_type", "complete_pass", "receiver_player_id",
+            "rusher_player_id", "yards_gained", "qb_kneel"]
+    p = nfl.load_pbp(list(seasons)).to_pandas()
+    p = p[[c for c in cols if c in p.columns]]
+    p = p[p["season_type"] == "REG"]
+    rec = p[(p["complete_pass"] == 1) & p["receiver_player_id"].notna()]
+    rec = (rec.groupby(["season", "week", "receiver_player_id"])["yards_gained"].max()
+              .rename("long_rec").reset_index().rename(columns={"receiver_player_id": "player_id"}))
+    rush = p[(p["play_type"] == "run") & p["rusher_player_id"].notna() & (p["qb_kneel"].fillna(0) == 0)]
+    rush = (rush.groupby(["season", "week", "rusher_player_id"])["yards_gained"].max()
+                .rename("long_rush").reset_index().rename(columns={"rusher_player_id": "player_id"}))
+    return rec.merge(rush, on=["season", "week", "player_id"], how="outer")
+
+
+def build_history(player_stats: pd.DataFrame, longest: pd.DataFrame = None) -> pd.DataFrame:
+    """
+    Regular-season offensive player-games in chronological order. `longest` (from load_longest)
+    adds the longest-play columns; without it they are 0, so the longest-play markets have nothing
+    to project from (every other market is unaffected).
+    """
     df = player_stats[player_stats["season_type"] == "REG"].copy()
     df = df[df["position"].isin(["QB", "RB", "WR", "TE", "FB"])]
+    if longest is not None:
+        df = df.merge(longest, on=["season", "week", "player_id"], how="left")
+    for col in ("long_rec", "long_rush"):
+        if col not in df:
+            df[col] = 0.0
     for col in {c for s in MARKETS.values() for c in s.cols}:
         df[col] = df[col].fillna(0)
     return df.sort_values(["season", "week"]).reset_index(drop=True)

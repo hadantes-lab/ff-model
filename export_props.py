@@ -33,7 +33,7 @@ import team_ratings
 import team_stats
 from matchups import CoverageModel, load_coverage_targets
 from props_model import (
-    MARKETS, CORE_MARKETS, MIN_GAMES, blend_toward_market, environment_effect, fair_line, load_calibration,
+    MARKETS, CORE_MARKETS, EXTENDED_MARKETS, load_longest, MIN_GAMES, blend_toward_market, environment_effect, fair_line, load_calibration,
     market_weight, stat_series, build_history, distribution_summary, draw, fit_player,
     line_probs, normalize_name, opponent_multipliers, position_priors, rng_for,
 )
@@ -89,10 +89,13 @@ def sample_event_odds(event, history, idx, rng, priors, markets):
     last = last[last["team"].isin(teams)]
     picks = []
     for pos, col, n, mkts in [
-        ("QB", "attempts", 1, ["player_pass_yds", "player_pass_tds"]),
-        ("RB", "carries", 2, ["player_rush_yds", "player_receptions", "player_anytime_td"]),
-        ("WR", "targets", 3, ["player_receptions", "player_reception_yds", "player_anytime_td"]),
-        ("TE", "targets", 1, ["player_receptions", "player_reception_yds", "player_anytime_td"]),
+        ("QB", "attempts", 1, ["player_pass_yds", "player_pass_tds", "player_pass_attempts", "player_pass_completions"]),
+        ("RB", "carries", 2, ["player_rush_yds", "player_receptions", "player_anytime_td", "player_rush_attempts",
+                              "player_rush_reception_yds", "player_rush_longest"]),
+        ("WR", "targets", 3, ["player_receptions", "player_reception_yds", "player_anytime_td",
+                              "player_reception_longest", "player_rush_reception_yds"]),
+        ("TE", "targets", 1, ["player_receptions", "player_reception_yds", "player_anytime_td",
+                              "player_reception_longest", "player_rush_reception_yds"]),
     ]:
         for t in teams:
             g = last[(last["team"] == t) & (last["position"] == pos)]
@@ -363,12 +366,39 @@ def build_context(props, games, history, season, sample=False) -> dict:
     except Exception as e:
         log(f"Target share unavailable ({e}); the page omits it.")
     try:
-        specs = {m: MARKETS[m] for m in {p["market"] for p in props}}
+        # "longest play" markets are left out: summing every player's longest play per game means nothing
+        specs = {m: MARKETS[m] for m in {p["market"] for p in props} if not m.endswith("_longest")}
         ctx["dvp"] = context_data.defense_vs_position(history, season, specs)
         log(f"Defense vs position for {len(ctx['dvp'])} defenses.")
     except Exception as e:
         log(f"Defense vs position unavailable ({e}); the page omits it.")
     return ctx
+
+
+# ---- which markets to pull ---------------------------------------------------------
+EXTENDED_MIN_CREDITS = 500     # keep this many credits AFTER a run before auto-adding the extra markets
+
+
+def choose_markets(base, mode, remaining, n_events):
+    """
+    -> (markets, note). `mode`: "off" = the base set only, "on" = base + EXTENDED_MARKETS, "auto" = the
+    extras only if the credits left after this run stay at or above EXTENDED_MIN_CREDITS. The Odds API
+    free plan holds 500 credits a month and the base pull alone uses most of that, so "auto" never turns
+    the extras on there; it does on a paid plan, where the headroom exists. Cost is per market that
+    returns data, so the estimate here is an upper bound.
+    """
+    extra = [m for m in EXTENDED_MARKETS if m not in base]
+    if mode == "off" or not extra:
+        return list(base), "extra markets off"
+    if mode == "on":
+        return list(base) + extra, f"extra markets forced on (+{len(extra)} markets per game)"
+    if remaining is None:
+        return list(base), "extra markets skipped: credits remaining unknown"
+    cost = n_events * (len(base) + len(extra))
+    if remaining - cost >= EXTENDED_MIN_CREDITS:
+        return list(base) + extra, f"extra markets on: {remaining} credits left, this run costs up to {cost}"
+    return list(base), (f"extra markets skipped: {remaining} credits left and this run could cost up to {cost}, "
+                        f"which would leave under {EXTENDED_MIN_CREDITS} (use --extended on to force)")
 
 
 # ---- ranking the picks ----------------------------------------------------
@@ -460,6 +490,9 @@ def main():
                     help="skip the man/zone coverage matchup (saves ~1 min of play-by-play loading)")
     ap.add_argument("--max-events", type=int, help="only the first N games (saves credits)")
     ap.add_argument("--days", type=int, default=7, help="games starting within N days")
+    ap.add_argument("--extended", choices=["auto", "on", "off"], default="auto",
+                    help="also pull pass attempts/completions, rush attempts, rush+rec yards, longest reception "
+                         "and rush. auto = only when plenty of credits remain (never on the free plan)")
     args = ap.parse_args()
 
     season = nfl.get_current_season()
@@ -471,8 +504,22 @@ def main():
     if bad:
         sys.exit(f"Unknown market(s): {bad}. Choose from: {list(MARKETS)}")
 
+    key, events, headers = None, None, None
+    if not args.sample:        # the events list is free and its headers carry the credits left, which decides the markets
+        key = odds_api.load_key()
+        events, headers = odds_api.fetch_events(key, args.days)
+        if args.max_events:
+            events = events[: args.max_events]
+    if not (args.markets or args.all_markets):
+        remaining = None if headers is None or headers.get("x-requests-remaining") is None else int(headers.get("x-requests-remaining"))
+        markets, note = choose_markets(markets, args.extended if not args.sample or args.extended == "on" else "off",
+                                       remaining, 0 if events is None else len(events))
+        log(f"Markets: {len(markets)} ({note})")
+
     log(f"Loading nflverse history (season {season}, week {week})...")
-    history = build_history(nfl.load_player_stats([season - 1, season]).to_pandas())
+    needs_longest = any(m in ("player_reception_longest", "player_rush_longest") for m in markets)
+    history = build_history(nfl.load_player_stats([season - 1, season]).to_pandas(),
+                            load_longest([season - 1, season]) if needs_longest else None)
     history = gc.attach_context(history, gc.load_game_lines([season - 1, season]))   # totals/spreads of past games
     calibration = load_calibration()
     log("Calibration: " + ("loaded" if calibration else "NOT FOUND (run tune_props.py --write) -- using raw projections"))
@@ -503,11 +550,7 @@ def main():
                   for _, r in wk.iterrows()]
         log(f"SAMPLE MODE: {len(events)} games, demo lines made up from the model.")
     else:
-        key = odds_api.load_key()
-        events, headers = odds_api.fetch_events(key, args.days)
         credits = odds_api.credits_line(headers)
-        if args.max_events:
-            events = events[: args.max_events]
         regions = -(-len(books) // 10) if books else 1
         log(f"{len(events)} games in the next {args.days} days. Worst-case cost this run: "
             f"{len(events) * len(markets) * regions} credits ({len(events)} games x {len(markets)} markets x "

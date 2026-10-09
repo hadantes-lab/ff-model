@@ -363,6 +363,19 @@ cards, all information beside the prop rather than inputs to the projection (`co
 Game Lines cards also show the weather. Forecasts are appended to `tracking/weather_history.csv` on every real run and
 by `collect_lines.py` on the off days (a forecast moves day to day, and that path is worth keeping).
 
+**More markets.** Beyond the five core props, six more are modeled and calibrated: pass attempts, pass
+completions, rush attempts, rush+rec yards, and two new ones, **longest reception** and **longest rush**. The longest-play
+stats aren't in nflverse's weekly player stats, so `props_model.load_longest` builds them from play-by-play (a QB scramble
+counts as a rush; kneels don't), and they're projected like yardage. Walk-forward results over 2024-25 (`backtest_props.py`):
+a typical miss of 10.2 yards on longest reception and 8.2 on longest rush, small bias (+1.3 and +0.6 yards), 50% intervals
+covering 50-51% of outcomes (80% and 90% intervals run a little narrow, 75% and 82%, about like rec yards); calibration
+(`tune_props.py --write`) trims error a further 2.8% and 5.1%. The old markets' calibration is unchanged.
+
+These cost credits: every market is charged per game, so the full set is ~11 per game instead of 5. `export_props.py
+--extended auto|on|off` (default auto) decides: auto adds them only if at least 500 credits would remain after the run,
+which never happens on the free 500-credit plan and does on a paid one; `on` forces them, `off` never. The choice is logged
+at the start of every run ("Markets: 11 (extra markets on: ...)").
+
 How the model works, and what it still can't see: `props_model.py`. It does not know about
 weather or in-game injuries, and it simulates players independently of each other (aside from
 the shared game-script factor `game_odds.py` uses for team totals). Treat large model-vs-market
