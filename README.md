@@ -314,6 +314,32 @@ fills in over time: only games we were already pulling have one, and the button 
 none. Editing the line under "Your line & odds" redraws the chart. The game log (`games` on each prop in the
 snapshot) comes from `game_log_for` in `export_props.py`; the chart's math is pure functions tested under node.
 
+**The backlog: what gets stored as the season goes.** `tracking/props_log.csv` keeps one row per prop and
+overwrites it each pull, so on its own it loses the path a line took. Three append-only/upsert files keep it:
+- `tracking/line_history.csv` (`line_history.py`): one row per prop and per game spread/total **per pull**: the
+  consensus line, the no-vig probability, the best price on each side, how many books fed the consensus, the
+  model's own projection and probability, and injury status. From it, `closing_lines()` derives each line's
+  opening, its closing (the last pull *before* kickoff; live in-game pulls are ignored) and the move between.
+  Written by every refresh, and by `collect_lines.py` on the days the main refresh doesn't run.
+- `tracking/power_history.csv`: the 1-32 power rankings after every completed week (rating, record, point
+  differential, schedule strength, offense/defense EPA). Backfilled for every week since 2021 using only the
+  games before each week, so it is what a live run would have said (`python team_ratings.py --backfill-power`),
+  then added to each week.
+- `tracking/props_log.csv`: graded predictions, as before.
+
+Schedule: the main refresh runs Sun/Mon/Thu (props for games in the next 24 hours, plus the whole slate's game
+lines); `.github/workflows/collect-lines.yml` adds Tue/Wed/Fri/Sat game-line pulls at a flat ~2 Odds API credits
+each, so a game's spread and total are seen roughly daily instead of three times a week. Props stay on the main
+schedule since they are the expensive call (about 5 credits per game). Everything is committed back to the
+repo, because Actions runs are ephemeral. Roughly 2 MB per season at this rate.
+
+What is deliberately **not** stored: per-book prices or book names. The repo is public and the Odds API's terms
+bar republishing an odds board, so only our own derived numbers (median line, no-vig probability, best price) are
+kept. If a per-book history is ever wanted it belongs in private storage. Also not stored because it can be
+rebuilt any time for free: player game logs, team stats, and past final scores and closing game lines (nflverse
+has those back to 1999). The one thing that cannot be rebuilt later is past *prop* lines, which is why this
+exists. `python line_history.py summary` shows how much has been collected.
+
 How the model works, and what it still can't see: `props_model.py`. It does not know about
 weather or in-game injuries, and it simulates players independently of each other (aside from
 the shared game-script factor `game_odds.py` uses for team totals). Treat large model-vs-market

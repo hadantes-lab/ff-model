@@ -25,6 +25,7 @@ import nflreadpy as nfl
 import depth_chart as dc
 import game_context as gc
 import game_odds as go
+import line_history
 import odds_api
 import props_tracker
 import team_ratings
@@ -539,7 +540,7 @@ def main():
     if unmatched:
         log("  unmatched: " + ", ".join(sorted(unmatched)[:12]) + (" ..." if len(unmatched) > 12 else ""))
 
-    profiles, lg_ypp, lg_plays, power = {}, 5.4, 62.0, None
+    profiles, lg_ypp, lg_plays, power, rgames = {}, 5.4, 62.0, None, None
     try:   # informational matchup stats + power rankings; a data hiccup here must never block the odds page
         tg = team_stats.team_game_stats(team_stats.load_pbp(range(int(season) - 2, int(season) + 1)))
         profiles, lg_ypp, lg_plays = team_stats.current_profiles(tg), float(tg["ypp"].mean()), float(tg["plays"].mean())
@@ -621,6 +622,12 @@ def main():
     if not args.sample:
         n = props_tracker.log_predictions(snapshot)
         log(f"Tracker: logged/updated {n} props for later grading (tracking/props_log.csv)")
+        # The backlog: append-only, one row per prop/game per pull (see line_history.py).
+        n = line_history.append_rows(line_history.rows_from_snapshot(snapshot, snapshot["generated"]))
+        log(f"Backlog: appended {n} rows to tracking/line_history.csv")
+        if power is not None and rgames is not None:
+            n = team_ratings.snapshot_power_history(rgames, int(season), snapshot["generated"])
+            log(f"Backlog: stored {n} power-ranking rows (tracking/power_history.csv)")
 
 
 if __name__ == "__main__":

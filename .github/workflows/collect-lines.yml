@@ -1,0 +1,60 @@
+name: Collect lines
+
+# The off days (Tue, Wed, Fri, Sat). The main refresh covers Sun/Mon/Thu; this adds cheap game-line
+# pulls in between so line movement and closing lines build up. One bulk call, ~2 Odds API credits,
+# no simulation, no site rebuild. 13:00 UTC = 8:00 AM CDT; GitHub may start it a few minutes late.
+on:
+  schedule:
+    - cron: "0 13 * * 2,3,5,6"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# Shares nothing with the Pages deploy, but two collectors must not race each other.
+concurrency:
+  group: tracking-data
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    env:
+      ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for Odds API key
+        id: key
+        run: |
+          if [ -z "$ODDS_API_KEY" ]; then
+            echo "::warning::ODDS_API_KEY secret is not set - nothing to collect."
+            echo "have_key=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "have_key=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-python@v5
+        if: steps.key.outputs.have_key == 'true'
+        with:
+          python-version: "3.12"
+          cache: pip
+      - if: steps.key.outputs.have_key == 'true'
+        run: pip install -r requirements.txt
+
+      - name: Pull game lines and store them with the power rankings
+        if: steps.key.outputs.have_key == 'true'
+        run: python collect_lines.py
+
+      # These files are the backlog: Actions runs are ephemeral, so they only persist by being
+      # committed back. Only our own derived numbers, never a sportsbook's odds board.
+      - name: Commit the backlog
+        if: steps.key.outputs.have_key == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tracking/line_history.csv tracking/power_history.csv
+          git diff --cached --quiet && echo "Nothing new to store." || git commit -m "Update line history [skip ci]"
+          git checkout -- .
+          git pull --rebase -X theirs origin main
+          git push

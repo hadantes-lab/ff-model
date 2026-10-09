@@ -35,6 +35,8 @@ The user-specified convention: the 15th-ranked team is neutral, and the best tea
 so #1 at the 15th team is -6 (+ home field), and #1 vs #32 is about -13.3.
 """
 
+import pathlib
+
 import numpy as np
 import pandas as pd
 
@@ -257,6 +259,69 @@ def project_game(pt: dict, home: str, away: str, home_spread=None, qb_out_home=F
     return out
 
 
+# ---- weekly history (the backlog) -----------------------------------------------------
+POWER_HISTORY_FILE = pathlib.Path(__file__).parent / "tracking" / "power_history.csv"
+POWER_COLUMNS = ["season", "through_week", "computed_at", "team", "rank", "prev_rank", "rating", "record",
+                 "pd_per_game", "sos", "off_epa", "def_epa", "hfa"]
+POWER_KEY = ["season", "through_week", "team"]
+
+
+def power_rows(pt: dict, season: int, through_week: int, computed_at: str) -> list:
+    """The power table as history rows: the rankings through `through_week` of `season`."""
+    return [{"season": season, "through_week": through_week, "computed_at": computed_at, "team": r["team"],
+             "rank": r["rank"], "prev_rank": r["prev_rank"], "rating": r["rating"], "record": r["record"],
+             "pd_per_game": r["pd_per_game"], "sos": r["sos"], "off_epa": r["off_epa"], "def_epa": r["def_epa"],
+             "hfa": round(pt["hfa"], 2)} for r in pt["table"]]
+
+
+def load_power_history(path=None) -> pd.DataFrame:
+    path = pathlib.Path(path or POWER_HISTORY_FILE)
+    if not path.exists() or path.stat().st_size == 0:
+        return pd.DataFrame(columns=POWER_COLUMNS)
+    return pd.read_csv(path)
+
+
+def upsert_power_history(rows: list, path=None) -> int:
+    """
+    Keep one row per (season, through_week, team): a re-run of the same week replaces its rows (the
+    rankings can shift slightly if a late stat correction lands), everything else is untouched.
+    """
+    if not rows:
+        return 0
+    path = pathlib.Path(path or POWER_HISTORY_FILE)
+    path.parent.mkdir(exist_ok=True)
+    new = pd.DataFrame(rows, columns=POWER_COLUMNS)
+    old = load_power_history(path)
+    both = pd.concat([old, new], ignore_index=True).drop_duplicates(subset=POWER_KEY, keep="last")
+    both = both.sort_values(["season", "through_week", "rank"]).reset_index(drop=True)
+    both.to_csv(path, index=False)
+    return len(new)
+
+
+def snapshot_power_history(games: pd.DataFrame, season: int, computed_at: str, path=None) -> int:
+    """Store the rankings as of right now (through the latest completed week of `season`)."""
+    done = games[games["season"] == season]
+    if done.empty:
+        return 0
+    through = int(done["week"].max())
+    return upsert_power_history(power_rows(power_table(games, season, None), season, through, computed_at), path)
+
+
+def backfill_power_history(games: pd.DataFrame, first_season: int, computed_at: str, path=None) -> int:
+    """
+    Rebuild the rankings as they stood after every completed week since `first_season`. Each week
+    uses only the games before it, exactly as a live run would have, so the backfill is honest.
+    """
+    n = 0
+    for season in sorted(games["season"].unique()):
+        if season < first_season:
+            continue
+        for week in sorted(games[games["season"] == season]["week"].unique()):
+            pt = power_table(games, int(season), int(week) + 1)
+            n += upsert_power_history(power_rows(pt, int(season), int(week), computed_at), path)
+    return n
+
+
 # ---- do the article-inspired context features add anything? ---------------------------
 CONTEXT_FEATURES = ["dqb", "rest_diff", "thursday", "dome", "windy", "cold", "turf"]
 
@@ -315,11 +380,19 @@ def main():
     ap = argparse.ArgumentParser(description="Walk-forward test of the power-rating system.")
     ap.add_argument("--first", type=int, default=2018)
     ap.add_argument("--json", action="store_true", help="write web/rating_backtest.json")
+    ap.add_argument("--backfill-power", action="store_true",
+                    help="rebuild tracking/power_history.csv for every completed week since 2021 and exit")
     args = ap.parse_args()
     season = nfl.get_current_season()
     tg = ts.team_game_stats(ts.load_pbp(range(args.first, season + 1)))
     sched = nfl.load_schedules(list(range(args.first, season + 1))).to_pandas()
     g = build_games(tg, sched[sched["game_type"] == "REG"])
+    if args.backfill_power:
+        import datetime
+        stamp = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
+        n = backfill_power_history(g, 2021, stamp)
+        print(f"power history: wrote {n} rows -> {POWER_HISTORY_FILE}")
+        return
 
     print("Which performance measure builds the best ratings? (each week predicted from earlier games only)")
     print(f"  {'target':24s} {'MAE':>6s} {'rank-rule MAE':>14s}   market MAE")
