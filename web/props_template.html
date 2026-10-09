@@ -242,6 +242,39 @@
   .hc-svg text { fill: var(--text-faint); font-size: 10px; font-family: "IBM Plex Mono", monospace; }
   .hc-svg .val { fill: #fff; font-size: 11px; font-weight: 600; }
   .hc-svg .linelbl { fill: var(--gold); font-size: 11px; font-weight: 600; }
+  /* ---- left rail ---- */
+  #week-view { display: grid; grid-template-columns: 300px minmax(0, 1fr); column-gap: 20px; align-items: start;
+    max-width: 1500px; margin: 0 auto; padding: 0 20px; }
+  #week-view[hidden] { display: none; }
+  #week-view > .rail { grid-column: 1; grid-row: 1 / span 12; position: sticky; top: 12px; align-self: start;
+    max-height: calc(100vh - 24px); overflow-y: auto; margin-top: 16px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: var(--radius); padding: 10px; }
+  #week-view > :not(.rail) { grid-column: 2; min-width: 0; }
+  #week-view > .wrap { max-width: none; padding-left: 0; padding-right: 0; }
+  .rail .field { width: 100%; margin-bottom: 8px; }
+  .rail button { font: inherit; color: inherit; text-align: left; cursor: pointer; width: 100%; background: none; border: 1px solid transparent; }
+  .rg { display: block; padding: 8px 10px; border-radius: 8px; }
+  .rg:hover, .rp:hover { background: var(--surface-2); }
+  .rg.sel { background: var(--surface-2); border-color: var(--gold-dim); }
+  .rg .teams { font-weight: 600; font-size: 14px; display: flex; justify-content: space-between; gap: 8px; }
+  .rg .meta { font-size: 11.5px; color: var(--text-faint); margin-top: 2px; display: flex; flex-wrap: wrap; gap: 2px 10px; }
+  .rgame { margin-bottom: 2px; }
+  .rplayers { margin: 2px 0 8px 8px; padding-left: 8px; border-left: 2px solid var(--border); }
+  .rp { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 8px; padding: 6px 8px; border-radius: 8px; align-items: center; }
+  .rp.sel { background: var(--surface-2); border-color: var(--gold-dim); }
+  .rp .nm { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rp .sub { font-size: 11px; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rp .ln { font-family: "IBM Plex Mono", monospace; font-size: 12px; text-align: right; }
+  .rp .px { font-family: "IBM Plex Mono", monospace; font-size: 10.5px; color: var(--text-faint); text-align: right; }
+  .rp .star { color: var(--gold); }
+  .rail .rhead { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-faint); margin: 6px 4px; }
+  .pchip { display: inline-flex; align-items: center; gap: 6px; background: var(--gold); color: var(--gold-ink); font-weight: 700;
+    font-size: 12px; padding: 4px 6px 4px 10px; border-radius: 99px; border: none; cursor: pointer; }
+  @media (max-width: 960px) {
+    #week-view { grid-template-columns: 1fr; }
+    #week-view > .rail { grid-column: 1; grid-row: auto; position: static; max-height: 320px; margin-bottom: 4px; }
+    #week-view > :not(.rail) { grid-column: 1; }
+  }
 </style>
 
 <div class="topbar">
@@ -263,6 +296,10 @@
 </div>
 
 <div id="week-view">
+<aside class="rail" id="rail" aria-label="Games and players">
+  <input class="field" id="q" type="search" placeholder="Search players or teams&hellip;" aria-label="Search players or teams">
+  <div id="rail-list"></div>
+</aside>
 <div class="wrap" id="track-record" hidden></div>
 <div class="wrap" id="top-picks" hidden style="padding-top:16px;"></div>
 <div class="demo-banner" id="demo" hidden><div class="wrap">Demo lines &mdash; these prices were generated from the model itself to show the layout. They are not real sportsbook lines and any &ldquo;edge&rdquo; here is meaningless.</div></div>
@@ -273,8 +310,7 @@
     <div class="seg" id="pos-seg" role="group" aria-label="Position">
       <button class="active" data-pos="">All</button><button data-pos="QB">QB</button><button data-pos="RB">RB</button><button data-pos="WR">WR</button><button data-pos="TE">TE</button>
     </div>
-    <select class="field" id="game" aria-label="Game"><option value="">All games</option></select>
-    <input class="field" id="q" type="search" placeholder="Search a player&hellip;" aria-label="Search a player">
+    <span id="player-chip"></span>
     <label class="check"><input type="checkbox" id="only-ev"> Model +EV only</label>
     <label class="check"><input type="checkbox" id="hide-thin"> Hide thin samples</label>
     <select class="field spacer" id="sort" aria-label="Sort">
@@ -375,20 +411,18 @@ function renderHeader() {
 }
 
 /* ---------- filters + list ---------- */
-const S = { markets: new Set(), pos: "", game: "", q: "", sort: "ev", onlyEv: false, hideThin: false, limit: 80, open: null };
+const S = { markets: new Set(), pos: "", game: "", player: null, q: "", sort: "ev", onlyEv: false, hideThin: false, limit: 80, open: null };
 
 function buildControls() {
   const labels = [...new Map(P.map(p => [p.market, p.label]))];
   $("market-chips").innerHTML = labels.map(([m, l]) => `<button class="chip-btn" aria-pressed="false" data-m="${m}">${esc(l)}</button>`).join("");
-  const games = [...new Map(P.map(p => [p.game, p.commence]))].sort((a, b) => a[1].localeCompare(b[1]));
-  $("game").innerHTML += games.map(([g]) => `<option>${esc(g)}</option>`).join("");
 }
 
 function visible() {
   const q = S.q.trim().toLowerCase();
   let rows = P.filter(p =>
-    (!S.markets.size || S.markets.has(p.market)) && (!S.pos || p.pos === S.pos) && (!S.game || p.game === S.game) &&
-    (!q || p.player.toLowerCase().includes(q)) && (!S.onlyEv || (p.pick_ev != null && p.pick_ev > 0)) && (!S.hideThin || !p.thin));
+    (!S.markets.size || S.markets.has(p.market)) && (!S.pos || p.pos === S.pos) && (!S.game || p.game === S.game) && (!S.player || p.player === S.player) &&
+    (!q || p.player.toLowerCase().includes(q) || p.team.toLowerCase().includes(q) || p.game.toLowerCase().includes(q)) && (!S.onlyEv || (p.pick_ev != null && p.pick_ev > 0)) && (!S.hideThin || !p.thin));
   const key = { ev: p => -(p.pick_ev ?? -9), edge: p => -Math.abs(p.edge ?? 0), name: p => p.player, time: p => p.commence + p.player }[S.sort];
   return rows.sort((a, b) => { const x = key(a), y = key(b); return x < y ? -1 : x > y ? 1 : 0; });
 }
@@ -738,6 +772,83 @@ function renderGames() {
     : `<div class="empty">No games priced this run${DATA.sample ? " (demo mode has no real game lines to price against)" : " -- game lines may not have been available from the Odds API."}</div>`;
 }
 
+/* ---------- left rail: games -> players ---------- */
+/* RAIL:BEGIN -- pure functions (no DOM); tests/test_rail.py runs these under node */
+const RAIL_POS = { QB: 0, RB: 1, WR: 2, TE: 3, FB: 4 };
+const RAIL_FEATURED = { QB: "player_pass_yds", RB: "player_rush_yds", WR: "player_reception_yds", TE: "player_reception_yds", FB: "player_rush_yds" };
+function railFeatured(props) {                     // the one prop to show under a player's name
+  const want = RAIL_FEATURED[props[0].pos];
+  return props.find(p => p.market === want) || props[0];
+}
+function railModel(props, gameLines, q) {
+  q = (q || "").trim().toLowerCase();
+  const games = new Map();
+  props.forEach(p => {
+    if (!games.has(p.game)) games.set(p.game, { game: p.game, commence: p.commence, players: new Map(), n: 0 });
+    const g = games.get(p.game);
+    g.n++;
+    const key = p.player_id || p.player;
+    if (!g.players.has(key)) g.players.set(key, []);
+    g.players.get(key).push(p);
+  });
+  const lines = new Map((gameLines || []).map(g => [g.game, g]));
+  const out = [];
+  games.forEach(g => {
+    const [away, home] = g.game.split(" @ ");
+    const gameMatch = !q || g.game.toLowerCase().includes(q);
+    let players = [...g.players.values()].map(list => ({ name: list[0].player, pos: list[0].pos, team: list[0].team,
+      feat: railFeatured(list), n: list.length, top: list.some(p => p.top_rank) }));
+    if (q && !gameMatch) players = players.filter(pl => pl.name.toLowerCase().includes(q) || pl.team.toLowerCase().includes(q));
+    if (!gameMatch && !players.length) return;
+    players.sort((a, b) => (RAIL_POS[a.pos] ?? 9) - (RAIL_POS[b.pos] ?? 9) || b.feat.line - a.feat.line || a.name.localeCompare(b.name));
+    const gl = lines.get(g.game);
+    out.push({ game: g.game, away, home, commence: g.commence, n: g.n, spread: gl ? gl.home_spread : null, total: gl ? gl.total : null,
+      searching: !!q, players });
+  });
+  return out.sort((a, b) => a.commence.localeCompare(b.commence));
+}
+/* RAIL:END */
+
+function renderRail() {
+  const model = railModel(P, DATA.games, S.q);
+  const spreadTxt = g => g.spread == null ? "" : (g.spread <= 0 ? `${g.home} ${g.spread}` : `${g.away} ${-g.spread}`);
+  $("rail-list").innerHTML = `<button class="rg ${!S.game && !S.player ? "sel" : ""}" data-game="" data-clear="1"><div class="teams"><span>All games</span><span class="num" style="font-weight:500;color:var(--text-faint)">${P.length}</span></div></button>
+    ${model.length ? "" : `<div class="note" style="padding:8px;">Nothing matches.</div>`}
+    ${model.map(g => {
+      const open = S.game === g.game || g.searching;
+      return `<div class="rgame"><button class="rg ${S.game === g.game && !S.player ? "sel" : ""}" data-game="${esc(g.game)}">
+        <div class="teams"><span>${esc(g.away)} @ ${esc(g.home)}</span><span class="num" style="font-weight:500;color:var(--text-faint)">${g.n}</span></div>
+        <div class="meta"><span>${new Date(g.commence).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })}</span>
+          ${g.spread != null ? `<span>${esc(spreadTxt(g))}</span>` : ""}${g.total != null ? `<span>O/U ${g.total}</span>` : ""}</div></button>
+        ${open ? `<div class="rplayers">${g.players.map(pl => {
+          const f = pl.feat, bo = f.best_over, bu = f.best_under;
+          return `<button class="rp ${S.player === pl.name ? "sel" : ""}" data-player="${esc(pl.name)}" data-game="${esc(g.game)}">
+            <div class="nm">${pl.top ? `<span class="star" title="One of the week's top 10 picks">&#9733;</span> ` : ""}${esc(pl.name)}</div>
+            <div class="ln">${f.kind === "td" ? "Any TD" : f.line}</div>
+            <div class="sub">${pl.pos} &middot; ${esc(pl.team)} &middot; ${esc(f.label)}</div>
+            <div class="px">${bo && bu ? `${price(bo.price)}/${price(bu.price)}` : ""}</div></button>`;
+        }).join("")}</div>` : ""}</div>`;
+    }).join("")}`;
+  $("player-chip").innerHTML = S.player ? `<button class="pchip" id="clear-player" title="Show everyone again">${esc(S.player)} <span aria-hidden="true">&#10005;</span></button>` : "";
+}
+
+function railSelect(game, player) {
+  if (player) {
+    S.markets.clear(); S.pos = ""; S.onlyEv = false; S.hideThin = false;
+    document.querySelectorAll("#market-chips button").forEach(b => b.setAttribute("aria-pressed", "false"));
+    document.querySelectorAll("#pos-seg button").forEach(b => b.classList.toggle("active", b.dataset.pos === ""));
+    $("only-ev").checked = false; $("hide-thin").checked = false;
+    S.game = game; S.player = player;
+    const mine = P.filter(p => p.player === player && p.game === game);
+    S.open = mine.length ? railFeatured(mine).id : null;
+  } else {
+    S.game = game; S.player = null; S.open = null;
+  }
+  S.limit = 80;
+  renderRail(); renderList();
+  if (S.open != null) { const row = document.querySelector(`.row[data-id="${S.open}"]`); if (row) row.scrollIntoView({ block: "start", behavior: "smooth" }); }
+}
+
 /* ---------- top 10 props ---------- */
 function renderTopPicks() {
   const top = P.filter(p => p.top_rank).sort((a, b) => a.top_rank - b.top_rank);
@@ -759,11 +870,11 @@ function renderTopPicks() {
 }
 
 function openProp(id) {
-  S.markets.clear(); S.pos = ""; S.game = ""; S.q = ""; S.onlyEv = false; S.hideThin = false; S.limit = 1000; S.open = id;
+  S.markets.clear(); S.pos = ""; S.game = ""; S.player = null; S.q = ""; S.onlyEv = false; S.hideThin = false; S.limit = 1000; S.open = id;
   document.querySelectorAll("#market-chips button").forEach(b => b.setAttribute("aria-pressed", "false"));
   document.querySelectorAll("#pos-seg button").forEach(b => b.classList.toggle("active", b.dataset.pos === ""));
-  $("game").value = ""; $("q").value = ""; $("only-ev").checked = false; $("hide-thin").checked = false;
-  renderList();
+  $("q").value = ""; $("only-ev").checked = false; $("hide-thin").checked = false;
+  renderRail(); renderList();
   const row = document.querySelector(`.row[data-id="${id}"]`);
   if (row) row.scrollIntoView({ block: "center", behavior: "smooth" });
 }
@@ -852,8 +963,12 @@ $("pos-seg").addEventListener("click", e => {
   document.querySelectorAll("#pos-seg button").forEach(x => x.classList.toggle("active", x === b));
   S.pos = b.dataset.pos; S.limit = 80; renderList();
 });
-$("game").addEventListener("change", e => { S.game = e.target.value; S.limit = 80; renderList(); });
-$("q").addEventListener("input", e => { S.q = e.target.value; S.limit = 80; renderList(); });
+$("rail-list").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  railSelect(b.dataset.game || "", b.dataset.player || null);
+});
+$("player-chip").addEventListener("click", e => { if (e.target.closest("#clear-player")) railSelect(S.game, null); });
+$("q").addEventListener("input", e => { S.q = e.target.value; S.limit = 80; renderRail(); renderList(); });
 $("sort").addEventListener("change", e => { S.sort = e.target.value; renderList(); });
 $("only-ev").addEventListener("change", e => { S.onlyEv = e.target.checked; S.limit = 80; renderList(); });
 $("hide-thin").addEventListener("change", e => { S.hideThin = e.target.checked; S.limit = 80; renderList(); });
@@ -866,5 +981,5 @@ $("rows").addEventListener("keydown", e => {
   if ((e.key === "Enter" || e.key === " ") && e.target.classList.contains("row-head")) { e.preventDefault(); e.target.click(); }
 });
 
-renderHeader(); renderTrackRecord(); renderTopPicks(); buildControls(); renderList();
+renderHeader(); renderTrackRecord(); renderTopPicks(); buildControls(); renderRail(); renderList();
 </script>

@@ -340,6 +340,14 @@ rebuilt any time for free: player game logs, team stats, and past final scores a
 has those back to 1999). The one thing that cannot be rebuilt later is past *prop* lines, which is why this
 exists. `python line_history.py summary` shows how much has been collected.
 
+**Game and player browser.** The This Week tab has a left rail: every game in the window with kickoff, spread and
+over/under and how many props it has; click a game to filter the list to it and expand its players (grouped QB,
+RB, WR, TE, each showing the one prop most people look at for that position -- pass yards, rush yards, or
+receiving yards -- with its line and prices; a gold star marks the top-10 picks); click a player to see all of his
+markets with the featured one already open on its hit-rate chart; a chip above the list clears the player. The
+search box matches player, team or game. On a phone the rail stacks above the list in a scrolling box. The
+grouping logic is a pure function tested under node (`tests/test_rail.py`).
+
 How the model works, and what it still can't see: `props_model.py`. It does not know about
 weather or in-game injuries, and it simulates players independently of each other (aside from
 the shared game-script factor `game_odds.py` uses for team totals). Treat large model-vs-market
