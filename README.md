@@ -303,6 +303,17 @@ rating, about 1 or less against the market). Referee, Google Trends and state be
 no mechanism, the article drops two of them itself, and its train/test split is random rather than by date, which
 lets future games leak into training, so its accuracy figures aren't comparable to the walk-forward numbers here.
 
+**Hit-rate chart.** Open any prop and the top panel is a game-by-game chart of the player's results
+against the line: one bar per game (green over, red under, grey push) with the opponent, date and an `@`
+for away games, the line drawn across, and a dashed slot for the upcoming game. Above it: hit rate (and what
+the market's price implies, so you can see at a glance whether the history agrees with the odds), under rate,
+average, median and games. Controls: window (L5, L10, L15, season, all loaded games), home/away split, and
+**Today's line** vs **Line then**. *Today's line* measures every past game against the current line ("if this
+line had been set then"). *Line then* uses the line each game actually had, from our own tracking log, so it
+fills in over time: only games we were already pulling have one, and the button is disabled for a player with
+none. Editing the line under "Your line & odds" redraws the chart. The game log (`games` on each prop in the
+snapshot) comes from `game_log_for` in `export_props.py`; the chart's math is pure functions tested under node.
+
 How the model works, and what it still can't see: `props_model.py`. It does not know about
 weather or in-game injuries, and it simulates players independently of each other (aside from
 the shared game-script factor `game_odds.py` uses for team totals). Treat large model-vs-market

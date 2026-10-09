@@ -32,7 +32,7 @@ import team_stats
 from matchups import CoverageModel, load_coverage_targets
 from props_model import (
     MARKETS, CORE_MARKETS, MIN_GAMES, blend_toward_market, environment_effect, fair_line, load_calibration,
-    market_weight, build_history, distribution_summary, draw, fit_player,
+    market_weight, stat_series, build_history, distribution_summary, draw, fit_player,
     line_probs, normalize_name, opponent_multipliers, position_priors, rng_for,
 )
 
@@ -283,6 +283,49 @@ def build_game(event, home, away, home_fits, away_fits, line, prices, live_weigh
         "total_pick": total_pick, "total_pick_price": total_price,
         "total_pick_ev": None if total_ev is None else round(total_ev, 4),
     }
+
+
+# ---- game log for the hit-rate chart -----------------------------------------
+GAME_LOG_MAX = 34          # roughly two seasons of games
+
+
+def schedule_lookup(sched) -> dict:
+    """{(season, week, team): (is_home, 'YYYY-MM-DD')} from an nflverse schedule frame."""
+    out = {}
+    for r in sched.itertuples(index=False):
+        out[(int(r.season), int(r.week), r.home_team)] = (1, str(r.gameday))
+        out[(int(r.season), int(r.week), r.away_team)] = (0, str(r.gameday))
+    return out
+
+
+def lines_then_lookup(log_df) -> dict:
+    """{(player_id, market): {(season, week): line}} -- the line each past game actually had when
+    we logged it (empty for anything we were not yet pulling)."""
+    out = {}
+    if log_df is None or log_df.empty:
+        return out
+    for r in log_df[["player_id", "market", "season", "week", "line"]].itertuples(index=False):
+        if r.line == r.line:
+            out.setdefault((r.player_id, r.market), {})[(int(r.season), int(r.week))] = float(r.line)
+    return out
+
+
+def game_log_for(history, player_id, market, sched_map, lines_then) -> list:
+    """
+    Every game this player appeared in over the loaded seasons (oldest first, last GAME_LOG_MAX) as
+    [season, week, opponent, stat value, is_home (1/0/None), date, line-then or None], for the
+    hit-rate chart. The value is the market's own stat (e.g. rush + rec TDs for TDs).
+    """
+    g = history[history["player_id"] == player_id].tail(GAME_LOG_MAX)
+    if g.empty:
+        return []
+    vals = stat_series(g, MARKETS[market]).to_numpy()
+    then = lines_then.get((player_id, market), {})
+    out = []
+    for (season, week, team, opp), v in zip(zip(g["season"], g["week"], g["team"], g["opponent_team"]), vals):
+        home, date = sched_map.get((int(season), int(week), team), (None, None))
+        out.append([int(season), int(week), opp, round(float(v), 1), home, date, then.get((int(season), int(week)))])
+    return out
 
 
 # ---- ranking the picks ----------------------------------------------------
@@ -548,6 +591,13 @@ def main():
         game["profile"] = team_stats.matchup_profile(profiles, home, away, lg_ypp, lg_plays)
         games.append(game)
     log(f"{len(games)} games priced for sides/totals.")
+    try:   # the hit-rate chart's game log: a failure here must not block the page
+        sched_map = schedule_lookup(nfl.load_schedules([int(season) - 1, int(season)]).to_pandas())
+        then_map = lines_then_lookup(props_tracker._load())
+        for p in props:
+            p["games"] = game_log_for(history, p["player_id"], p["market"], sched_map, then_map)
+    except Exception as e:
+        log(f"Game logs unavailable for the hit-rate chart ({e}); the chart will say no game log is available.")
     top = rank_top_props(props)
     game_picks = rank_game_picks(games)
     log(f"Top {len(top)} props and {len(game_picks)} ranked game picks.")

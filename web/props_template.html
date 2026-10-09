@@ -228,6 +228,20 @@
     .brow { grid-template-columns: 28px 1fr 56px; row-gap: 2px; }
     .brow > :nth-child(3), .brow > :nth-child(5), .brow > :nth-child(6) { grid-column: 2 / span 2; }
   }
+  .hc { grid-column: 1 / -1; }
+  .hc-top { display: flex; flex-wrap: wrap; gap: 14px 22px; align-items: flex-end; justify-content: space-between; margin-bottom: 6px; }
+  .hc-stats { display: flex; flex-wrap: wrap; gap: 6px 22px; }
+  .hc-stat .k { font-size: 10.5px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.06em; }
+  .hc-stat .v { font-family: "IBM Plex Mono", monospace; font-size: 18px; font-weight: 600; }
+  .hc-stat .v.pos { color: var(--pos); } .hc-stat .v.neg { color: var(--neg); }
+  .hc-stat .s { font-size: 11px; color: var(--text-faint); }
+  .hc-ctl { display: flex; flex-wrap: wrap; gap: 8px; }
+  .hc-ctl .seg button { padding: 4px 10px; font-size: 12px; }
+  .hc-ctl .seg button:disabled { opacity: 0.4; cursor: not-allowed; }
+  svg.hc-svg { width: 100%; height: auto; display: block; }
+  .hc-svg text { fill: var(--text-faint); font-size: 10px; font-family: "IBM Plex Mono", monospace; }
+  .hc-svg .val { fill: #fff; font-size: 11px; font-weight: 600; }
+  .hc-svg .linelbl { fill: var(--gold); font-size: 11px; font-weight: 600; }
 </style>
 
 <div class="topbar">
@@ -409,6 +423,102 @@ function renderList() {
   if (S.open != null && $("detail-" + S.open)) renderDetail(P[S.open]);
 }
 
+/* ---------- hit-rate chart ---------- */
+/* HITRATE:BEGIN -- pure functions (no DOM); tests/test_hitrate.py runs these under node */
+function hitSelect(games, hc) {
+  let g = games.slice();
+  if (hc.ha === "home") g = g.filter(x => x[4] === 1);
+  else if (hc.ha === "away") g = g.filter(x => x[4] === 0);
+  if (hc.win === "season") {
+    const s = Math.max(...games.map(x => x[0]));
+    g = g.filter(x => x[0] === s);
+  } else if (hc.win !== "all") g = g.slice(-hc.win);
+  return g;
+}
+function hitResult(v, line, kind) {
+  if (kind === "td") return v >= 1 ? "over" : "under";
+  return v > line ? "over" : v < line ? "under" : "push";
+}
+function hitStats(games, line, kind, mode) {
+  const res = games.map(x => hitResult(x[3], mode === "then" && x[6] != null ? x[6] : line, kind));
+  const over = res.filter(r => r === "over").length, under = res.filter(r => r === "under").length;
+  const vals = games.map(x => x[3]).sort((a, b) => a - b);
+  const mid = vals.length ? (vals.length % 2 ? vals[(vals.length - 1) / 2] : (vals[vals.length / 2 - 1] + vals[vals.length / 2]) / 2) : null;
+  return { n: games.length, over, under, push: res.length - over - under, results: res,
+    pct: over + under ? over / (over + under) : null,
+    avg: vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null, median: mid };
+}
+/* HITRATE:END */
+
+const HC = { win: 10, ha: "all", mode: "now" };
+const HC_WINS = [[5, "L5"], [10, "L10"], [15, "L15"], ["season", "Season"], ["all", "All"]];
+
+function renderHit(p, line) {
+  const el = $("hc-" + p.id);
+  if (!el) return;
+  const all = p.games || [];
+  if (!all.length) { el.innerHTML = `<h3>Game log</h3><div class="note">No game log available for this player.</div>`; return; }
+  const hasThen = all.some(g => g[6] != null);
+  if (HC.mode === "then" && !hasThen) HC.mode = "now";
+  const sel = hitSelect(all, HC), st = hitStats(sel, line, p.kind, HC.mode);
+  const implied = p.market_over != null ? p.market_over : null;
+  const edgeCls = st.pct == null || implied == null ? "" : st.pct > implied + 0.03 ? "pos" : st.pct < implied - 0.03 ? "neg" : "";
+  const seg = (items, cur, key) => `<div class="seg" data-hc="${key}">${items.map(([v, l]) => `<button data-v="${v}" class="${String(cur) === String(v) ? "active" : ""}">${l}</button>`).join("")}</div>`;
+
+  /* chart */
+  const W = 760, H = 250, padL = 8, padR = 44, top = 24, base = H - 46;
+  const n = sel.length, slots = n + 1;                               // + the upcoming game
+  const thresholds = sel.map(x => HC.mode === "then" && x[6] != null ? x[6] : line);
+  const maxv = Math.max(1, line, ...sel.map(x => x[3]), ...thresholds) * 1.12;
+  const sy = v => base - (v / maxv) * (base - top);
+  const slot = (W - padL - padR) / Math.max(slots, 1), bw = Math.min(46, slot * 0.7);
+  const bars = sel.map((g, i) => {
+    const x = padL + slot * i + (slot - bw) / 2, h = Math.max(2, base - sy(g[3])), res = st.results[i];
+    const col = res === "over" ? "var(--pos)" : res === "under" ? "var(--neg)" : "var(--bar)";
+    const lbl = (g[4] === 0 ? "@" : "") + g[2];
+    const date = g[5] ? new Date(g[5] + "T12:00:00").toLocaleDateString([], { month: "short", day: "numeric" }) : `wk ${g[1]}`;
+    const showDate = slot >= 30;
+    const own = HC.mode === "then" && g[6] != null
+      ? `<line x1="${x - 3}" x2="${x + bw + 3}" y1="${sy(g[6]).toFixed(1)}" y2="${sy(g[6]).toFixed(1)}" stroke="var(--gold)" stroke-width="2.5"/>` : "";
+    return `<g><title>${g[0]} wk ${g[1]} ${g[4] === 0 ? "at" : "vs"} ${g[2]}: ${g[3]}${g[6] != null ? ` (line then ${g[6]})` : ""}</title>
+      <rect x="${x.toFixed(1)}" y="${(base - h).toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="3" fill="${col}"/>
+      ${h > 16 ? `<text class="val" x="${(x + bw / 2).toFixed(1)}" y="${(base - h + 13).toFixed(1)}" text-anchor="middle">${Math.round(g[3])}</text>` : `<text x="${(x + bw / 2).toFixed(1)}" y="${(base - h - 4).toFixed(1)}" text-anchor="middle">${Math.round(g[3])}</text>`}
+      ${own}
+      <text x="${(x + bw / 2).toFixed(1)}" y="${base + 13}" text-anchor="middle">${slot >= 22 ? esc(lbl) : ""}</text>
+      <text x="${(x + bw / 2).toFixed(1)}" y="${base + 25}" text-anchor="middle">${showDate ? date : ""}</text></g>`;
+  }).join("");
+  const ux = padL + slot * n + (slot - bw) / 2;
+  const upcoming = `<g><rect x="${ux.toFixed(1)}" y="${top}" width="${bw.toFixed(1)}" height="${(base - top).toFixed(1)}" rx="3" fill="none" stroke="var(--text-faint)" stroke-dasharray="4 3"/>
+    <text x="${(ux + bw / 2).toFixed(1)}" y="${(top + (base - top) / 2).toFixed(1)}" text-anchor="middle" style="font-size:16px">?</text>
+    <text x="${(ux + bw / 2).toFixed(1)}" y="${base + 13}" text-anchor="middle">${p.home ? "" : "@"}${esc(p.opp)}</text><text x="${(ux + bw / 2).toFixed(1)}" y="${base + 25}" text-anchor="middle">next</text></g>`;
+  const showNow = HC.mode === "now";
+  const ly = sy(line).toFixed(1);
+  const svg = `<svg class="hc-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Game-by-game results against the line">
+    <line x1="${padL}" x2="${W - padR + 4}" y1="${base}" y2="${base}" stroke="var(--border)"/>
+    ${bars}${upcoming}
+    ${showNow ? `<line x1="${padL}" x2="${W - padR + 4}" y1="${ly}" y2="${ly}" stroke="var(--gold)" stroke-width="1.5" stroke-dasharray="6 4"/>
+    <text class="linelbl" x="${W - padR + 8}" y="${(+ly + 4).toFixed(1)}">${line}</text>` : ""}
+  </svg>`;
+
+  const f1 = x => x == null ? "&mdash;" : (Math.abs(x) >= 100 ? Math.round(x) : x.toFixed(1));
+  el.innerHTML = `
+    <div class="hc-top">
+      <div class="hc-stats">
+        <div class="hc-stat"><div class="k">Hit rate (over)</div><div class="v ${edgeCls}">${st.pct == null ? "&mdash;" : Math.round(st.pct * 100) + "%"} <span style="font-size:13px; font-weight:500; color:var(--text-dim)">(${st.over} of ${st.over + st.under})</span></div>
+          <div class="s">${implied == null ? "" : `Market implies ${pct(implied)} over`}${st.push ? ` &middot; ${st.push} push` : ""}</div></div>
+        <div class="hc-stat"><div class="k">Under</div><div class="v">${st.pct == null ? "&mdash;" : Math.round((1 - st.pct) * 100) + "%"}</div></div>
+        <div class="hc-stat"><div class="k">Average</div><div class="v">${f1(st.avg)}</div><div class="s">${p.kind === "td" ? "TDs/game" : `${st.avg == null ? "" : signed(st.avg - line, 1) + " vs line"}`}</div></div>
+        <div class="hc-stat"><div class="k">Median</div><div class="v">${f1(st.median)}</div></div>
+        <div class="hc-stat"><div class="k">Games</div><div class="v">${st.n}</div></div>
+      </div>
+      <div class="hc-ctl">${seg(HC_WINS, HC.win, "win")}${seg([["all", "All"], ["home", "Home"], ["away", "Away"]], HC.ha, "ha")}
+        <div class="seg" data-hc="mode"><button data-v="now" class="${HC.mode === "now" ? "active" : ""}">Today's line</button><button data-v="then" class="${HC.mode === "then" ? "active" : ""}" ${hasThen ? "" : "disabled"} title="${hasThen ? "Compare each game with the line it actually had when we logged it" : "No past lines logged for this player yet"}">Line then</button></div></div>
+    </div>
+    ${n ? svg : `<div class="empty" style="padding:30px 0;">No games match these filters.</div>`}
+    <div class="legend"><span><i style="background:var(--pos)"></i>${p.kind === "td" ? "scored" : "over"}</span><span><i style="background:var(--neg)"></i>${p.kind === "td" ? "no TD" : "under"}</span>${st.push ? `<span><i style="background:var(--bar)"></i>push</span>` : ""}<span>${HC.mode === "then" ? "gold ticks = the line that game had" : "dashed line = " + (p.kind === "td" ? "any TD" : "the line (edit it under Your line & odds)")}</span><span>@ = away</span></div>
+    ${HC.mode === "now" && p.kind !== "td" ? `<div class="note">Hit rate here is each past game measured against <em>today's</em> line, i.e. "if this line had been set then". Switch to <strong>Line then</strong> to use the line each game really had, available for games we were already logging${hasThen ? "" : " (none for this player yet; it builds up every week)"}.</div>` : ""}`;
+}
+
 /* ---------- detail ---------- */
 function chartSVG(p, line) {
   const W = 600, H = 150, pad = 18, base = H - 22, top = 8;
@@ -443,9 +553,8 @@ function chartSVG(p, line) {
 function renderDetail(p) {
   const el = $("detail-" + p.id);
   const bo = p.best_over, bu = p.best_under;
-  const log = p.log.slice();
-  const maxv = Math.max(1, ...log.map(g => g[3]));
   el.innerHTML = `
+    <div class="panel hc" id="hc-${p.id}"></div>
     <div class="panel">
       <h3>Simulated outcomes (20,000 games)</h3>
       <div id="chart-${p.id}"></div>
@@ -464,9 +573,6 @@ function renderDetail(p) {
       ${p.matchup ? `<div class="note"><strong>Coverage matchup.</strong> ${esc(p.opp)} played zone on about ${(p.matchup.opp_zone * 100).toFixed(0)}% of pass plays (league ${(p.matchup.league_zone * 100).toFixed(0)}%; 2024&ndash;25 tendencies, pulled toward the league because schemes only partly carry over).
         ${p.matchup.split ? `${esc(p.player)} averaged ${p.matchup.split.zone_ypt} yards/target against zone (${p.matchup.split.zone_n} targets) and ${p.matchup.split.man_ypt} against man (${p.matchup.split.man_n}); only ${(p.matchup.reliability * 100).toFixed(0)}% of that split is trusted, because a receiver's zone-vs-man gap barely repeats year to year. Net effect &times;${p.matchup.mult.toFixed(3)}.` : "No reliable zone/man split for this receiver, so no adjustment."}
         Coverage tags are not published for 2026 yet.</div>` : ""}
-      <h3 style="margin-top:18px">Last ${log.length} games${p.kind === "td" ? " (rush + rec TDs)" : ""}</h3>
-      <div class="log" id="log-${p.id}"></div>
-      <div class="note" id="hit-${p.id}"></div>
     </div>
     <div class="panel">
       <h3>Your line &amp; odds</h3>
@@ -498,12 +604,7 @@ function renderDetail(p) {
       cell(p.kind === "td" ? "P(TD)" : "P(over)", pct(r.over, 1), null, r.push > 0.0005 ? `push ${pct(r.push, 1)}` : (p.kind === "td" ? "model" : "no push at this line")) +
       cell(p.kind === "td" ? "EV on Yes" : "EV on over", evO == null ? "—" : signed(evO * 100, 1) + "%", evO, "per $1 at " + price(po)) +
       (p.kind === "td" ? "" : cell("P(under)", pct(r.under, 1), null, "") + cell("EV on under", evU == null ? "—" : signed(evU * 100, 1) + "%", evU, "per $1 at " + price(pu)));
-    $("log-" + p.id).innerHTML = log.map(g => {
-      const hit = g[3] > line;
-      return `<div class="b" title="${g[0]} wk ${g[1]} vs ${g[2]}: ${g[3]}"><div class="n">${Math.round(g[3])}</div><div class="bar ${hit ? "hit" : "miss"}" style="height:${Math.max(3, g[3] / maxv * 58)}px"></div><div class="t">${g[2]}</div></div>`;
-    }).join("");
-    const hits = log.filter(g => g[3] > line).length;
-    $("hit-" + p.id).textContent = `Went over ${line} in ${hits} of ${log.length} recent games (green bars).`;
+    renderHit(p, line);
   };
   ["wl-", "wo-", "wu-"].forEach(k => $(k + p.id).addEventListener("input", upd));
   upd();
@@ -720,6 +821,15 @@ $("view-tabs").addEventListener("click", e => {
   if (view === "power") renderPower();
   if (view === "history") { renderHistoryList(); renderHistoryDetail(); }
 });
+$("rows").addEventListener("click", e => {
+  const b = e.target.closest(".hc [data-hc] button"); if (!b || b.disabled) return;
+  e.stopPropagation();
+  const key = b.parentElement.dataset.hc, v = b.dataset.v;
+  HC[key] = key === "win" ? (v === "season" || v === "all" ? v : +v) : v;
+  const p = P[S.open]; if (!p) return;
+  const inp = $("wl-" + p.id), line = p.kind === "td" ? 0.5 : parseFloat(inp.value);
+  renderHit(p, Number.isNaN(line) ? p.line : line);
+}, true);
 $("top-picks").addEventListener("click", e => {
   const b = e.target.closest("[data-open]"); if (b) openProp(+b.dataset.open);
 });
