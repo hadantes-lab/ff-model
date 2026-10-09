@@ -351,7 +351,7 @@ grouping logic is a pure function tested under node (`tests/test_rail.py`).
 **Context panels (weather, matchup, target share).** Open a prop and under the hit-rate chart there are three
 cards, all information beside the prop rather than inputs to the projection (`context_data.py`):
 - *Game-day weather*: forecast for the game's hours from Open-Meteo (free, no key), flagged windy (15+ mph, or gusts
-  of 25+), freezing, or rain likely; domes and closed roofs say "indoors". The venue comes from the schedule's stadium
+  of 25+), freezing, or rain likely; domes and closed roofs say "indoors"; retractable-roof homes (ARI, ATL, HOU, IND, DAL) with the roof not yet set are marked as such and get no weather flags, since those roofs are closed for nearly every game. The venue comes from the schedule's stadium
   name first, since a "home" game isn't always played at home (this season's Jaguars game is in London). The card says
   plainly that across 2021-26 games wind, cold and roof showed no measurable effect beyond what the lines price in.
 - *Defense vs position*: how much the opposing defense has allowed per game to *all* players at the prop's position

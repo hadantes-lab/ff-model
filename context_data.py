@@ -62,6 +62,10 @@ VENUE_COORDS = {
     "melbourne": (-37.8200, 144.9834), "mcg": (-37.8200, 144.9834),
 }
 INDOOR_ROOFS = ("dome", "closed")
+# Retractable-roof homes. The schedule only fills in `roof` at game time, and these roofs are closed for
+# most games (Arizona, Atlanta, Houston, Indianapolis and Dallas were closed for nearly all of 2025), so
+# an unknown roof here must not be read as "outdoors": the card says so instead of raising wind/rain flags.
+RETRACTABLE_HOMES = ("ARI", "ATL", "HOU", "IND", "DAL")
 
 WEATHER_TEXT = {0: "Clear", 1: "Mostly clear", 2: "Partly cloudy", 3: "Overcast", 45: "Fog", 48: "Fog",
                 51: "Light drizzle", 53: "Drizzle", 55: "Heavy drizzle", 56: "Freezing drizzle", 57: "Freezing drizzle",
@@ -135,7 +139,9 @@ def weather_for_game(home_team, commence, roof, stadium, fetch=fetch_forecast) -
     wx = parse_forecast(js, commence) if js else None
     if wx is None:
         return None
-    return dict(wx, indoors=False, roof=str(roof), stadium=stadium)
+    unknown_roof = str(roof).lower() not in ("outdoors", "open")
+    retractable = bool(home_team in RETRACTABLE_HOMES and unknown_roof and xy == TEAM_COORDS.get(home_team))
+    return dict(wx, indoors=False, retractable=retractable, roof=str(roof), stadium=stadium)
 
 
 def schedule_row(sched: pd.DataFrame, home: str, away: str, commence):

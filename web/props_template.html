@@ -600,7 +600,7 @@ function targetRows(td, win) {
   return { team, rows };
 }
 function weatherFlags(w) {
-  if (!w || w.indoors) return [];
+  if (!w || w.indoors || w.retractable) return [];           // a retractable roof is usually closed: no weather flags
   const f = [];
   if ((w.wind_mph != null && w.wind_mph >= 15) || (w.gust_mph != null && w.gust_mph >= 25)) f.push("windy");
   if (w.temp_f != null && w.temp_f <= 32) f.push("freezing");
@@ -620,6 +620,7 @@ function weatherCardHTML(game) {
     <div class="wx-facts"><span>${esc(w.stadium || "")} &middot; ${esc(w.roof)} roof: weather doesn't apply.</span></div></div>`;
   const flags = weatherFlags(w);
   return `<div class="ccard"><h4>Game-day weather</h4>
+    ${w.retractable ? `<div class="note" style="margin:0 0 6px;"><strong>Retractable roof.</strong> The roof is set at game time and is usually closed here, so treat the outdoor forecast below as a worst case.</div>` : ""}
     <div class="wx-main"><span class="wx-temp">${w.temp_f}&deg;F</span><span style="font-size:15px;">${esc(w.sky)}</span>${flags.map(f => `<span class="tag warn">${f}</span>`).join("")}</div>
     <div class="wx-facts"><span>Wind ${w.wind_mph ?? "&mdash;"} mph${w.gust_mph != null ? ` (gusts ${w.gust_mph})` : ""}</span><span>Rain chance ${w.precip_pct ?? "&mdash;"}%</span></div>
     <div class="note">${esc(w.stadium || "")}, kickoff to about 3 hours later. For context only: across 2021&ndash;26 games, wind, cold and roof showed no measurable effect on results beyond what the lines already price in.</div></div>`;
@@ -1010,6 +1011,7 @@ function gameWeatherHTML(g) {
   const w = (CTX.weather || {})[g.game];
   if (!w) return "";
   if (w.indoors) return `<div class="note" style="margin-top:4px;">Weather: indoors (${esc(w.roof)} roof)</div>`;
+  if (w.retractable) return `<div class="note" style="margin-top:4px;">Weather: retractable roof (usually closed); outdoor forecast ${w.temp_f}&deg;F, wind ${w.wind_mph ?? "?"} mph</div>`;
   return `<div class="note" style="margin-top:4px;">Weather: ${w.temp_f}&deg;F, ${esc(w.sky.toLowerCase())}, wind ${w.wind_mph ?? "?"} mph${w.gust_mph != null ? ` (gusts ${w.gust_mph})` : ""}, ${w.precip_pct ?? "?"}% rain ${weatherFlags(w).map(f => `<span class="tag warn">${f}</span>`).join(" ")}</div>`;
 }
 

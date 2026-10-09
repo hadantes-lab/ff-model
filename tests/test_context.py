@@ -58,6 +58,16 @@ class TestWeather(unittest.TestCase):
         self.assertFalse(cd.is_indoors("outdoors"))
         self.assertFalse(cd.is_indoors("open"))                                    # an open retractable roof is outdoors
 
+    def test_retractable_roof_with_unknown_status_is_marked_not_treated_as_outdoors(self):
+        fx = lambda lat, lon: _forecast()
+        unknown = cd.weather_for_game("ARI", "2026-10-11T13:00:00Z", float("nan"), "State Farm Stadium", fetch=fx)
+        self.assertTrue(unknown["retractable"])
+        self.assertFalse(cd.weather_for_game("ARI", "2026-10-11T13:00:00Z", "open", "State Farm Stadium", fetch=fx)["retractable"])
+        self.assertFalse(cd.weather_for_game("GB", "2026-10-11T13:00:00Z", float("nan"), "Lambeau Field", fetch=fx)["retractable"])
+        # an Arizona "home" game played abroad is a genuinely outdoor venue
+        abroad = cd.weather_for_game("ARI", "2026-10-11T13:00:00Z", float("nan"), "Estadio Azteca", fetch=fx)
+        self.assertFalse(abroad["retractable"])
+
     def test_outdoor_game_gets_a_card_and_failures_give_none(self):
         w = cd.weather_for_game("GB", "2026-10-11T13:00:00Z", "outdoors", "Lambeau Field", fetch=lambda lat, lon: _forecast())
         self.assertFalse(w["indoors"])
@@ -210,6 +220,7 @@ class TestContextJs(unittest.TestCase):
         self.assertEqual(self._run("weatherFlags({indoors: false, wind_mph: 5, gust_mph: 24, temp_f: 50, precip_pct: 20})"), [])
         self.assertEqual(self._run("weatherFlags({indoors: true})"), [])
         self.assertEqual(self._run("weatherFlags({indoors: false, wind_mph: 8, gust_mph: 26, temp_f: 50, precip_pct: 0})"), ["windy"])
+        self.assertEqual(self._run("weatherFlags({indoors: false, retractable: true, wind_mph: 27, gust_mph: 36, temp_f: 20, precip_pct: 90})"), [])
 
 
 if __name__ == "__main__":
