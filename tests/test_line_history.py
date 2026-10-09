@@ -11,6 +11,7 @@ import unittest
 
 import pandas as pd
 
+import collect_lines as cl
 import line_history as lh
 import team_ratings as tr
 from test_ratings import TEAMS, _league
@@ -166,6 +167,59 @@ class TestPowerHistory(unittest.TestCase):
     def test_first_season_filter(self):
         n = tr.backfill_power_history(self.games, 2026, "bf", self.path)
         self.assertEqual(set(tr.load_power_history(self.path)["season"]), {2026})
+
+
+def _raw_event(eid, home, away, commence, spread=-3.0, total=45.0):
+    """An Odds API bulk game-lines event with two books, in the real response shape."""
+    def book(title, hp, ap, op, up):
+        return {"title": title, "key": title.lower(), "markets": [
+            {"key": "spreads", "outcomes": [{"name": home, "point": spread, "price": hp},
+                                            {"name": away, "point": -spread, "price": ap}]},
+            {"key": "totals", "outcomes": [{"name": "Over", "point": total, "price": op},
+                                           {"name": "Under", "point": total, "price": up}]}]}
+    return {"id": eid, "home_team": home, "away_team": away, "commence_time": commence,
+            "bookmakers": [book("BookA", -110, -110, -105, -115), book("BookB", -108, -112, -110, -110)]}
+
+
+class TestCollector(unittest.TestCase):
+    """collect_lines.store_game_lines on a realistic response (this is the path the off-day workflow runs)."""
+    SCHED = pd.DataFrame([
+        {"season": 2026, "week": 6, "gameday": "2099-01-01", "home_team": "NE", "away_team": "BUF"},
+        {"season": 2026, "week": 5, "gameday": "2000-01-01", "home_team": "NO", "away_team": "ATL"}])
+
+    def setUp(self):
+        self.path = pathlib.Path(tempfile.mkdtemp()) / "h.csv"
+
+    def test_stores_spread_and_total_rows_with_the_games_own_week(self):
+        raw = [_raw_event("e1", "New England Patriots", "Buffalo Bills", "2099-01-01T17:00:00Z")]
+        n = cl.store_game_lines(raw, self.SCHED, 2026, 5, "2026-10-09T13:00:00+00:00", self.path)
+        self.assertEqual(n, 2)
+        d = lh.load(self.path).set_index("market")
+        self.assertEqual(d.loc["game_spread", "line"], -3.0)
+        self.assertEqual(d.loc["game_total", "line"], 45.0)
+        self.assertEqual(set(d["week"]), {6})                                  # from the schedule, not the default 5
+        self.assertEqual(d.loc["game_spread", "best_over"], -108)              # best home price
+        self.assertTrue(0.45 < d.loc["game_total", "fair_over"] < 0.55)
+        self.assertNotIn("BookA", self.path.read_text(encoding="utf-8"))       # no book names on disk
+
+    def test_games_already_in_progress_are_skipped(self):
+        raw = [_raw_event("live", "New Orleans Saints", "Atlanta Falcons", "2000-01-01T17:00:00Z"),
+               _raw_event("e1", "New England Patriots", "Buffalo Bills", "2099-01-01T17:00:00Z")]
+        self.assertEqual(cl.store_game_lines(raw, self.SCHED, 2026, 5, "t", self.path), 2)
+        self.assertEqual(set(lh.load(self.path)["game"]), {"BUF @ NE"})
+
+    def test_empty_response_stores_nothing(self):
+        self.assertEqual(cl.store_game_lines([], self.SCHED, 2026, 5, "t", self.path), 0)
+        self.assertFalse(self.path.exists())
+
+    def test_two_pulls_build_a_trail_with_a_move(self):
+        a = [_raw_event("e1", "New England Patriots", "Buffalo Bills", "2099-01-01T17:00:00Z", spread=-3.0)]
+        b = [_raw_event("e1", "New England Patriots", "Buffalo Bills", "2099-01-01T17:00:00Z", spread=-4.5)]
+        cl.store_game_lines(a, self.SCHED, 2026, 5, "2026-10-09T13:00:00+00:00", self.path)
+        cl.store_game_lines(b, self.SCHED, 2026, 5, "2026-10-10T13:00:00+00:00", self.path)
+        c = lh.closing_lines(lh.load(self.path))
+        sp = c[c["market"] == "game_spread"].iloc[0]
+        self.assertEqual((sp["opening_line"], sp["closing_line"], sp["n_pulls"], sp["move"]), (-3.0, -4.5, 2, -1.5))
 
 
 if __name__ == "__main__":

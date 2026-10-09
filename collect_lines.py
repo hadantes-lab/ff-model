@@ -29,23 +29,27 @@ def log(msg):
     print(msg, file=sys.stderr)
 
 
+def store_game_lines(raw, sched, season, default_week, pulled_at, path=None) -> int:
+    """
+    Turn a raw bulk game-lines response into backlog rows and append them. Games already in
+    progress are skipped: their lines are LIVE and would corrupt "closing line". -> rows appended.
+    """
+    events = [e for e in raw if not odds_api.has_started(e)]
+    lines, prices = odds_api.consensus_game_lines(events), odds_api.consensus_game_prices(events)
+    week_for = lambda h, a, c: props_tracker.week_for_game(sched, h, a, c, default=default_week)
+    return line_history.append_rows(
+        line_history.rows_from_game_lines(events, lines, prices, week_for, season, pulled_at), path)
+
+
 def main():
     key = odds_api.load_key()
     season = int(nfl.get_current_season())
     pulled_at = line_history.now_iso()
 
-    raw, headers = odds_api.fetch_game_lines(key)
-    log(f"Game lines pulled. {odds_api.credits_line(headers)}")
-    # a game in progress has LIVE lines; they would corrupt "closing line", so skip them
-    events = [e for e in raw if not odds_api.has_started(e)]
-    lines, prices = odds_api.consensus_game_lines(events), odds_api.consensus_game_prices(events)
-
+    raw, _from_cache = odds_api.fetch_game_lines(key)        # prints its own credits line when it hits the API
     sched = nfl.load_schedules([season]).to_pandas()
-    wk_default = int(nfl.get_current_week())
-    week_for = lambda h, a, c: props_tracker.week_for_game(sched, h, a, c, default=wk_default)
-    rows = line_history.rows_from_game_lines(events, lines, prices, week_for, season, pulled_at)
-    n = line_history.append_rows(rows)
-    log(f"Backlog: appended {n} game-line rows for {len(events)} upcoming games.")
+    n = store_game_lines(raw, sched, season, int(nfl.get_current_week()), pulled_at)
+    log(f"Backlog: appended {n} game-line rows ({n // 2} upcoming games).")
 
     try:
         tg = team_stats.team_game_stats(team_stats.load_pbp(range(season - 2, season + 1)))
