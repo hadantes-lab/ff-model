@@ -1,0 +1,72 @@
+name: Backfill lines
+
+# MANUAL ONLY. Fills tracking/line_history.csv with past player-prop lines from the Odds API's
+# historical endpoints, which need a PAID plan and cost ~10 credits per market per game per snapshot.
+# Nothing is spent unless "execute" is ticked AND a credit cap is given; "plan" costs nothing and
+# "probe" costs at most 1 credit. See backfill_history.py for the full explanation.
+on:
+  workflow_dispatch:
+    inputs:
+      command:
+        description: "plan = estimate only (free) | probe = does this key's plan include historical data? (<=1 credit) | run"
+        type: choice
+        options: [plan, probe, run]
+        default: plan
+      seasons:
+        description: "Seasons, space separated (2023 or later)"
+        default: "2025"
+      offsets:
+        description: "Hours before kickoff per snapshot (0.5 = closing line; add 120 for an opening-ish line)"
+        default: "0.5"
+      markets:
+        description: "core = 5 main props, extended = also attempts/completions/rush+rec"
+        type: choice
+        options: [core, extended]
+        default: core
+      execute:
+        description: "Actually spend credits (run only)"
+        type: boolean
+        default: false
+      max_credits:
+        description: "Hard cap on credits this run may spend (required with execute)"
+        default: "0"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tracking-data
+  cancel-in-progress: false
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    env:
+      ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      - name: Run
+        run: |
+          ARGS="${{ inputs.command }} --seasons ${{ inputs.seasons }} --offsets ${{ inputs.offsets }} --markets ${{ inputs.markets }}"
+          if [ "${{ inputs.execute }}" = "true" ]; then ARGS="$ARGS --execute --max-credits ${{ inputs.max_credits }}"; fi
+          echo "python backfill_history.py $ARGS"
+          python backfill_history.py $ARGS
+
+      # What was fetched is only ever our derived numbers (see line_history.py); commit it so it persists.
+      - name: Commit the backfilled lines
+        if: inputs.command == 'run' && inputs.execute
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tracking/line_history.csv tracking/backfill_state.json
+          git diff --cached --quiet && echo "Nothing new." || git commit -m "Backfill historical lines [skip ci]"
+          git checkout -- .
+          git pull --rebase -X theirs origin main
+          git push

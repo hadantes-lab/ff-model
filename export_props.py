@@ -680,6 +680,8 @@ def main():
     try:   # the hit-rate chart's game log: a failure here must not block the page
         sched_map = schedule_lookup(nfl.load_schedules([int(season) - 1, int(season)]).to_pandas())
         then_map = lines_then_lookup(props_tracker._load())
+        for k, by_game in line_history.closing_map(line_history.load()).items():   # the backlog's closing lines win
+            then_map.setdefault(k, {}).update(by_game)
         for p in props:
             p["games"] = game_log_for(history, p["player_id"], p["market"], sched_map, then_map)
     except Exception as e:

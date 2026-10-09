@@ -376,6 +376,23 @@ These cost credits: every market is charged per game, so the full set is ~11 per
 which never happens on the free 500-credit plan and does on a paid one; `on` forces them, `off` never. The choice is logged
 at the start of every run ("Markets: 11 (extra markets on: ...)").
 
+**Backfilling past lines (`backfill_history.py`).** The hit-rate chart's "Line then" view and any check of the model against
+real closing lines need past prop lines, which only the Odds API's historical endpoints have (player props from May 2023, 5-minute
+snapshots, **paid plans only**, ~10 credits per market per game per snapshot). The tool is built and tested with the API faked,
+and **spends nothing unless told to**:
+```
+python backfill_history.py plan --seasons 2024 2025      # estimate only: no key, no API calls
+python backfill_history.py probe                          # does this key's plan include historical data? (<=1 credit)
+python backfill_history.py run --seasons 2025 --execute --max-credits 15000
+```
+One closing-line snapshot per game for the five core markets is about 13,600 credits per season at most (a ceiling: markets with no
+data aren't charged); `--offsets 0.5 120` adds an opening-ish line, `--markets extended` adds four more markets. `--execute`
+requires `--max-credits`, and the cap is enforced from the API's own per-call cost header. Every (game, snapshot) fetched is recorded in
+`tracking/backfill_state.json`, so an interrupted or capped run resumes without re-spending. It can also be run from the Actions tab
+("Backfill lines", manual only, defaults to the free plan estimate). Fetched lines go into `tracking/line_history.csv` as our derived
+numbers only (median line, no-vig probability, best price; never book names or per-book prices), and the chart's "Line then" picks
+up their closing lines automatically.
+
 How the model works, and what it still can't see: `props_model.py`. It does not know about
 weather or in-game injuries, and it simulates players independently of each other (aside from
 the shared game-script factor `game_odds.py` uses for team totals). Treat large model-vs-market

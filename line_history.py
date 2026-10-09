@@ -168,6 +168,19 @@ def closing_lines(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+def closing_map(df: pd.DataFrame = None) -> dict:
+    """
+    {(player_id, market): {(season, week): closing line}} for props, from the backlog (including anything
+    backfilled from the historical API). Feeds the hit-rate chart's "Line then" view.
+    """
+    df = load() if df is None else df
+    c = closing_lines(df[df["kind"] == "prop"]) if len(df) else closing_lines(df)
+    out = {}
+    for r in c.itertuples(index=False):
+        out.setdefault((r.player_id, r.market), {})[(int(r.season), int(r.week))] = float(r.closing_line)
+    return out
+
+
 def summary(df: pd.DataFrame) -> dict:
     """How much backlog there is: rows, distinct pulls, props/games covered, date span, per week."""
     if df.empty:
