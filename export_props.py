@@ -24,6 +24,7 @@ import nflreadpy as nfl
 
 import depth_chart as dc
 import game_context as gc
+import context_data
 import game_odds as go
 import line_history
 import odds_api
@@ -329,6 +330,47 @@ def game_log_for(history, player_id, market, sched_map, lines_then) -> list:
     return out
 
 
+# ---- context panels (weather, target share, defense vs position) -----------------
+def build_context(props, games, history, season, sample=False) -> dict:
+    """
+    Information shown beside a prop; none of it feeds the projection. Each part is independent and
+    guarded, so a failed weather call or a missing pbp file drops that panel, never the page.
+    """
+    ctx = {"weather": {}, "targets": {}, "dvp": {}}
+    # games on the page: label -> (home, away, commence)
+    seen = {}
+    for p in props:
+        away, home = p["game"].split(" @ ")
+        seen[p["game"]] = (p["game"], home, away, p["commence"])
+    for g in games:
+        if g.get("in_window", True):
+            seen.setdefault(g["game"], (g["game"], g["home"], g["away"], g["commence"]))
+    try:
+        sched = nfl.load_schedules([season]).to_pandas()
+        cards, meta = context_data.collect_weather(list(seen.values()), sched)
+        ctx["weather"] = cards
+        if not sample and cards:
+            n = context_data.append_weather_history(
+                context_data.weather_rows(cards, meta, season, line_history.now_iso()))
+            log(f"Backlog: stored weather for {n} games (tracking/weather_history.csv)")
+        log(f"Weather for {len(cards)} of {len(seen)} games.")
+    except Exception as e:
+        log(f"Weather unavailable ({e}); the page omits it.")
+    teams = sorted({p["team"] for p in props})
+    try:
+        ctx["targets"] = context_data.target_tables(context_data.load_pbp_targets(season), history, season, teams)
+        log(f"Target share for {len(ctx['targets'])} teams.")
+    except Exception as e:
+        log(f"Target share unavailable ({e}); the page omits it.")
+    try:
+        specs = {m: MARKETS[m] for m in {p["market"] for p in props}}
+        ctx["dvp"] = context_data.defense_vs_position(history, season, specs)
+        log(f"Defense vs position for {len(ctx['dvp'])} defenses.")
+    except Exception as e:
+        log(f"Defense vs position unavailable ({e}); the page omits it.")
+    return ctx
+
+
 # ---- ranking the picks ----------------------------------------------------
 TOP_PROPS = 10
 TOP_PROP_MAX_GAP = 12      # the page already flags |model - market| >= 12 as "model far from market"
@@ -599,6 +641,7 @@ def main():
             p["games"] = game_log_for(history, p["player_id"], p["market"], sched_map, then_map)
     except Exception as e:
         log(f"Game logs unavailable for the hit-rate chart ({e}); the chart will say no game log is available.")
+    context = build_context(props, games, history, int(season), args.sample)
     top = rank_top_props(props)
     game_picks = rank_game_picks(games)
     log(f"Top {len(top)} props and {len(game_picks)} ranked game picks.")
@@ -611,7 +654,7 @@ def main():
         "generated": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
         "season": int(season), "week": int(week), "sample": bool(args.sample),
         "credits": credits, "markets": markets, "n_games": len(events), "props": props, "games": games,
-        "game_picks": game_picks, "rating_backtest": rating_backtest,
+        "game_picks": game_picks, "rating_backtest": rating_backtest, "context": context,
         "power": None if power is None else {"table": power["table"], "hfa": round(power["hfa"], 2),
                                               "per_rank": round(team_ratings.PER_RANK, 3)},
     }

@@ -18,6 +18,7 @@ import sys
 
 import nflreadpy as nfl
 
+import context_data
 import line_history
 import odds_api
 import props_tracker
@@ -50,6 +51,19 @@ def main():
     sched = nfl.load_schedules([season]).to_pandas()
     n = store_game_lines(raw, sched, season, int(nfl.get_current_week()), pulled_at)
     log(f"Backlog: appended {n} game-line rows ({n // 2} upcoming games).")
+
+    try:      # the forecast for the coming week's games moves day to day; that path is the data
+        upcoming = []
+        for e in raw:
+            if odds_api.has_started(e):
+                continue
+            home, away = odds_api.TEAM_ABBR[e["home_team"]], odds_api.TEAM_ABBR[e["away_team"]]
+            upcoming.append((f"{away} @ {home}", home, away, e["commence_time"]))
+        cards, meta = context_data.collect_weather(upcoming, sched)
+        n = context_data.append_weather_history(context_data.weather_rows(cards, meta, season, pulled_at))
+        log(f"Backlog: stored weather for {n} games.")
+    except Exception as e:
+        log(f"Weather not stored this run ({e}).")
 
     try:
         tg = team_stats.team_game_stats(team_stats.load_pbp(range(season - 2, season + 1)))

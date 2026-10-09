@@ -275,6 +275,30 @@
     #week-view > .rail { grid-column: 1; grid-row: auto; position: static; max-height: 320px; margin-bottom: 4px; }
     #week-view > :not(.rail) { grid-column: 1; }
   }
+  /* ---- context panels ---- */
+  .ctx { grid-column: 1 / -1; }
+  .ctx-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); gap: 16px; margin-bottom: 16px; }
+  .ccard { background: var(--surface-2); border-radius: 10px; padding: 12px 14px; }
+  .ccard h4 { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-faint); margin-bottom: 8px; font-weight: 600; }
+  .wx-main { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .wx-temp { font-family: "IBM Plex Mono", monospace; font-size: 30px; font-weight: 600; }
+  .wx-facts { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 13px; color: var(--text-dim); margin-top: 6px; }
+  .dvp { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .dvp th, .dvp td { padding: 5px 6px; text-align: right; border-top: 1px solid var(--border); }
+  .dvp th { color: var(--text-faint); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; border-top: none; }
+  .dvp th:first-child, .dvp td:first-child { text-align: left; }
+  .dvp tr.me td { font-weight: 700; }
+  .pill { display: inline-block; min-width: 38px; text-align: center; padding: 1px 8px; border-radius: 99px; font-family: "IBM Plex Mono", monospace;
+    font-size: 12px; font-weight: 600; }
+  .pill.soft { background: var(--pos-bg); color: var(--pos); } .pill.tough { background: var(--neg-bg); color: var(--neg); }
+  .pill.mid { background: var(--surface-3); color: var(--text-dim); }
+  .tst { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .tst th, .tst td { padding: 5px 8px; text-align: right; border-top: 1px solid var(--border); white-space: nowrap; }
+  .tst th { color: var(--text-faint); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; border-top: none; }
+  .tst th:first-child, .tst td:first-child { text-align: left; }
+  .tst tr.me td { background: rgba(217,164,65,0.14); font-weight: 700; }
+  .sharebar { display: inline-block; height: 8px; border-radius: 4px; background: var(--gold); vertical-align: middle; margin-right: 6px; opacity: 0.8; }
+  @media (max-width: 720px) { .ctx-grid { grid-template-columns: 1fr; } }
 </style>
 
 <div class="topbar">
@@ -553,6 +577,91 @@ function renderHit(p, line) {
     ${HC.mode === "now" && p.kind !== "td" ? `<div class="note">Hit rate here is each past game measured against <em>today's</em> line, i.e. "if this line had been set then". Switch to <strong>Line then</strong> to use the line each game really had, available for games we were already logging${hasThen ? "" : " (none for this player yet; it builds up every week)"}.</div>` : ""}`;
 }
 
+/* ---------- context panels: weather, defense vs position, target share ---------- */
+/* TARGETS:BEGIN -- pure functions (no DOM); tests/test_context.py runs these under node */
+const DVP_MARKETS = {
+  QB: ["player_pass_yds", "player_pass_tds", "player_rush_yds"], RB: ["player_rush_yds", "player_receptions", "player_reception_yds"],
+  WR: ["player_receptions", "player_reception_yds"], TE: ["player_receptions", "player_reception_yds"], FB: ["player_rush_yds"],
+};
+function dvpClass(rank) { return rank <= 10 ? "tough" : rank >= 23 ? "soft" : "mid"; }   // rank 1 = allows the fewest
+function targetRows(td, win) {
+  if (!td || !td.weeks.length) return null;
+  const weeks = td.weeks.map(w => w[0]);
+  const use = new Set(win === "season" ? weeks : weeks.slice(-win));
+  const team = { tgt: 0, rz: 0, in10: 0 };
+  td.weeks.forEach(w => { if (use.has(w[0])) { team.tgt += w[1]; team.rz += w[2]; team.in10 += w[3]; } });
+  const rows = td.players.map(pl => {
+    let gp = 0, tgt = 0, rz = 0, in10 = 0;
+    pl.g.forEach(g => { if (use.has(g[0])) { gp++; tgt += g[1]; rz += g[2]; in10 += g[3]; } });
+    return { id: pl.id, name: pl.name, pos: pl.pos, gp, tgt, rz, in10,
+      avg: gp ? tgt / gp : 0, share: team.tgt ? tgt / team.tgt : 0,
+      rzShare: team.rz ? rz / team.rz : 0, in10Share: team.in10 ? in10 / team.in10 : 0 };
+  }).filter(r => r.tgt > 0).sort((a, b) => b.tgt - a.tgt || a.name.localeCompare(b.name));
+  return { team, rows };
+}
+function weatherFlags(w) {
+  if (!w || w.indoors) return [];
+  const f = [];
+  if ((w.wind_mph != null && w.wind_mph >= 15) || (w.gust_mph != null && w.gust_mph >= 25)) f.push("windy");
+  if (w.temp_f != null && w.temp_f <= 32) f.push("freezing");
+  if (w.precip_pct != null && w.precip_pct >= 50) f.push("rain likely");
+  return f;
+}
+/* TARGETS:END */
+
+const TSW = { win: "season" };
+const TS_WINS = [[3, "L3"], [6, "L6"], [10, "L10"], ["season", "Season"]];
+const CTX = DATA.context || {};
+
+function weatherCardHTML(game) {
+  const w = (CTX.weather || {})[game];
+  if (!w) return `<div class="ccard"><h4>Game-day weather</h4><div class="note">No forecast available for this game.</div></div>`;
+  if (w.indoors) return `<div class="ccard"><h4>Game-day weather</h4><div class="wx-main"><span style="font-size:18px; font-weight:600;">Indoors</span></div>
+    <div class="wx-facts"><span>${esc(w.stadium || "")} &middot; ${esc(w.roof)} roof: weather doesn't apply.</span></div></div>`;
+  const flags = weatherFlags(w);
+  return `<div class="ccard"><h4>Game-day weather</h4>
+    <div class="wx-main"><span class="wx-temp">${w.temp_f}&deg;F</span><span style="font-size:15px;">${esc(w.sky)}</span>${flags.map(f => `<span class="tag warn">${f}</span>`).join("")}</div>
+    <div class="wx-facts"><span>Wind ${w.wind_mph ?? "&mdash;"} mph${w.gust_mph != null ? ` (gusts ${w.gust_mph})` : ""}</span><span>Rain chance ${w.precip_pct ?? "&mdash;"}%</span></div>
+    <div class="note">${esc(w.stadium || "")}, kickoff to about 3 hours later. For context only: across 2021&ndash;26 games, wind, cold and roof showed no measurable effect on results beyond what the lines already price in.</div></div>`;
+}
+
+function dvpCardHTML(p) {
+  const d = ((CTX.dvp || {})[p.opp] || {})[p.pos];
+  const markets = (DVP_MARKETS[p.pos] || []).filter(m => d && d[m]);
+  if (!markets.length) return `<div class="ccard"><h4>${esc(p.opp)} defense vs ${p.pos}s</h4><div class="note">Not enough games yet.</div></div>`;
+  const label = m => (P.find(x => x.market === m) || {}).label || m.replace("player_", "").replace(/_/g, " ");
+  return `<div class="ccard"><h4>${esc(p.opp)} defense vs ${p.pos}s</h4>
+    <table class="dvp"><thead><tr><th>Allowed per game</th><th>${esc(p.opp)}</th><th>League</th><th>Rank</th></tr></thead><tbody>
+    ${markets.map(m => `<tr class="${m === p.market ? "me" : ""}"><td>${esc(label(m))}</td><td class="num">${d[m].pg}</td><td class="num">${d[m].lg}</td>
+      <td><span class="pill ${dvpClass(d[m].rank)}" title="${d[m].rank} of 32; 1 = allows the fewest">#${d[m].rank}</span></td></tr>`).join("")}
+    </tbody></table>
+    <div class="note">Totals for <em>all</em> ${p.pos}s the defense has faced (${d[markets[0]].n} games). Rank 1 = allows the fewest (toughest); green = a soft matchup.</div></div>`;
+}
+
+function targetCardHTML(p) {
+  const td = (CTX.targets || {})[p.team];
+  const res = targetRows(td, TSW.win);
+  if (!res) return `<div class="ccard" style="grid-column:1/-1"><h4>${esc(p.team)} target share</h4><div class="note">No target data yet.</div></div>`;
+  const pc = x => (x * 100).toFixed(1) + "%";
+  const rows = res.rows.slice(0, 14);
+  if (!rows.some(r => r.name === p.player)) { const me = res.rows.find(r => r.name === p.player); if (me) rows.push(me); }
+  const maxShare = Math.max(0.01, ...rows.map(r => r.share));
+  return `<div class="ccard" style="margin-bottom:16px;"><div class="hc-top" style="margin-bottom:6px;"><h4 style="margin:0;">${esc(p.team)} target share &middot; ${res.team.tgt} team targets</h4>
+      <div class="seg" data-ts="win">${TS_WINS.map(([v, l]) => `<button data-v="${v}" class="${String(TSW.win) === String(v) ? "active" : ""}">${l}</button>`).join("")}</div></div>
+    <div class="scroll-x"><table class="tst"><thead><tr><th>Player</th><th>GP</th><th>Avg</th><th>Total</th><th>Share</th><th>RZ</th><th>RZ share</th><th>In-10</th><th>In-10 share</th></tr></thead><tbody>
+    ${rows.map(r => `<tr class="${r.name === p.player ? "me" : ""}"><td>${esc(r.name)} <span style="color:var(--text-faint); font-size:11px;">${r.pos}</span></td><td class="num">${r.gp}</td><td class="num">${r.avg.toFixed(1)}</td><td class="num">${r.tgt}</td>
+      <td class="num"><span class="sharebar" style="width:${Math.round(r.share / maxShare * 46)}px"></span>${pc(r.share)}</td>
+      <td class="num">${r.rz}</td><td class="num">${pc(r.rzShare)}</td><td class="num">${r.in10}</td><td class="num">${pc(r.in10Share)}</td></tr>`).join("")}
+    </tbody></table></div>
+    <div class="note">Targets = passes thrown to a receiver. RZ = inside the opponent's 20, In-10 = inside the 10 (the closest free stand-in for end-zone targets). Windows are the team's last N games.</div></div>`;
+}
+
+function renderCtx(p) {
+  const el = $("ctx-" + p.id);
+  if (!el) return;
+  el.innerHTML = `<div class="ctx-grid">${weatherCardHTML(p.game)}${dvpCardHTML(p)}</div>${targetCardHTML(p)}`;
+}
+
 /* ---------- detail ---------- */
 function chartSVG(p, line) {
   const W = 600, H = 150, pad = 18, base = H - 22, top = 8;
@@ -589,6 +698,7 @@ function renderDetail(p) {
   const bo = p.best_over, bu = p.best_under;
   el.innerHTML = `
     <div class="panel hc" id="hc-${p.id}"></div>
+    <div class="panel ctx" id="ctx-${p.id}"></div>
     <div class="panel">
       <h3>Simulated outcomes (20,000 games)</h3>
       <div id="chart-${p.id}"></div>
@@ -639,6 +749,7 @@ function renderDetail(p) {
       cell(p.kind === "td" ? "EV on Yes" : "EV on over", evO == null ? "—" : signed(evO * 100, 1) + "%", evO, "per $1 at " + price(po)) +
       (p.kind === "td" ? "" : cell("P(under)", pct(r.under, 1), null, "") + cell("EV on under", evU == null ? "—" : signed(evU * 100, 1) + "%", evU, "per $1 at " + price(pu)));
     renderHit(p, line);
+    renderCtx(p);
   };
   ["wl-", "wo-", "wu-"].forEach(k => $(k + p.id).addEventListener("input", upd));
   upd();
@@ -758,6 +869,7 @@ function gameCardHTML(g) {
     <div class="note" style="margin-top:10px;">${predNote}</div>
     <div class="note" style="margin-top:4px;">${trustNote}</div>
     ${rankLineHTML(g)}
+    ${gameWeatherHTML(g)}
     ${profileHTML(g)}
   </div>`;
 }
@@ -894,6 +1006,13 @@ function pickBoardHTML() {
       <div class="num ${e.ev == null ? "" : e.ev > 0.005 ? "ev pos" : "ev neg"}" style="text-align:right;">${e.ev == null ? "&mdash;" : signed(e.ev * 100, 1) + "%"}</div></div>`).join("")}</div>`;
 }
 
+function gameWeatherHTML(g) {
+  const w = (CTX.weather || {})[g.game];
+  if (!w) return "";
+  if (w.indoors) return `<div class="note" style="margin-top:4px;">Weather: indoors (${esc(w.roof)} roof)</div>`;
+  return `<div class="note" style="margin-top:4px;">Weather: ${w.temp_f}&deg;F, ${esc(w.sky.toLowerCase())}, wind ${w.wind_mph ?? "?"} mph${w.gust_mph != null ? ` (gusts ${w.gust_mph})` : ""}, ${w.precip_pct ?? "?"}% rain ${weatherFlags(w).map(f => `<span class="tag warn">${f}</span>`).join(" ")}</div>`;
+}
+
 function rankLineHTML(g) {
   const r = g.rank;
   if (!r) return "";
@@ -933,6 +1052,13 @@ $("view-tabs").addEventListener("click", e => {
   if (view === "history") { renderHistoryList(); renderHistoryDetail(); }
 });
 $("rows").addEventListener("click", e => {
+  const tb = e.target.closest(".ctx [data-ts] button");
+  if (tb) {
+    e.stopPropagation();
+    TSW.win = tb.dataset.v === "season" ? "season" : +tb.dataset.v;
+    const p = P[S.open]; if (p) renderCtx(p);
+    return;
+  }
   const b = e.target.closest(".hc [data-hc] button"); if (!b || b.disabled) return;
   e.stopPropagation();
   const key = b.parentElement.dataset.hc, v = b.dataset.v;

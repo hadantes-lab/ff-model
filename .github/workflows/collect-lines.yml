@@ -53,7 +53,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add tracking/line_history.csv tracking/power_history.csv
+          git add tracking/line_history.csv tracking/power_history.csv tracking/weather_history.csv
           git diff --cached --quiet && echo "Nothing new to store." || git commit -m "Update line history [skip ci]"
           git checkout -- .
           git pull --rebase -X theirs origin main

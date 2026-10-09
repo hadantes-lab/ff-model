@@ -348,6 +348,21 @@ markets with the featured one already open on its hit-rate chart; a chip above t
 search box matches player, team or game. On a phone the rail stacks above the list in a scrolling box. The
 grouping logic is a pure function tested under node (`tests/test_rail.py`).
 
+**Context panels (weather, matchup, target share).** Open a prop and under the hit-rate chart there are three
+cards, all information beside the prop rather than inputs to the projection (`context_data.py`):
+- *Game-day weather*: forecast for the game's hours from Open-Meteo (free, no key), flagged windy (15+ mph, or gusts
+  of 25+), freezing, or rain likely; domes and closed roofs say "indoors". The venue comes from the schedule's stadium
+  name first, since a "home" game isn't always played at home (this season's Jaguars game is in London). The card says
+  plainly that across 2021-26 games wind, cold and roof showed no measurable effect beyond what the lines price in.
+- *Defense vs position*: how much the opposing defense has allowed per game to *all* players at the prop's position
+  (pass yards, pass TDs, rush yards for QBs; rushing, catches, receiving for RB/WR/TE), against the league average,
+  ranked 1-32 with 1 = allows the fewest. Uses this season once a defense has 3 games, otherwise last season too.
+- *Target share*: the player's team, every player's targets, share of the team's, and red-zone (inside the 20) and
+  inside-the-10 targets with their shares (the closest free stand-in for end-zone targets; first-read targets need
+  charting data). Windows L3 / L6 / L10 / season count the *team's* games, so a bye isn't a game.
+Game Lines cards also show the weather. Forecasts are appended to `tracking/weather_history.csv` on every real run and
+by `collect_lines.py` on the off days (a forecast moves day to day, and that path is worth keeping).
+
 How the model works, and what it still can't see: `props_model.py`. It does not know about
 weather or in-game injuries, and it simulates players independently of each other (aside from
 the shared game-script factor `game_odds.py` uses for team totals). Treat large model-vs-market

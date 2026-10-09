@@ -96,7 +96,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add tracking/props_log.csv tracking/line_history.csv tracking/power_history.csv web/track_record.json web/player_history.json
+          git add tracking/props_log.csv tracking/line_history.csv tracking/power_history.csv tracking/weather_history.csv web/track_record.json web/player_history.json
           git diff --cached --quiet && echo "No tracker changes." || git commit -m "Update props tracking log [skip ci]"
           git checkout -- .   # discard regenerated build outputs (already published) so the rebase can run
           git pull --rebase -X theirs origin main   # a concurrent run edited the same files: this run's rows win (upsert semantics)
