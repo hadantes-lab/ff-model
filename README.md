@@ -393,6 +393,30 @@ requires `--max-credits`, and the cap is enforced from the API's own per-call co
 numbers only (median line, no-vig probability, best price; never book names or per-book prices), and the chart's "Line then" picks
 up their closing lines automatically.
 
+**A free alternative for past lines: ESPN (`espn_lines.py`).** `nfl-data-py` (the older sibling of the `nflreadpy` already used
+here) has no prop lines, but ESPN's public odds API does, and it keeps serving them for finished games: for each player prop, the
+**opening and closing line** (and Over/Under prices on the 2024-25 ESPN BET data), for 12 of our markets including longest
+reception/rush, attempts and completions. 2024-25 comes from ESPN BET, this season from DraftKings (ESPN's partner now). Each game's
+ESPN event id is already in the nflverse schedule and ESPN athlete ids map to nflverse ids via `nflreadpy.load_ff_playerids`, so one
+request per game suffices (~270 requests per season):
+```
+python espn_lines.py collect --seasons 2024 2025 2026   # resumable; raw responses are cached locally, git-ignored
+python espn_lines.py validate                           # compare with the lines we logged ourselves
+python espn_lines.py summary
+```
+Rows go to `tracking/espn_lines.csv` (kept apart from `line_history.csv` so it stays clear these are one book's numbers, with a
+`provider` and a `priced` flag; DraftKings lines come without prices). The hit-rate chart's "Line then" uses our own pulls first and
+falls back to ESPN's closing line.
+
+How good is it? Checked against 955 props where we also logged the Odds API consensus before kickoff: the lines correlate at 0.996,
+counts (receptions, pass TDs) match exactly 83-84% of the time, yardage lines differ by ~3 yards on average (pass yards ~9). ESPN's
+"current" value is **not** a sharper later line: on the props where it differs from ours it sits slightly *farther* from the real
+results (mean miss 22.0 vs 20.8; correlation of the difference with what happened -0.09). So treat it as one book's real line, a
+good display of what the line was, not as better information than our consensus. Caveats: the API is undocumented and unofficial (it
+could change or disappear, so the collector fails soft and keeps nothing it can't re-fetch), it is for personal modeling, and one
+book is a noisier proxy for "the market" than a median across books, so the paid historical backfill above remains the better source
+for judging the model's edge if you ever upgrade.
+
 How the model works, and what it still can't see: `props_model.py`. It does not know about
 weather or in-game injuries, and it simulates players independently of each other (aside from
 the shared game-script factor `game_odds.py` uses for team totals). Treat large model-vs-market

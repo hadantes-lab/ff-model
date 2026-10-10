@@ -570,11 +570,11 @@ function renderHit(p, line) {
         <div class="hc-stat"><div class="k">Games</div><div class="v">${st.n}</div></div>
       </div>
       <div class="hc-ctl">${seg(HC_WINS, HC.win, "win")}${seg([["all", "All"], ["home", "Home"], ["away", "Away"]], HC.ha, "ha")}
-        <div class="seg" data-hc="mode"><button data-v="now" class="${HC.mode === "now" ? "active" : ""}">Today's line</button><button data-v="then" class="${HC.mode === "then" ? "active" : ""}" ${hasThen ? "" : "disabled"} title="${hasThen ? "Compare each game with the line it actually had when we logged it" : "No past lines logged for this player yet"}">Line then</button></div></div>
+        <div class="seg" data-hc="mode"><button data-v="now" class="${HC.mode === "now" ? "active" : ""}">Today's line</button><button data-v="then" class="${HC.mode === "then" ? "active" : ""}" ${hasThen ? "" : "disabled"} title="${hasThen ? "Compare each game with the line it actually had: our own pulls, else ESPN's closing line" : "No past lines for this player yet"}">Line then</button></div></div>
     </div>
     ${n ? svg : `<div class="empty" style="padding:30px 0;">No games match these filters.</div>`}
     <div class="legend"><span><i style="background:var(--pos)"></i>${p.kind === "td" ? "scored" : "over"}</span><span><i style="background:var(--neg)"></i>${p.kind === "td" ? "no TD" : "under"}</span>${st.push ? `<span><i style="background:var(--bar)"></i>push</span>` : ""}<span>${HC.mode === "then" ? "gold ticks = the line that game had" : "dashed line = " + (p.kind === "td" ? "any TD" : "the line (edit it under Your line & odds)")}</span><span>@ = away</span></div>
-    ${HC.mode === "now" && p.kind !== "td" ? `<div class="note">Hit rate here is each past game measured against <em>today's</em> line, i.e. "if this line had been set then". Switch to <strong>Line then</strong> to use the line each game really had, available for games we were already logging${hasThen ? "" : " (none for this player yet; it builds up every week)"}.</div>` : ""}`;
+    ${HC.mode === "now" && p.kind !== "td" ? `<div class="note">Hit rate here is each past game measured against <em>today's</em> line, i.e. "if this line had been set then". Switch to <strong>Line then</strong> to use the line each game really had: our own pulls where we have them, otherwise the closing line ESPN showed (one book, so it can sit a few yards from the market consensus)${hasThen ? "" : " (none for this player yet; it builds up every week)"}.</div>` : ""}`;
 }
 
 /* ---------- context panels: weather, defense vs position, target share ---------- */

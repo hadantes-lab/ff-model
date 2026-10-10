@@ -25,6 +25,7 @@ import nflreadpy as nfl
 import depth_chart as dc
 import game_context as gc
 import context_data
+import espn_lines
 import game_odds as go
 import line_history
 import odds_api
@@ -682,6 +683,10 @@ def main():
         then_map = lines_then_lookup(props_tracker._load())
         for k, by_game in line_history.closing_map(line_history.load()).items():   # the backlog's closing lines win
             then_map.setdefault(k, {}).update(by_game)
+        for k, by_game in espn_lines.closing_map().items():        # last resort: the one line ESPN showed (single book)
+            cur = then_map.setdefault(k, {})
+            for wk, line in by_game.items():
+                cur.setdefault(wk, line)
         for p in props:
             p["games"] = game_log_for(history, p["player_id"], p["market"], sched_map, then_map)
     except Exception as e:
