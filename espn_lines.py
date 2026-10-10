@@ -252,9 +252,16 @@ def closing_map(df: pd.DataFrame = None) -> dict:
 
 
 # ---- driver ------------------------------------------------------------------------
+NO_DATA_FINAL_DAYS = 7      # a recent game with no props might just be a failed request: retry it until it's a week old
+
+
 def collect(seasons, sched=None, ids=None, history_loader=None, get=http_get, out_path=None, state_path=None,
-            limit_games=None) -> dict:
-    """Fetch every finished game in `seasons` not already done. Resumable; fails soft per game."""
+            limit_games=None, today=None) -> dict:
+    """
+    Fetch every finished game in `seasons` not already done. Resumable; fails soft per game. A game with
+    no props is recorded as done (never retried) only once it is NO_DATA_FINAL_DAYS old.
+    """
+    today = pd.Timestamp(today) if today is not None else pd.Timestamp.now()
     import nflreadpy as nfl
     from props_model import build_history
 
@@ -277,9 +284,10 @@ def collect(seasons, sched=None, ids=None, history_loader=None, get=http_get, ou
             summary["games"] += 1
             if not items:
                 summary["no_data"] += 1
-                state["done"].append(eid)                  # nothing to get for this game; don't retry forever
-                sp.parent.mkdir(exist_ok=True)
-                sp.write_text(json.dumps(state), encoding="utf-8")
+                if (today - pd.Timestamp(r.gameday)).days >= NO_DATA_FINAL_DAYS:
+                    state["done"].append(eid)              # old enough that "no data" is real: don't retry forever
+                    sp.parent.mkdir(exist_ok=True)
+                    sp.write_text(json.dumps(state), encoding="utf-8")
                 continue
             lines = main_lines(items)
             game = {"season": int(season), "week": int(r.week), "home": r.home_team, "away": r.away_team,

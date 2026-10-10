@@ -46,6 +46,13 @@ jobs:
         if: steps.key.outputs.have_key == 'true'
         run: python collect_lines.py
 
+      # Past games' prop lines from ESPN (free; one request per finished game; see espn_lines.py). Unofficial
+      # endpoint, so it may fail without failing the run. Tue/Wed/Fri/Sat picks up the previous days' games.
+      - name: Collect ESPN lines for newly finished games
+        if: steps.key.outputs.have_key == 'true'
+        continue-on-error: true
+        run: python espn_lines.py collect --seasons $(python -c "import nflreadpy as n; print(n.get_current_season())")
+
       # These files are the backlog: Actions runs are ephemeral, so they only persist by being
       # committed back. Only our own derived numbers, never a sportsbook's odds board.
       - name: Commit the backlog
@@ -53,7 +60,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add tracking/line_history.csv tracking/power_history.csv tracking/weather_history.csv
+          git add tracking/line_history.csv tracking/power_history.csv tracking/weather_history.csv tracking/espn_lines.csv tracking/espn_state.json
           git diff --cached --quiet && echo "Nothing new to store." || git commit -m "Update line history [skip ci]"
           git checkout -- .
           git pull --rebase -X theirs origin main

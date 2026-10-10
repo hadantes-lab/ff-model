@@ -125,6 +125,7 @@ class TestCollect(unittest.TestCase):
         return {"count": 0, "pageCount": 0, "items": []}
 
     def go(self, **kw):
+        kw.setdefault("today", "2025-12-01")                                          # well after the fixtures' game dates
         return el.collect([2025], sched=self.sched, ids=self.ids, history_loader=self.hist, get=self.fake_get,
                           out_path=self.out, state_path=self.state, **kw)
 
@@ -192,6 +193,22 @@ class TestDedupeAnd404(unittest.TestCase):
         with mock.patch("urllib.request.urlopen", boom), mock.patch("time.sleep"):
             self.assertIsNone(el.http_get("https://example.invalid/x", cache=False))
         self.assertEqual(len(calls), 1)
+
+
+class TestRecentGamesWithNoDataAreRetried(unittest.TestCase):
+    def test_no_data_is_only_final_once_the_game_is_a_week_old(self):
+        d = pathlib.Path(tempfile.mkdtemp())
+        sched = pd.DataFrame([{"season": 2025, "week": 1, "game_type": "REG", "gameday": "2025-09-07", "gametime": "13:00",
+                               "home_team": "ATL", "away_team": "TB", "home_score": 1, "away_score": 0, "espn": 401772830.0}])
+        ids = pd.DataFrame({"espn_id": [1.0], "gsis_id": ["x"]})
+        hist = lambda s: pd.DataFrame([{"player_id": "x", "player_display_name": "X", "team": "ATL", "week": 1}])
+        empty = lambda url, **kw: {"count": 0, "pageCount": 0, "items": []}
+        run = lambda today: el.collect([2025], sched=sched, ids=ids, history_loader=hist, get=empty,
+                                       out_path=d / "e.csv", state_path=d / "s.json", today=today)
+        run("2025-09-09")                                                              # two days after: might be a blip
+        self.assertEqual(run("2025-09-10")["no_data"], 1)                              # so it was tried again
+        run("2025-09-20")                                                              # now old enough: recorded as done
+        self.assertEqual(run("2025-09-21")["skipped_done"], 1)
 
 
 if __name__ == "__main__":

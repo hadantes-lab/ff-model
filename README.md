@@ -406,7 +406,7 @@ python espn_lines.py summary
 ```
 Rows go to `tracking/espn_lines.csv` (kept apart from `line_history.csv` so it stays clear these are one book's numbers, with a
 `provider` and a `priced` flag; DraftKings lines come without prices). The hit-rate chart's "Line then" uses our own pulls first and
-falls back to ESPN's closing line.
+falls back to ESPN's closing line. The off-day collector (`collect-lines.yml`, Tue/Wed/Fri/Sat) runs `collect` for the current season, picking up each newly finished game; a game with no props is retried until it is a week old, then recorded as having none.
 
 How good is it? Checked against 955 props where we also logged the Odds API consensus before kickoff: the lines correlate at 0.996,
 counts (receptions, pass TDs) match exactly 83-84% of the time, yardage lines differ by ~3 yards on average (pass yards ~9). ESPN's
