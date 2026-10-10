@@ -25,3 +25,27 @@ pulled_at,season,week,game,commence,stadium,roof,indoors,temp_f,wind_mph,gust_mp
 2026-10-09T23:30:38+00:00,2026,6,BUF @ LV,2026-10-18T20:25:00Z,Allegiant Stadium,dome,True,,,,,
 2026-10-09T23:30:38+00:00,2026,6,LAC @ KC,2026-10-18T20:25:00Z,GEHA Field at Arrowhead Stadium,outdoors,False,55,9,10,3,Mostly clear
 2026-10-09T23:30:38+00:00,2026,6,WAS @ SF,2026-10-20T00:15:00Z,Levi's Stadium,outdoors,False,81,9,8,0,Clear
+2026-10-10T17:31:12+00:00,2026,5,PHI @ JAX,2026-10-11T13:30:00Z,Tottenham Hotspur Stadium,outdoors,False,59,7,14,0,Overcast
+2026-10-10T17:31:12+00:00,2026,5,CHI @ GB,2026-10-11T17:00:00Z,Lambeau Field,outdoors,False,76,14,26,0,Clear
+2026-10-10T17:31:12+00:00,2026,5,CIN @ MIA,2026-10-11T17:00:00Z,Hard Rock Stadium,outdoors,False,90,10,13,2,Clear
+2026-10-10T17:31:12+00:00,2026,5,CLE @ NYJ,2026-10-11T17:00:00Z,MetLife Stadium,outdoors,False,64,10,24,81,Rain
+2026-10-10T17:31:12+00:00,2026,5,HOU @ TEN,2026-10-11T17:00:00Z,Nissan Stadium,outdoors,False,67,9,17,4,Overcast
+2026-10-10T17:31:12+00:00,2026,5,IND @ PIT,2026-10-11T17:00:00Z,Acrisure Stadium,outdoors,False,66,16,36,53,Drizzle
+2026-10-10T17:31:12+00:00,2026,5,LV @ NE,2026-10-11T17:00:00Z,Gillette Stadium,outdoors,False,65,11,17,5,Overcast
+2026-10-10T17:31:12+00:00,2026,5,MIN @ NO,2026-10-11T17:00:00Z,Caesars Superdome,dome,True,,,,,
+2026-10-10T17:31:12+00:00,2026,5,DEN @ LAC,2026-10-11T20:05:00Z,SoFi Stadium,dome,True,,,,,
+2026-10-10T17:31:12+00:00,2026,5,DET @ ARI,2026-10-11T20:25:00Z,State Farm Stadium,nan,False,84,22,33,22,Mostly clear
+2026-10-10T17:31:12+00:00,2026,5,SF @ SEA,2026-10-11T20:25:00Z,Lumen Field,outdoors,False,60,10,19,0,Clear
+2026-10-10T17:31:12+00:00,2026,5,BAL @ ATL,2026-10-12T00:20:00Z,Mercedes-Benz Stadium,nan,False,65,10,24,1,Overcast
+2026-10-10T17:31:12+00:00,2026,5,BUF @ LA,2026-10-13T00:15:00Z,SoFi Stadium,dome,True,,,,,
+2026-10-10T17:31:12+00:00,2026,6,SEA @ DEN,2026-10-16T00:15:00Z,Empower Field at Mile High,outdoors,False,62,14,19,23,Clear
+2026-10-10T17:31:12+00:00,2026,6,HOU @ JAX,2026-10-18T13:30:00Z,Wembley Stadium,outdoors,False,54,12,28,11,Overcast
+2026-10-10T17:31:12+00:00,2026,6,CHI @ ATL,2026-10-18T17:00:00Z,Mercedes-Benz Stadium,nan,False,53,6,10,6,Clear
+2026-10-10T17:31:12+00:00,2026,6,CAR @ PHI,2026-10-18T17:00:00Z,Lincoln Financial Field,outdoors,False,56,12,17,7,Mostly clear
+2026-10-10T17:31:12+00:00,2026,6,TEN @ IND,2026-10-18T17:00:00Z,Lucas Oil Stadium,nan,False,48,8,11,4,Clear
+2026-10-10T17:31:12+00:00,2026,6,NYJ @ NE,2026-10-18T17:00:00Z,Gillette Stadium,outdoors,False,56,12,13,8,Partly cloudy
+2026-10-10T17:31:12+00:00,2026,6,NO @ NYG,2026-10-18T17:00:00Z,MetLife Stadium,outdoors,False,57,15,20,9,Mostly clear
+2026-10-10T17:31:12+00:00,2026,6,ARI @ LA,2026-10-18T20:05:00Z,SoFi Stadium,dome,True,,,,,
+2026-10-10T17:31:12+00:00,2026,6,BUF @ LV,2026-10-18T20:25:00Z,Allegiant Stadium,dome,True,,,,,
+2026-10-10T17:31:12+00:00,2026,6,LAC @ KC,2026-10-18T20:25:00Z,GEHA Field at Arrowhead Stadium,outdoors,False,48,11,14,5,Clear
+2026-10-10T17:31:12+00:00,2026,6,WAS @ SF,2026-10-20T00:15:00Z,Levi's Stadium,outdoors,False,77,9,10,1,Clear
