@@ -267,5 +267,15 @@
    "alpha_per_market": 0.004166666666666667
   }
  },
+ "confidence": {
+  "slope": 0.034298387123012516,
+  "se": 0.04933602352751754,
+  "ci": [
+   -0.062400218990921866,
+   0.1309969932369469
+  ],
+  "n": 10471,
+  "strength": 0.0
+ },
  "note": "Static prior for the market-blend weight, fitted by market_trust.py on 2024-25 ESPN BET closing lines. `early` marks the markets whose big projection gaps vs the OPENING line have won (see early_table)."
 }

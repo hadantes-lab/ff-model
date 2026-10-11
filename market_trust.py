@@ -131,16 +131,40 @@ def early_table(x: pd.DataFrame, n_tests: int = None) -> dict:
     return out
 
 
-def write(results: dict, path=None, note="", early: dict = None):
+def confidence_study(x: pd.DataFrame) -> dict:
+    """
+    Measure how strongly the model's record on a player should move the weight on that player. `x` is the
+    comparison frame (see build_frame): its raw model probability `p_m_env` and the real outcome `over` define each
+    row's hit. -> {strength, slope, ci, n} where strength > 0 only if the record predicts the next hit.
+    """
+    import player_confidence as pc
+
+    d = x.copy()
+    d["hit"] = (((d["p_m_env"] > 0.5) & (d["over"] == 1)) | ((d["p_m_env"] < 0.5) & (d["over"] == 0))).astype(float)
+    d = d[d["p_m_env"] != 0.5]
+    p = pc.persistence(d)
+    return dict(p, strength=pc.strength_from(p))
+
+
+def write(results: dict, path=None, note="", early: dict = None, confidence: dict = None):
     path = pathlib.Path(path or TRUST_FILE)
     payload = {"weights": {m: r["weight"] for m, r in results.items() if r.get("weight") is not None},
                "evidence": {m: {k: r[k] for k in ("n", "verdict", "change_at_best", "ci", "best_grid") if k in r}
                             for m, r in results.items()},
                "early": early or {},
+               "confidence": confidence or {"strength": 0.0},
                "note": note or "Static prior for the market-blend weight, fitted by market_trust.py on 2024-25 ESPN BET closing "
                                "lines. `early` marks the markets whose big projection gaps vs the OPENING line have won (see early_table)."}
     path.write_text(json.dumps(payload, indent=1), encoding="utf-8")
     return path
+
+
+def load_confidence(path=None) -> float:
+    """How strongly the 0-10 player grade moves the model's weight (0 until the record is shown to predict anything)."""
+    path = pathlib.Path(path or TRUST_FILE)
+    if not path.exists():
+        return 0.0
+    return float((json.loads(path.read_text(encoding="utf-8")).get("confidence") or {}).get("strength", 0.0))
 
 
 def load_early(path=None) -> dict:
@@ -234,8 +258,13 @@ def main():
     for m, r in sorted(early.items()):
         print(f"  {m:28s} won {r['hit_rate']:.1%} of {r['n_picks']}  ROI {r['roi']:+.1%} [{r['roi_ci'][0]:+.1%}, {r['roi_ci'][1]:+.1%}]  gap >= {r['rel_threshold']:.1%} of the line"
               f"  -> {'QUALIFIES' if r['qualifies'] else 'no'}")
+    conf = confidence_study(x)
+    ci = conf["ci"]
+    print(f"\nPLAYER-RECORD CONFIDENCE: does the model's record on a player predict whether it hits him next? "
+          f"slope {conf['slope']:+.3f}" + (f" [{ci[0]:+.3f}, {ci[1]:+.3f}]" if ci[0] is not None else "") +
+          f" over {conf['n']} props -> strength {conf['strength']:.2f}")
     if args.write:
-        print("\nwrote", write(res, early=early))
+        print("\nwrote", write(res, early=early, confidence=conf))
 
 
 if __name__ == "__main__":

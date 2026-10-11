@@ -29,13 +29,14 @@ import espn_lines
 import game_odds as go
 import line_history
 import market_trust
+import player_confidence
 import odds_api
 import props_tracker
 import team_ratings
 import team_stats
 from matchups import CoverageModel, load_coverage_targets
 from props_model import (
-    MARKETS, CORE_MARKETS, EXTENDED_MARKETS, load_longest, MIN_GAMES, blend_toward_market, environment_effect, fair_line, load_calibration,
+    MARKETS, CORE_MARKETS, EXTENDED_MARKETS, LAMBDA_MAX, load_longest, MIN_GAMES, blend_toward_market, environment_effect, fair_line, load_calibration,
     market_weight, stat_series, build_history, distribution_summary, draw, fit_player,
     line_probs, normalize_name, opponent_multipliers, position_priors, rng_for,
 )
@@ -163,7 +164,7 @@ def ev_per_dollar(win_prob, lose_prob, american):
 
 
 def build_prop(event, home, away, player_row, market, cons, fit, mult, inj, matchup=None, promo=1.0,
-               lambda_override=None):
+               lambda_override=None, confidence=None):
     env = fit.get("env")
     spec = MARKETS[market]
     line = cons["point"]
@@ -176,6 +177,11 @@ def build_prop(event, home, away, player_row, market, cons, fit, mult, inj, matc
     predicted_line = fair_line(spec.kind, draws)
     line_gap = None if predicted_line is None else round(predicted_line - line, 2)
 
+    # The player's 0-10 model grade scales the weight (see player_confidence.py); with the measured strength at 0
+    # the factor is exactly 1.0 and nothing changes.
+    conf_mult = 1.0 if confidence is None else confidence["multiplier"]
+    lambda_eff = lambda_override if conf_mult == 1.0 else (LAMBDA_MAX if lambda_override is None else lambda_override) * conf_mult
+
     market_over = cons["fair_over"]
     if market_over is None and cons["best_over"]:
         market_over = odds_api.american_to_prob(cons["best_over"]["price"])   # includes the vig
@@ -184,7 +190,7 @@ def build_prop(event, home, away, player_row, market, cons, fit, mult, inj, matc
     # downstream (edge, EV, the pick) uses the model shrunk toward the market. Raw stays visible.
     raw = dict(p)
     if market_over is not None:
-        adj_over = blend_toward_market(p["over"], market_over, fit["n_eff"], lambda_override)
+        adj_over = blend_toward_market(p["over"], market_over, fit["n_eff"], lambda_eff)
         p = {"over": adj_over, "push": p["push"], "under": max(0.0, 1.0 - p["push"] - adj_over)}
 
     ev_o = ev_per_dollar(p["over"], p["under"], cons["best_over"]["price"]) if cons["best_over"] else None
@@ -214,7 +220,8 @@ def build_prop(event, home, away, player_row, market, cons, fit, mult, inj, matc
         "over": round(p["over"], 4), "push": round(p["push"], 4), "under": round(p["under"], 4),
         "model_over": round(raw["over"], 4), "model_under": round(raw["under"], 4),
         "gap": None if market_over is None else round((raw["over"] - market_over) * 100, 1),
-        "trust": round(market_weight(fit["n_eff"], lambda_override) if lambda_override is not None
+        "confidence": confidence,
+        "trust": round(market_weight(fit["n_eff"], lambda_eff) if lambda_eff is not None
                       else market_weight(fit["n_eff"]), 3),
         "fair_over": cons["fair_over"], "market_over": None if market_over is None else round(market_over, 4),
         "edge": None if market_over is None else round((p["over"] - market_over) * 100, 1),
@@ -545,6 +552,10 @@ def main():
     if live_weights:
         log(f"Live calibration: refined trust weight for {len(live_weights)} market(s) "
             f"from tracked results ({', '.join(live_weights)})")
+    conf_strength = market_trust.load_confidence()
+    conf_records = player_confidence.lookup(player_confidence.player_records(props_tracker._load(), int(season)), int(season))
+    log(f"Player confidence: {len(conf_records)} player-market records this season, strength {conf_strength:.2f}"
+        + ("" if conf_strength else " (the record has not been shown to predict anything, so grades are shown but change nothing)"))
     static_trust = market_trust.load_weights()
     if static_trust:
         log(f"Trust weights from past closing lines: {len(static_trust)} markets "
@@ -640,7 +651,8 @@ def main():
                 skipped += 1
                 continue
             lambda_override = resolve_trust(market, live_weights, static_trust)
-            props.append(build_prop(ev, home, away, row, market, c, fit, mult, status, matchup, promo, lambda_override))
+            props.append(build_prop(ev, home, away, row, market, c, fit, mult, status, matchup, promo, lambda_override,
+                                    player_confidence.confidence_for(conf_records.get((row["player_id"], market)), conf_strength)))
 
     log(f"{len(props)} props simulated; {skipped} skipped (out/doubtful or under {MIN_GAMES} games); "
         f"{len(unmatched)} names not matched to a player.")

@@ -460,7 +460,7 @@ function rowHTML(p) {
   return `<div class="row ${S.open === p.id ? "open" : ""} ${p.top_rank ? "top-pick" : ""}" data-id="${p.id}">
     <div class="row-head" role="button" tabindex="0" aria-expanded="${S.open === p.id}">
       <div class="who"><div class="name">${esc(p.player)}</div>
-        <div class="sub"><span>${p.team} ${p.home ? "vs" : "@"} ${p.opp}</span><span class="tag">${p.pos}</span>${p.top_rank ? `<span class="tag gold" title="One of the week's 10 best prop picks by expected value">Top ${p.top_rank}</span>` : ""}
+        <div class="sub"><span>${p.team} ${p.home ? "vs" : "@"} ${p.opp}</span><span class="tag">${p.pos}</span>${p.top_rank ? `<span class="tag gold" title="One of the week's 10 best prop picks by expected value">Top ${p.top_rank}</span>` : ""}${p.confidence && p.confidence.n ? `<span class="tag ${p.confidence.grade >= 6.5 ? "ok" : p.confidence.grade <= 3.5 ? "warn" : ""}" title="${confTitle(p.confidence)}">Model ${p.confidence.grade.toFixed(1)}/10</span>` : ""}
           ${p.injury ? `<span class="tag warn">${esc(p.injury)}</span>` : ""}${p.promoted ? `<span class="tag" title="A teammate ahead of him in usage is Out/Doubtful/IR; his volume is scaled x${p.promoted} toward the team's rate">backup starting</span>` : ""}${p.thin ? `<span class="tag warn">${p.n_games} games</span>` : ""}${p.env && Math.abs(p.env.mult - 1) >= 0.04 ? `<span class="tag" title="Game total ${p.env.total}, ${p.team} implied ${p.env.implied}: moves the projection ${signed((p.env.mult - 1) * 100, 1)}%">${p.env.total} total ${signed((p.env.mult - 1) * 100, 0)}%</span>` : ""}${p.dfs && p.dfs.some(d => d.gap !== 0) ? `<span class="tag">pick'em line differs</span>` : ""}${big ? `<span class="tag warn" title="The raw model is ${Math.abs(p.gap).toFixed(0)} points from the market, far more than a real edge usually is">model far from market</span>` : ""}</div></div>
       <div class="mk"><div class="lbl">${esc(p.label)}</div><div class="line">${fmtLine(p)}</div></div>
       <div class="model"><div class="mean">${p.kind === "td" ? pct(p.over, 1) : "μ " + p.mean}</div>
@@ -480,6 +480,24 @@ function renderList() {
     ? shown.map(rowHTML).join("") + (rows.length > shown.length ? `<button class="more" id="more">Show ${Math.min(80, rows.length - shown.length)} more (${rows.length - shown.length} hidden)</button>` : "")
     : `<div class="empty">No props match these filters.</div>`;
   if (S.open != null && $("detail-" + S.open)) renderDetail(P[S.open]);
+}
+
+/* ---------- model confidence grade ---------- */
+function confTitle(c) {
+  if (!c || !c.n) return "No tracked games yet for the model on this player";
+  return `The model's side has been right ${c.hits} of ${c.n} times on this player and market this season` +
+    (c.mean_abs_z != null ? `; typical miss ${c.mean_abs_z.toFixed(2)} standard deviations of its own forecast (0.8 is well calibrated)` : "");
+}
+function confNoteHTML(p) {
+  const c = p.confidence;
+  if (!c) return "";
+  const eff = c.strength > 0
+    ? `This grade scales the model's weight on this prop by &times;${c.multiplier.toFixed(2)}.`
+    : `It does <strong>not</strong> change the edge: tested on about 10,000 past props, the model's record on a player has not predicted whether it hits him next (the model's side won about half the time whatever the record), so the measured strength is 0. The grade is tracked and will start to count automatically if the tracked results ever show it matters.`;
+  const rec = c.n
+    ? `The model's side has been right <strong>${c.hits} of ${c.n}</strong> on ${esc(p.player)}&rsquo;s ${esc(p.label)} this season${c.mean_abs_z != null ? `, missing by ${c.mean_abs_z.toFixed(2)} of its own standard deviations on average (0.8 = well calibrated)` : ""}.`
+    : `The model has no tracked games on ${esc(p.player)}&rsquo;s ${esc(p.label)} yet this season, so the grade sits at the neutral 5.`;
+  return `<div class="note"><strong>Model confidence ${c.grade.toFixed(1)}/10.</strong> ${rec} ${eff}</div>`;
 }
 
 /* ---------- hit-rate chart ---------- */
@@ -714,6 +732,7 @@ function renderDetail(p) {
         <div class="fact"><div class="k">Model's own line</div><div class="v">${p.predicted_line == null ? "—" : p.predicted_line}</div></div>
       </div>
       ${p.predicted_line != null ? `<div class="note"><strong>Prediction line.</strong> Computed from the simulated distribution alone, before knowing where the book set the real line: <strong>${p.predicted_line}</strong>, vs the posted <strong>${p.line}</strong> (${signed(p.line_gap, 1)}). This is the raw model's own opinion of a fair line, separate from the market-blended probability above.</div>` : ""}
+      ${confNoteHTML(p)}
       ${p.promoted ? `<div class="note"><strong>Backup starting.</strong> A teammate ahead of him in recent usage is Out/Doubtful/IR, so his volume projection is scaled ×${p.promoted} toward what this offense (not him personally) has recently done at his position -- his own thin recent history alone would understate him.</div>` : ""}
       ${p.env ? `<div class="note"><strong>Game environment.</strong> Total ${p.env.total}, ${esc(p.team)} ${p.env.margin >= 0 ? "favored by " + p.env.margin : "underdogs by " + Math.abs(p.env.margin)} &rarr; implied ${esc(p.team)} ${p.env.implied}, ${esc(p.opp)} ${p.env.implied_opp}. This player's recent games averaged a ${p.env.avg_total} total and ${signed(p.env.avg_margin, 1)} margin, so this setup moves the projection &times;${p.env.mult.toFixed(3)}. The size of the effect per market was measured on 2023&ndash;25 games and shrunk by how well it held up out of sample.</div>` : ""}
       ${p.matchup ? `<div class="note"><strong>Coverage matchup.</strong> ${esc(p.opp)} played zone on about ${(p.matchup.opp_zone * 100).toFixed(0)}% of pass plays (league ${(p.matchup.league_zone * 100).toFixed(0)}%; 2024&ndash;25 tendencies, pulled toward the league because schemes only partly carry over).

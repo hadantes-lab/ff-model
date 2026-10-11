@@ -48,6 +48,7 @@ COLUMNS = KEY + [
     "model_over", "model_under", "market_over", "gap", "trust",
     "pick", "pick_price", "pick_ev",
     "logged_at", "actual", "result", "graded_at",
+    "mean", "sd",          # the model's projection and spread when logged: lets the player record score forecast accuracy
 ]
 BIG_MOVE = {"yards": 3.0, "count": 1.0, "spread": 1.5, "total": 2.0}  # per-kind threshold to flag a line move
 
@@ -123,6 +124,7 @@ def log_predictions(snapshot: dict) -> int:
             "line": p["line"], "model_over": p["model_over"], "model_under": p["model_under"],
             "market_over": p.get("market_over"), "gap": p.get("gap"), "trust": p.get("trust"),
             "pick": p.get("pick"), "pick_price": pick_price, "pick_ev": p.get("pick_ev"),
+            "mean": p.get("mean"), "sd": p.get("sd"),
             "logged_at": now, "actual": np.nan, "result": np.nan, "graded_at": np.nan,
         })
     for g in snapshot.get("games", []):
@@ -545,6 +547,11 @@ def main():
             REPORT_FILE.write_text(json.dumps(rep, separators=(",", ":")), encoding="utf-8")
             HISTORY_FILE.write_text(json.dumps(build_player_history(), separators=(",", ":")), encoding="utf-8")
             print(f"\nWrote {REPORT_FILE} and {HISTORY_FILE}", file=sys.stderr)
+        import player_confidence
+        rec = player_confidence.player_records(_load())
+        player_confidence.RECORD_FILE.parent.mkdir(exist_ok=True)
+        rec.to_csv(player_confidence.RECORD_FILE, index=False)
+        print(f"Wrote {len(rec)} player model records -> {player_confidence.RECORD_FILE}", file=sys.stderr)
 
 
 if __name__ == "__main__":

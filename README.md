@@ -446,6 +446,21 @@ sort shows where the projection sits furthest from the line for exploration, not
 backtest is two seasons of one book's prices, so treat the weights as a prior; `python market_trust.py --write` redoes it as the
 backlog (`line_history.csv`, `espn_lines.csv`) grows, and the collector will keep adding lines for it.
 
+**Per-player model record and confidence grade (`player_confidence.py`).** For every player and market, the tracker now keeps how the
+model has done on him this season: how often its raw side (over or under the posted line) was right, and, for props logged from now on, how
+large its misses were in units of its own forecast spread. From those comes a **grade out of 10** (5.0 = no information; a player with no
+tracked games is a 5, and a short record is shrunk toward 5, so 3-0 grades about 6.7, not 10). The table is `tracking/player_model_record.csv`
+(rewritten by `props_tracker.py report` each refresh); the grade shows as a "Model 6.2/10" chip on a prop's row and with the record in its detail view.
+
+It enters the edge as a multiplier on the model's blend weight: `1 + strength x (grade - 5) / 5`, capped at +/-50%. **`strength` is measured,
+not chosen**, by `market_trust.py`: it regresses "did the model's side hit next time?" on the record going in, over 10,471 past props (2024-25).
+Result: slope +0.034 per point of record, 95% interval -0.062 to +0.131, so the record does not demonstrably predict anything, and the model's
+side won 51-53% of the time in every grade band. A related effect did show up (a player the model under-projected tends to be over-projected
+next time, t = -7), but correcting for it improved accuracy by only 0.15-0.2% and still could not beat the market. So the stored strength is
+**0.0**: the grade is tracked and displayed, and the multiplier is exactly 1.0. If tracked results ever show the record matters, re-running
+`python market_trust.py --write` sets a positive strength and the grade starts moving edges with no code change (the live data can be tested
+the same way with `player_confidence.persistence`).
+
 How the model works, and what it still can't see: `props_model.py`. It does not know about
 weather or in-game injuries, and it simulates players independently of each other (aside from
 the shared game-script factor `game_odds.py` uses for team totals). Treat large model-vs-market
