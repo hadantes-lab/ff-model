@@ -306,6 +306,18 @@
   .su-pts { font-family: "IBM Plex Mono", monospace; font-weight: 700; font-size: 20px; color: var(--gold); text-align: center;
     background: var(--surface-2); border-radius: 8px; padding: 3px 0; }
   .su-row.final { opacity: 0.8; }
+  .tier { display: inline-flex; align-items: center; justify-content: center; font-family: "Barlow Condensed", sans-serif; font-weight: 700;
+    font-size: 26px; width: 42px; height: 42px; border-radius: 10px; border: 1px solid transparent; }
+  .tier.tS { background: var(--gold); color: var(--gold-ink); box-shadow: 0 0 18px -4px var(--gold); }
+  .tier.tA { background: var(--pos); color: #fff; }
+  .tier.tB { background: var(--pos-bg); color: var(--pos); border-color: var(--pos); }
+  .tier.tC { background: var(--surface-3); color: var(--text); }
+  .tier.tD { background: var(--surface-2); color: var(--text-dim); }
+  .tier.tE { background: var(--warn-bg); color: var(--warn); }
+  .tier.tF { background: var(--neg-bg); color: var(--neg); }
+  .tier-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 12px 8px 4px; border-top: 1px solid var(--border); }
+  .tier-head .nm { font-weight: 700; font-size: 14px; }
+  .tier-head .hist { font-size: 12px; color: var(--text-faint); }
   .su-pick { font-weight: 700; font-size: 15px; }
   .su-bar { height: 8px; border-radius: 4px; background: var(--surface-3); overflow: hidden; margin-top: 4px; }
   .su-bar > i { display: block; height: 100%; background: var(--gold); }
@@ -1033,33 +1045,46 @@ function openProp(id) {
   if (row) row.scrollIntoView({ block: "center", behavior: "smooth" });
 }
 
-/* ---------- straight-up confidence pool ---------- */
+/* ---------- straight-up winners, in tiers ---------- */
+/* SU:BEGIN -- pure functions (no DOM); tests/test_su_tiers.py runs these under node */
+function suGroups(entries, tiers) {                        // tiers: the ordered definitions, best first
+  const by = {};
+  entries.forEach(e => { (by[e.tier] = by[e.tier] || []).push(e); });
+  return tiers.filter(t => by[t.tier]).map(t => Object.assign({}, t, {
+    games: by[t.tier].slice().sort((a, b) => b.pick_prob - a.pick_prob || a.game.localeCompare(b.game)) }));
+}
+function suCopyText(groups) {
+  return groups.map(g => `${g.tier}: ${g.games.map(e => e.pick).join(", ")}`).join("\n");
+}
+/* SU:END */
+
 function suBoardHTML() {
   const pool = DATA.su_pool;
   if (!pool || !pool.entries || !pool.entries.length) return "";
-  const es = pool.entries, sm = pool.summary;
+  const es = pool.entries, sm = pool.summary, groups = suGroups(es, pool.tiers);
   const when = e => new Date(e.kickoff).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" });
   const spreadTxt = e => e.spread <= 0 ? `${e.home} ${e.spread}` : `${e.away} ${-e.spread}`;
-  const rows = es.map(e => {
+  const row = e => {
     const fin = e.status === "final";
     const res = fin ? (e.correct === true ? `<span class="su-ok">&#10003; won ${e.home_score}-${e.away_score}</span>`
-      : e.correct === false ? `<span class="su-bad">&#10007; lost, ${esc(e.winner)} won ${Math.max(e.home_score, e.away_score)}-${Math.min(e.home_score, e.away_score)}</span>` : "tie") : `<span style="color:var(--text-faint)">${when(e)}</span>`;
+      : e.correct === false ? `<span class="su-bad">&#10007; lost, ${esc(e.winner)} won ${Math.max(e.home_score, e.away_score)}-${Math.min(e.home_score, e.away_score)}</span>` : "tie")
+      : `<span style="color:var(--text-faint)">${when(e)}</span>`;
     const sim = e.p_model == null ? "" : ` &middot; our sim says ${esc(e.pick)} ${pct(e.pick_side === "home" ? e.p_model : 1 - e.p_model)}`;
     return `<div class="su-row ${fin ? "final" : ""}">
-      <div class="su-pts" title="Confidence points: ${es.length} = most sure, 1 = least sure">${e.points}</div>
+      <div><span class="tier t${e.tier}" title="${esc(e.tier)} tier">${e.tier}</span></div>
       <div><div class="su-pick">${esc(e.pick)}</div><div class="sub" style="color:var(--text-faint); font-size:12px;">over ${esc(e.opponent)} &middot; ${e.pick_side === "home" ? "home" : "away"}</div></div>
       <div><span class="num">${pct(e.pick_prob, 1)}</span> to win<div class="su-bar"><i style="width:${Math.round(e.pick_prob * 100)}%"></i></div></div>
       <div>${esc(spreadTxt(e))}<div class="sub" style="color:var(--text-faint); font-size:12px;">${e.source === "live" ? "current line" : "closing line"}${sim}</div></div>
       <div>${res}</div></div>`;
-  }).join("");
-  const paste = es.map(e => `${e.points} ${e.pick}`).join(", ");
-  return `<div class="board"><h2>Straight-up winners: confidence pool (1&ndash;${es.length})</h2>
-    <div class="note">Moneyline winners with no point spread. <strong>${es.length} = most confident, 1 = least</strong>; in a pool you score the points on every pick that wins, so the order matters as much as the picks.
-      Week ${pool.week}: ${sm.final ? `${sm.final} played (${sm.won} points won, ${sm.lost} lost so far); ` : ""}expected ${sm.expected_points} of ${sm.max_points} possible points (${Math.round(sm.expected_share * 100)}%) if the market is right.</div>
-    <div style="margin:8px 0;"><button class="su-copy" id="su-copy" data-paste="${esc(paste)}">Copy picks for my pool</button> <span class="note" id="su-copied" style="display:none;">copied</span></div>
-    <div class="su-row head"><div>Pts</div><div>Pick</div><div>Win probability</div><div>Line</div><div>Result / kickoff</div></div>
-    ${rows}
-    <div class="note"><strong>How these are made.</strong> Each win probability is the market's: the posted spread converted with a ${pool.sd}-point standard deviation of the final margin (the moneyline gives the same numbers; they correlate at 0.995). That is deliberate: tested on 1,424 games from 2021&ndash;26, the market's picks won 66.6% straight up and our own power ratings only 63.2%, and mixing any share of our ratings into the market's probability made it worse, so our model has no weight here. The probabilities are well calibrated (teams priced 60&ndash;70% won 62.8%, 70&ndash;80% won 72.7%, 80&ndash;90% won 85.1%), and ordering a week's games this way scored 70.8% of the maximum possible pool points against 66.1% for the same picks in random order. Finished games keep their slot, since they still take a point value in the pool.</div></div>`;
+  };
+  const body = groups.map(g => `<div class="tier-head"><span class="nm">${g.tier} tier</span><span class="hist">${esc(g.range)} to win &middot; ${esc(g.blurb)}${g.win_rate == null ? "" : ` &middot; this tier has actually won ${Math.round(g.win_rate * 100)}% of ${g.n.toLocaleString()} games since 2021`}</span></div>${g.games.map(row).join("")}`).join("");
+  const key = pool.tiers.map(t => `<span class="tag"><b>${t.tier}</b> ${esc(t.range)}</span>`).join(" ");
+  return `<div class="board"><h2>Straight-up winners (moneyline picks), by tier</h2>
+    <div class="note">Who wins each game outright, no point spread, sorted from <strong>S (near-lock) down to F (coin flip)</strong>. A tier is a range of win probability, so it means the same thing every week. Week ${pool.week}: ${es.length} games${sm.final ? `, ${sm.final} played (${es.filter(e => e.correct === true).length} right, ${es.filter(e => e.correct === false).length} wrong so far)` : ""}; expect about ${sm.expected_winners} of the ${es.length} picks to win.</div>
+    <div style="margin:8px 0; display:flex; flex-wrap:wrap; gap:6px; align-items:center;">${key}</div>
+    <div style="margin:8px 0;"><button class="su-copy" id="su-copy" data-paste="${esc(suCopyText(groups))}">Copy picks by tier</button> <span class="note" id="su-copied" style="display:none;">copied</span></div>
+    ${body}
+    <div class="note"><strong>How these are made.</strong> Each win probability is the market's: the posted spread converted with a ${pool.sd}-point standard deviation of the final margin (the moneyline gives the same numbers; they correlate at 0.995). That is deliberate: tested on 1,424 games from 2021&ndash;26, the market's picks won 66.6% straight up and our own power ratings only 63.2%, and mixing any share of our ratings into the market's probability made it worse, so our model has no weight here. The tier records above are what each tier has really done, and they line up with their ranges. F-tier games are close to coin flips, so treat them that way. Finished games stay in the list so the week reads as a whole.</div></div>`;
 }
 
 /* ---------- game pick board + power rankings ---------- */

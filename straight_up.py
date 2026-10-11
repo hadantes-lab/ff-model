@@ -1,9 +1,16 @@
 """
 straight_up.py
 ==============
-Moneyline winners (straight up, no point spread) with a confidence ranking, for confidence pools: pick the
-winner of every game in the week, then give each pick a point value from 1 to N (N = games in the week), the most
-sure thing getting N. You score the points on every pick that wins, so the ORDER matters as much as the picks.
+Moneyline winners (straight up, no point spread), sorted into confidence TIERS, S best down to F. A tier is a band of
+win probability, not a rank, so it means the same thing every week: S is a near-lock, F is a coin flip. Within a tier
+games are ordered by probability, and each entry still carries `points` (N = most sure down to 1) for anyone who
+needs to fill in a numbered confidence pool.
+
+    S  84%+     A  76-84%     B  70-76%     C  65-70%     D  60-65%     E  55-60%     F  under 55%
+
+The cutoffs were picked from 1,424 games (2021-26) so the bands are round numbers and each one's real win rate sits in
+its band; `tier_history` recomputes that record from nflverse results, so the page always shows what each tier has
+actually done.
 
 WHERE THE WIN PROBABILITIES COME FROM (tested, 2021-26, 1,424 games)
 -------------------------------------------------------------------
@@ -35,6 +42,57 @@ import pandas as pd
 
 SPREAD_SD = 11.5
 
+# (tier, lowest win probability in the tier), best first. A pick's tier is the first whose floor it reaches.
+TIERS = [("S", 0.84), ("A", 0.76), ("B", 0.70), ("C", 0.65), ("D", 0.60), ("E", 0.55), ("F", 0.0)]
+TIER_ORDER = [t for t, _ in TIERS]
+TIER_BLURB = {"S": "near-lock", "A": "strong favorite", "B": "clear favorite", "C": "solid favorite", "D": "lean",
+              "E": "slight lean", "F": "toss-up"}
+
+
+def tier_of(pick_prob: float) -> str:
+    """The tier letter for the picked side's win probability."""
+    for tier, floor in TIERS:
+        if pick_prob >= floor:
+            return tier
+    return "F"
+
+
+def tier_range(tier: str) -> str:
+    """'84%+', '76-84%', ... for display."""
+    i = TIER_ORDER.index(tier)
+    lo = TIERS[i][1]
+    hi = TIERS[i - 1][1] if i > 0 else None
+    if hi is None:
+        return f"{round(lo * 100)}%+"
+    if lo == 0.0:
+        return f"under {round(hi * 100)}%"
+    return f"{round(lo * 100)}-{round(hi * 100)}%"
+
+
+def tier_history(sched: pd.DataFrame, first_season: int = 2021, sd: float = SPREAD_SD) -> dict:
+    """
+    What each tier has actually done: for every finished regular-season game since `first_season`, the tier of the
+    favorite on its closing line and whether that side won (a tie counts half). -> {tier: {n, win_rate, share}}.
+    """
+    d = sched[(sched["game_type"] == "REG") & (sched["season"] >= first_season) & sched["home_score"].notna()
+              & sched["spread_line"].notna()].copy()
+    if d.empty:
+        return {}
+    p_home = d["spread_line"].map(lambda x: win_prob(-float(x), sd))
+    pick_home = p_home >= 0.5
+    prob = p_home.where(pick_home, 1 - p_home)
+    won = pd.Series(0.5, index=d.index)
+    won[d["home_score"] > d["away_score"]] = 1.0
+    won[d["home_score"] < d["away_score"]] = 0.0
+    correct = won.where(pick_home, 1 - won)
+    tiers = prob.map(tier_of)
+    out = {}
+    for t in TIER_ORDER:
+        m = tiers == t
+        if m.any():
+            out[t] = {"n": int(m.sum()), "win_rate": float(correct[m].mean()), "share": float(m.mean())}
+    return out
+
 
 def win_prob(home_spread: float, sd: float = SPREAD_SD) -> float:
     """P(home team wins) from the posted home spread (negative = home favored)."""
@@ -53,6 +111,7 @@ def rank_slate(entries: list) -> list:
         e["pick_side"] = "home" if home_pick else "away"
         e["pick_prob"] = e["p_home"] if home_pick else 1 - e["p_home"]
         e["opponent"] = e["away"] if home_pick else e["home"]
+        e["tier"] = tier_of(e["pick_prob"])
     ordered = sorted(entries, key=lambda e: (-round(e["pick_prob"], 6), -abs(e.get("spread") or 0), e["game"]))
     n = len(ordered)
     for i, e in enumerate(ordered):
@@ -110,6 +169,10 @@ def pool_summary(entries: list) -> dict:
     expected = sum(e["points"] * e["pick_prob"] for e in entries)
     won = sum(e["points"] for e in entries if e.get("correct") is True)
     lost = sum(e["points"] for e in entries if e.get("correct") is False)
+    tiers = {}
+    for e in entries:
+        tiers[e["tier"]] = tiers.get(e["tier"], 0) + 1
     return {"games": len(entries), "max_points": n, "expected_points": round(expected, 1),
+            "expected_winners": round(sum(e["pick_prob"] for e in entries), 1), "tiers": tiers,
             "expected_share": round(expected / n, 3) if n else None, "won": won, "lost": lost,
             "final": sum(1 for e in entries if e["status"] == "final")}

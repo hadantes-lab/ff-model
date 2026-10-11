@@ -738,8 +738,14 @@ def main():
         sim = {(g["home"], g["away"]): g.get("model_home_win") for g in games}
         entries = straight_up.build_slate(sched_week, slate_week, live, sim, int(season))
         if entries:
+            hist_sched = nfl.load_schedules(list(range(2021, int(season) + 1))).to_pandas()
+            hist = straight_up.tier_history(hist_sched)
             su_pool = {"week": slate_week, "entries": entries, "sd": straight_up.SPREAD_SD,
-                       "summary": straight_up.pool_summary(entries)}
+                       "summary": straight_up.pool_summary(entries),
+                       "tiers": [{"tier": t, "range": straight_up.tier_range(t), "blurb": straight_up.TIER_BLURB[t],
+                                  **{k: hist[t][k] for k in ("n", "win_rate", "share")}} if t in hist else
+                                 {"tier": t, "range": straight_up.tier_range(t), "blurb": straight_up.TIER_BLURB[t], "n": 0,
+                                  "win_rate": None, "share": 0.0} for t in straight_up.TIER_ORDER]}
             log(f"Straight-up pool: {len(entries)} games ranked for week {slate_week} "
                 f"({sum(e['status'] == 'upcoming' for e in entries)} still to come).")
     except Exception as e:
