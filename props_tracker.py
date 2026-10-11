@@ -38,8 +38,8 @@ LOG_FILE = pathlib.Path(__file__).parent / "tracking" / "props_log.csv"
 REPORT_FILE = pathlib.Path(__file__).parent / "web" / "track_record.json"
 HISTORY_FILE = pathlib.Path(__file__).parent / "web" / "player_history.json"
 GRADE_DELAY_HOURS = 5      # a game is assumed final this long after kickoff
-GAME_MARKETS = ("game_spread", "game_total", "game_rank_spread")   # game_rank_spread: the power-rating spread
-SPREAD_MARKETS = ("game_spread", "game_rank_spread")                  # graded on the margin vs the home spread
+GAME_MARKETS = ("game_spread", "game_total", "game_rank_spread", "game_su")   # game_rank_spread: the power-rating spread
+SPREAD_MARKETS = ("game_spread", "game_rank_spread", "game_su")                  # graded on the margin vs the home spread
 KEY = ["season", "week", "player_id", "market"]
 
 COLUMNS = KEY + [
@@ -165,6 +165,19 @@ def log_predictions(snapshot: dict) -> int:
                 "pick_price": pick_obj["price"] if pick_obj else None, "pick_ev": g.get("rank_pick_ev"),
                 "logged_at": now, "actual": np.nan, "result": np.nan, "graded_at": np.nan,
             })
+    # The confidence-pool picks: P(home wins) from the market spread, graded as "over" = the home team won (the same
+    # margin > 0 test as a spread of 0). Only games still to come, so a finished game is never relogged after the fact.
+    for e in (snapshot.get("su_pool") or {}).get("entries", []):
+        if e.get("status") != "upcoming":
+            continue
+        rows.append({
+            "season": snapshot["season"], "week": e["week"], "player_id": f"GAME_{e['home']}_{e['away']}_su",
+            "market": "game_su", "player": e["game"], "team": e["home"], "opp": e["away"], "pos": "GAME", "game": e["game"],
+            "commence": e["kickoff"], "kind": "su", "line": 0.0, "model_over": e["p_home"], "model_under": 1 - e["p_home"],
+            "market_over": e["p_home"], "gap": None, "trust": None,
+            "pick": "over" if e["pick_side"] == "home" else "under", "pick_price": None, "pick_ev": None,
+            "logged_at": now, "actual": np.nan, "result": np.nan, "graded_at": np.nan,
+        })
     if not rows:
         return 0
 

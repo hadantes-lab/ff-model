@@ -461,6 +461,16 @@ next time, t = -7), but correcting for it improved accuracy by only 0.15-0.2% an
 `python market_trust.py --write` sets a positive strength and the grade starts moving edges with no code change (the live data can be tested
 the same way with `player_confidence.persistence`).
 
+**Straight-up winners and a confidence pool (`straight_up.py`).** Under Game Lines: every game of the week with a moneyline-style pick (no point
+spread) and a confidence ranking, most sure = N points down to 1 (N = games that week, usually 14-16), the way confidence pools score it. It covers
+the whole week from the schedule, so finished games keep their slot (with the result and the points won or lost) and a "copy picks" button gives a
+paste-ready list. Each win probability is the market's, from the spread: P(home wins) = Phi(-home_spread / 11.5). That is a measured choice, 1,424
+games 2021-26: the spread-based probability picks 66.6% of winners and so does the devigged moneyline (they correlate at 0.995, so no extra Odds API
+credits), while our own power ratings pick 63.2% and mixing any share of them into the market's number made it worse, so our model has weight zero
+here (our simulation's win chance is shown beside each pick for reference). It is well calibrated (teams priced 60-70% won 62.8%, 70-80% won 72.7%,
+80-90% won 85.1%), and ranking a week's games this way scored 70.8% of the maximum possible pool points against 66.1% for the same picks in random
+order. The picks are logged and graded like everything else (`game_su` in the tracking log, win = home team won), so the real record builds up.
+
 How the model works, and what it still can't see: `props_model.py`. It does not know about
 weather or in-game injuries, and it simulates players independently of each other (aside from
 the shared game-script factor `game_odds.py` uses for team totals). Treat large model-vs-market

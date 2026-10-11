@@ -299,6 +299,22 @@
   .tst tr.me td { background: rgba(217,164,65,0.14); font-weight: 700; }
   .sharebar { display: inline-block; height: 8px; border-radius: 4px; background: var(--gold); vertical-align: middle; margin-right: 6px; opacity: 0.8; }
   @media (max-width: 720px) { .ctx-grid { grid-template-columns: 1fr; } }
+  /* ---- straight-up pool ---- */
+  .su-row { display: grid; grid-template-columns: 56px minmax(0, 1.2fr) minmax(0, 1.5fr) minmax(0, 1.3fr) minmax(0, 1fr); gap: 10px;
+    align-items: center; padding: 8px 8px; border-top: 1px solid var(--border); font-size: 13px; }
+  .su-row.head { border-top: none; color: var(--text-faint); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .su-pts { font-family: "IBM Plex Mono", monospace; font-weight: 700; font-size: 20px; color: var(--gold); text-align: center;
+    background: var(--surface-2); border-radius: 8px; padding: 3px 0; }
+  .su-row.final { opacity: 0.8; }
+  .su-pick { font-weight: 700; font-size: 15px; }
+  .su-bar { height: 8px; border-radius: 4px; background: var(--surface-3); overflow: hidden; margin-top: 4px; }
+  .su-bar > i { display: block; height: 100%; background: var(--gold); }
+  .su-ok { color: var(--pos); font-weight: 700; } .su-bad { color: var(--neg); font-weight: 700; }
+  .su-copy { background: var(--surface-2); border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 5px 12px; cursor: pointer; font-size: 12.5px; }
+  @media (max-width: 720px) {
+    .su-row { grid-template-columns: 48px 1fr; row-gap: 3px; }
+    .su-row > :nth-child(n+3) { grid-column: 2; }
+  }
 </style>
 
 <div class="topbar">
@@ -900,9 +916,9 @@ function renderGames() {
   const all = DATA.games || [];
   const games = all.filter(g => g.in_window !== false);
   const later = all.length - games.length;
-  el.innerHTML = games.length
+  el.innerHTML = suBoardHTML() + (games.length
     ? pickBoardHTML() + games.map(gameCardHTML).join("") + (later ? `<div class="note" style="margin-top:10px;">${later} later game${later > 1 ? "s" : ""} (next week's slate) are tracked for line movement and will appear here on their game day.</div>` : "")
-    : `<div class="empty">No games priced this run${DATA.sample ? " (demo mode has no real game lines to price against)" : " -- game lines may not have been available from the Odds API."}</div>`;
+    : `<div class="empty">No games priced this run${DATA.sample ? " (demo mode has no real game lines to price against)" : " -- game lines may not have been available from the Odds API."}</div>`);
 }
 
 /* ---------- left rail: games -> players ---------- */
@@ -1017,6 +1033,35 @@ function openProp(id) {
   if (row) row.scrollIntoView({ block: "center", behavior: "smooth" });
 }
 
+/* ---------- straight-up confidence pool ---------- */
+function suBoardHTML() {
+  const pool = DATA.su_pool;
+  if (!pool || !pool.entries || !pool.entries.length) return "";
+  const es = pool.entries, sm = pool.summary;
+  const when = e => new Date(e.kickoff).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" });
+  const spreadTxt = e => e.spread <= 0 ? `${e.home} ${e.spread}` : `${e.away} ${-e.spread}`;
+  const rows = es.map(e => {
+    const fin = e.status === "final";
+    const res = fin ? (e.correct === true ? `<span class="su-ok">&#10003; won ${e.home_score}-${e.away_score}</span>`
+      : e.correct === false ? `<span class="su-bad">&#10007; lost, ${esc(e.winner)} won ${Math.max(e.home_score, e.away_score)}-${Math.min(e.home_score, e.away_score)}</span>` : "tie") : `<span style="color:var(--text-faint)">${when(e)}</span>`;
+    const sim = e.p_model == null ? "" : ` &middot; our sim says ${esc(e.pick)} ${pct(e.pick_side === "home" ? e.p_model : 1 - e.p_model)}`;
+    return `<div class="su-row ${fin ? "final" : ""}">
+      <div class="su-pts" title="Confidence points: ${es.length} = most sure, 1 = least sure">${e.points}</div>
+      <div><div class="su-pick">${esc(e.pick)}</div><div class="sub" style="color:var(--text-faint); font-size:12px;">over ${esc(e.opponent)} &middot; ${e.pick_side === "home" ? "home" : "away"}</div></div>
+      <div><span class="num">${pct(e.pick_prob, 1)}</span> to win<div class="su-bar"><i style="width:${Math.round(e.pick_prob * 100)}%"></i></div></div>
+      <div>${esc(spreadTxt(e))}<div class="sub" style="color:var(--text-faint); font-size:12px;">${e.source === "live" ? "current line" : "closing line"}${sim}</div></div>
+      <div>${res}</div></div>`;
+  }).join("");
+  const paste = es.map(e => `${e.points} ${e.pick}`).join(", ");
+  return `<div class="board"><h2>Straight-up winners: confidence pool (1&ndash;${es.length})</h2>
+    <div class="note">Moneyline winners with no point spread. <strong>${es.length} = most confident, 1 = least</strong>; in a pool you score the points on every pick that wins, so the order matters as much as the picks.
+      Week ${pool.week}: ${sm.final ? `${sm.final} played (${sm.won} points won, ${sm.lost} lost so far); ` : ""}expected ${sm.expected_points} of ${sm.max_points} possible points (${Math.round(sm.expected_share * 100)}%) if the market is right.</div>
+    <div style="margin:8px 0;"><button class="su-copy" id="su-copy" data-paste="${esc(paste)}">Copy picks for my pool</button> <span class="note" id="su-copied" style="display:none;">copied</span></div>
+    <div class="su-row head"><div>Pts</div><div>Pick</div><div>Win probability</div><div>Line</div><div>Result / kickoff</div></div>
+    ${rows}
+    <div class="note"><strong>How these are made.</strong> Each win probability is the market's: the posted spread converted with a ${pool.sd}-point standard deviation of the final margin (the moneyline gives the same numbers; they correlate at 0.995). That is deliberate: tested on 1,424 games from 2021&ndash;26, the market's picks won 66.6% straight up and our own power ratings only 63.2%, and mixing any share of our ratings into the market's probability made it worse, so our model has no weight here. The probabilities are well calibrated (teams priced 60&ndash;70% won 62.8%, 70&ndash;80% won 72.7%, 80&ndash;90% won 85.1%), and ordering a week's games this way scored 70.8% of the maximum possible pool points against 66.1% for the same picks in random order. Finished games keep their slot, since they still take a point value in the pool.</div></div>`;
+}
+
 /* ---------- game pick board + power rankings ---------- */
 function pickBoardHTML() {
   const picks = DATA.game_picks || [];
@@ -1115,6 +1160,11 @@ $("pos-seg").addEventListener("click", e => {
   const b = e.target.closest("button"); if (!b) return;
   document.querySelectorAll("#pos-seg button").forEach(x => x.classList.toggle("active", x === b));
   S.pos = b.dataset.pos; S.limit = 80; renderList();
+});
+$("games-list").addEventListener("click", e => {
+  const b = e.target.closest("#su-copy"); if (!b) return;
+  const done = () => { const n = $("su-copied"); if (n) { n.style.display = ""; setTimeout(() => { n.style.display = "none"; }, 1500); } };
+  try { navigator.clipboard.writeText(b.dataset.paste).then(done, done); } catch (err) { done(); }
 });
 $("rail-list").addEventListener("click", e => {
   const b = e.target.closest("button"); if (!b) return;

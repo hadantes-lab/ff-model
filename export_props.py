@@ -30,6 +30,7 @@ import game_odds as go
 import line_history
 import market_trust
 import player_confidence
+import straight_up
 import odds_api
 import props_tracker
 import team_ratings
@@ -245,6 +246,9 @@ def build_game(event, home, away, home_fits, away_fits, line, prices, live_weigh
     home_pts, away_pts = go.simulate_game_scores(home_fits, away_fits, rng)
     raw = go.spread_total_probs(home_pts, away_pts, line["home_spread"], line["total"])
     n_eff = go.fits_n_eff(home_fits, away_fits)
+    # our own simulated chance the home team wins outright; shown beside the straight-up pick for reference only
+    # (it carries zero weight there: see straight_up.py)
+    model_home_win = float((home_pts > away_pts).mean() + 0.5 * (home_pts == away_pts).mean())
 
     # The model's own "prediction line" from the raw simulation alone, in the same sign
     # convention as the real posted line, checked against it once pulled.
@@ -279,6 +283,7 @@ def build_game(event, home, away, home_fits, away_fits, line, prices, live_weigh
         "home_spread": line["home_spread"], "total": line["total"],
         "proj_home": round(raw["proj_home"], 1), "proj_away": round(raw["proj_away"], 1),
         "proj_margin": round(raw["proj_margin"], 1), "proj_total": round(raw["proj_total"], 1),
+        "model_home_win": round(model_home_win, 4),
         "predicted_spread": predicted_spread, "predicted_total": predicted_total,
         "spread_gap": spread_gap, "total_gap": total_gap,
         "n_players": len(home_fits) + len(away_fits), "n_eff": round(n_eff, 1),
@@ -725,6 +730,20 @@ def main():
     except Exception as e:
         log(f"Game logs unavailable for the hit-rate chart ({e}); the chart will say no game log is available.")
     context = build_context(props, games, history, int(season), args.sample)
+    su_pool = None
+    try:
+        sched_week = nfl.load_schedules([int(season)]).to_pandas()
+        slate_week = int(week)
+        live = {(g["home"], g["away"]): g["home_spread"] for g in games}
+        sim = {(g["home"], g["away"]): g.get("model_home_win") for g in games}
+        entries = straight_up.build_slate(sched_week, slate_week, live, sim, int(season))
+        if entries:
+            su_pool = {"week": slate_week, "entries": entries, "sd": straight_up.SPREAD_SD,
+                       "summary": straight_up.pool_summary(entries)}
+            log(f"Straight-up pool: {len(entries)} games ranked for week {slate_week} "
+                f"({sum(e['status'] == 'upcoming' for e in entries)} still to come).")
+    except Exception as e:
+        log(f"Straight-up pool unavailable ({e}); the page omits it.")
     top = rank_top_props(props)
     game_picks = rank_game_picks(games)
     log(f"Top {len(top)} props and {len(game_picks)} ranked game picks.")
@@ -739,6 +758,7 @@ def main():
         "credits": credits, "markets": markets, "n_games": len(events), "props": props, "games": games,
         "game_picks": game_picks, "rating_backtest": rating_backtest, "context": context,
         "trust_note": TRUST_NOTE if static_trust else None,
+        "su_pool": su_pool,
         "power": None if power is None else {"table": power["table"], "hfa": round(power["hfa"], 2),
                                               "per_rank": round(team_ratings.PER_RANK, 3)},
     }
