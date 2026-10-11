@@ -49,6 +49,7 @@ COLUMNS = KEY + [
     "pick", "pick_price", "pick_ev",
     "logged_at", "actual", "result", "graded_at",
     "mean", "sd",          # the model's projection and spread when logged: lets the player record score forecast accuracy
+    "top_rank",            # 1-10 if the prop was one of the week's top picks when logged (the weekly report grades them)
 ]
 BIG_MOVE = {"yards": 3.0, "count": 1.0, "spread": 1.5, "total": 2.0}  # per-kind threshold to flag a line move
 
@@ -124,7 +125,7 @@ def log_predictions(snapshot: dict) -> int:
             "line": p["line"], "model_over": p["model_over"], "model_under": p["model_under"],
             "market_over": p.get("market_over"), "gap": p.get("gap"), "trust": p.get("trust"),
             "pick": p.get("pick"), "pick_price": pick_price, "pick_ev": p.get("pick_ev"),
-            "mean": p.get("mean"), "sd": p.get("sd"),
+            "mean": p.get("mean"), "sd": p.get("sd"), "top_rank": p.get("top_rank"),
             "logged_at": now, "actual": np.nan, "result": np.nan, "graded_at": np.nan,
         })
     for g in snapshot.get("games", []):

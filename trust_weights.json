@@ -6,8 +6,8 @@
   "player_pass_tds": 0.0,
   "player_pass_yds": 0.0,
   "player_reception_longest": 0.05,
-  "player_reception_yds": 0.0,
-  "player_receptions": 0.0,
+  "player_reception_yds": 0.05,
+  "player_receptions": 0.05,
   "player_rush_attempts": 0.05,
   "player_rush_longest": 0.05,
   "player_rush_reception_yds": 0.05,
@@ -277,5 +277,6 @@
   "n": 10471,
   "strength": 0.0
  },
- "note": "Static prior for the market-blend weight, fitted by market_trust.py on 2024-25 ESPN BET closing lines. `early` marks the markets whose big projection gaps vs the OPENING line have won (see early_table)."
+ "note": "Static prior for the market-blend weight, fitted by market_trust.py on 2024-25 ESPN BET closing lines. `early` marks the markets whose big projection gaps vs the OPENING line have won (see early_table).",
+ "last_updated": "2026-10-10"
 }

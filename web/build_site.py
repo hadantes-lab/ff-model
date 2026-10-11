@@ -37,6 +37,15 @@ for slug, src, title, blurb in PAGES:
         shutil.copy(page, out / slug / "index.html")
         links.append((slug, title, blurb))
 
+# the weekly report: latest at /report/, every past week alongside it
+report_page = here / "weekly_report.html"
+if report_page.exists():
+    (out / "report").mkdir()
+    shutil.copy(report_page, out / "report" / "index.html")
+    for old_week in sorted((here.parent / "reports").glob("week-*.html")):
+        shutil.copy(old_week, out / "report" / old_week.name)
+    links.append(("report", "Weekly Report", "How every pick did last week (moneyline tiers, spreads, totals, props), with a write-up per market."))
+
 items = "\n".join(
     f'    <a class="card" href="{slug}/"><h2>{title}</h2><p>{blurb}</p></a>' for slug, title, blurb in links
 ) or "    <p>Nothing has been published yet.</p>"

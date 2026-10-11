@@ -1,0 +1,3 @@
+date,market,old_weight,new_weight,n,n_live,verdict
+2026-10-10,player_reception_yds,0.0,0.05,2700,356,model looks slightly better but not conclusively
+2026-10-10,player_receptions,0.0,0.05,2802,342,model looks slightly better but not conclusively

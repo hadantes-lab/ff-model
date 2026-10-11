@@ -6,5 +6,6 @@ web/auction_board.html
 .env
 web/cache/
 web/props.html
+web/weekly_report.html
 web/props_snapshot.json
 live_calibration.json

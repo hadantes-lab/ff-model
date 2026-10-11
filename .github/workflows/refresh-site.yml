@@ -62,6 +62,16 @@ jobs:
           python props_tracker.py refine
           python props_tracker.py report --json
 
+      # The weekly report: how every pick did (moneyline tiers, spreads, totals, props) with a write-up per
+      # market, and the learning step that re-measures how much the model deserves to be trusted from everything
+      # graded so far (improve.py). It reports the latest week that is mostly graded, so Monday's run covers the
+      # weekend and Thursday's run has the full week including Monday night. Runs before the props pull so any
+      # re-measured weights apply to today's picks. A failure here must never block the refresh.
+      - name: Weekly report and learning step
+        if: steps.key.outputs.have_key == 'true'
+        continue-on-error: true
+        run: python weekly_report.py --html
+
       # Only games starting in the next 24 hours: about one slate of API credits per run.
       # That window is what makes each day's page right: Sunday morning = the Sunday slate and
       # Sunday night, Monday morning = Monday night's game alone, Thursday morning = Thursday
@@ -96,7 +106,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add tracking/props_log.csv tracking/line_history.csv tracking/power_history.csv tracking/player_model_record.csv tracking/weather_history.csv web/track_record.json web/player_history.json
+          git add reports tracking/weekly_summary.csv tracking/learning_log.csv trust_weights.json tracking/props_log.csv tracking/line_history.csv tracking/power_history.csv tracking/player_model_record.csv tracking/weather_history.csv web/track_record.json web/player_history.json
           git diff --cached --quiet && echo "No tracker changes." || git commit -m "Update props tracking log [skip ci]"
           git checkout -- .   # discard regenerated build outputs (already published) so the rebase can run
           git pull --rebase -X theirs origin main   # a concurrent run edited the same files: this run's rows win (upsert semantics)

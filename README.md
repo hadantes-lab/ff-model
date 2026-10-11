@@ -473,6 +473,27 @@ own power ratings pick 63.2% and mixing any share of them into the market's numb
 win chance is shown beside each pick for reference). Ranking a week's games this way scored 70.8% of the maximum possible confidence-pool points
 against 66.1% for the same picks in random order. The picks are logged and graded like everything else (`game_su` in the tracking log).
 
+**The weekly report and the learning loop (`weekly_report.py`, `improve.py`).** Every refresh regenerates a report on the latest week that is mostly
+graded, so Monday morning's run covers the weekend (Monday night is noted as still pending) and Thursday's has the full week. It is published at
+`/report/` on the site (with every earlier week alongside it) and archived in `reports/week-NN.html` and `.md`. It grades, from the predictions
+logged before kickoff: **moneyline winners by tier** (S-F, right or wrong with the final score; weeks from before the picks were logged are rebuilt
+from closing spreads and labeled so), **game spread picks, game total picks and the power-rating spread**, and **player props per market**, two ways:
+the picks the page recommended or ranked in its top 10, and every "high-confidence" prop (the model's raw probability for its side at least 60%).
+Each group gets right/wrong/push, its win rate, and the win rate the model's *own probabilities expected*, so "7-3" can be read as lucky, unlucky or
+about right (a z-score against the stated probabilities), plus how the model's probabilities scored against the market's (Brier) and, once the
+projection is logged, how close the model's number and the line each landed to the real result. Each market gets a short plain-language write-up
+generated from those numbers, with two rules: a small sample is never called skill or failure, and the report will not say whether the model or the
+market was sharper on fewer than 30 games. It also flags a one-sided lean (this week's first report caught the model picking the Over in 16 of 16
+games, which points to a built-in bias, not 16 independent reads). Season-to-date numbers come from `tracking/weekly_summary.csv`.
+
+Using the results to improve it (`improve.py`): each run adds the newly graded tracked props to the 14,777-prop backtest (`tracking/trust_evidence.csv`)
+and re-measures, per market, how much of the model's disagreement with the market to believe, using the same strict rules that set the weights
+(Brier against the market's probability over a grid; above the floor only if the bootstrap interval excludes zero; capped at 0.25). A weight changes only
+if it moves by at least 0.025, only for markets with 40+ newly tracked props, and every change is written to `tracking/learning_log.csv`, applied to
+`trust_weights.json` (which the next props run reads) and listed in the report's last section; a group running 2+ standard deviations from what the
+model's own probabilities expected is flagged. The first run of it moved receptions and receiving yards from a weight of 0 to 0.05 on this season's
+tracked results, a tiny step, shown as such. Both pieces are built to be cautious: with a few weeks of data they will mostly say "nothing moved".
+
 How the model works, and what it still can't see: `props_model.py`. It does not know about
 weather or in-game injuries, and it simulates players independently of each other (aside from
 the shared game-script factor `game_odds.py` uses for team totals). Treat large model-vs-market
