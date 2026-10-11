@@ -417,6 +417,35 @@ could change or disappear, so the collector fails soft and keeps nothing it can'
 book is a noisier proxy for "the market" than a median across books, so the paid historical backfill above remains the better source
 for judging the model's edge if you ever upgrade.
 
+**Game script and volume: what testing showed (`volume_model.py`, `market_trust.py`).** The idea: a team expected to trail should throw
+more, one expected to lead should run more, so QB attempts and RB carries should be exploitable. Tested four ways, each walk-forward
+and out of sample:
+1. *It is true at the team level.* When a team's expected margin is 8+ points better than the scripts behind its recent games, it runs
+   about 2.3 more times than its recent average (the model predicts +2.1); passing responds less (a few attempts less for heavy favorites,
+   slightly more for moderate underdogs, and big underdogs don't throw more than their usual). Rushing is the script-sensitive volume.
+2. *It doesn't improve player projections.* A team-level game-script model (`volume_model.py`) beat a team's recent average by only
+   1%, and when turned into QB-attempt and RB-carry projections it matched but did not beat the game-context adjustment production
+   already applies (within ~0.5% on every market). Player-to-player noise dominates, so it is not wired into projections.
+3. *The market already prices it, and beats our numbers.* Against ~14,800 real closing lines (2024-25, ESPN BET, with prices), the
+   line's typical miss is 10-13% smaller than the model's on attempts, completions and carries (QB attempts 6.25 vs 7.1; RB carries
+   3.97 vs 4.47), no spread or total coefficient on how results land versus the line is significant (|t| < 2, signs flip between
+   seasons), and **no prop market shows the model adding measurable information beyond the closing line** (`python market_trust.py`;
+   the nearest, RB rushing yards, has an interval that still includes zero).
+4. *Early in the week the picture is subtler, and my first read of it was wrong.* After removing a mechanical effect, both the opponent
+   and the game-script adjustments do carry information about where a line will move between the open and the close (script t = +3.1;
+   strongest in pass attempts, receptions, rushing and receiving yards), so books do under-price script at the open. And picking the
+   side of the largest gaps against the opening line wins 54-55% of the time. **But that is not profit:** measured at the actual opening
+   *prices* (not a flat -110), the strongest quarter of picks across all markets has an ROI of about **-3.8%**, and no market clears the
+   bar after allowing for testing ten of them (best: pass TDs and rush attempts, +6% and +3% with intervals from -15% to +26%). Win rate
+   alone flatters, because the side the model likes is the side priced worse. It was also weaker in 2025 than in 2024.
+
+What changed because of this: each market's blend weight is now the measured one (`trust_weights.json`: 0 to 0.05 by market, against the
+single 0.15 cap before), so prop edges are shrunk almost entirely to the market and the page's Top 10 usually reads "No prop clears the
+bar" with the reason; the live tracker's own refinement still overrides a weight once it has 50+ graded picks. A "biggest raw model gap"
+sort shows where the projection sits furthest from the line for exploration, not as a play. Game spreads/totals are unaffected. The
+backtest is two seasons of one book's prices, so treat the weights as a prior; `python market_trust.py --write` redoes it as the
+backlog (`line_history.csv`, `espn_lines.csv`) grows, and the collector will keep adding lines for it.
+
 How the model works, and what it still can't see: `props_model.py`. It does not know about
 weather or in-game injuries, and it simulates players independently of each other (aside from
 the shared game-script factor `game_odds.py` uses for team totals). Treat large model-vs-market

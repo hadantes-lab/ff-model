@@ -28,6 +28,7 @@ import context_data
 import espn_lines
 import game_odds as go
 import line_history
+import market_trust
 import odds_api
 import props_tracker
 import team_ratings
@@ -376,6 +377,22 @@ def build_context(props, games, history, season, sample=False) -> dict:
     return ctx
 
 
+# ---- how much to trust the model, market by market --------------------------------
+def resolve_trust(market, live_weights, static_weights):
+    """
+    The ceiling on how much of the model's disagreement with the market counts, for one market:
+    the live tracker's refinement once it has enough graded picks, else the weight measured against
+    ~14,800 real 2024-25 closing lines (market_trust.py / trust_weights.json), else None (= LAMBDA_MAX).
+    """
+    live = (live_weights.get(market) or {}).get("suggested_weight")
+    return live if live is not None else static_weights.get(market)
+
+
+TRUST_NOTE = ("Tested on 14,777 past props against their real closing prices (2024-25), the model carries no measurable "
+              "information beyond the market in any prop market, so its edges are shrunk almost entirely to the market "
+              "(weights 0 to 5% by market). A pick here is therefore rare and should be treated as a curiosity, not a play.")
+
+
 # ---- which markets to pull ---------------------------------------------------------
 EXTENDED_MIN_CREDITS = 500     # keep this many credits AFTER a run before auto-adding the extra markets
 
@@ -528,6 +545,10 @@ def main():
     if live_weights:
         log(f"Live calibration: refined trust weight for {len(live_weights)} market(s) "
             f"from tracked results ({', '.join(live_weights)})")
+    static_trust = market_trust.load_weights()
+    if static_trust:
+        log(f"Trust weights from past closing lines: {len(static_trust)} markets "
+            f"(max {max(static_trust.values()):.2f}, {sum(w == 0 for w in static_trust.values())} at zero)")
     idx = build_roster_index(history)
     inj = injury_map(season)
     mults = {m: opponent_multipliers(history, MARKETS[m]) for m in markets}
@@ -618,7 +639,7 @@ def main():
             if fit is None:
                 skipped += 1
                 continue
-            lambda_override = (live_weights.get(market) or {}).get("suggested_weight")
+            lambda_override = resolve_trust(market, live_weights, static_trust)
             props.append(build_prop(ev, home, away, row, market, c, fit, mult, status, matchup, promo, lambda_override))
 
     log(f"{len(props)} props simulated; {skipped} skipped (out/doubtful or under {MIN_GAMES} games); "
@@ -705,6 +726,7 @@ def main():
         "season": int(season), "week": int(week), "sample": bool(args.sample),
         "credits": credits, "markets": markets, "n_games": len(events), "props": props, "games": games,
         "game_picks": game_picks, "rating_backtest": rating_backtest, "context": context,
+        "trust_note": TRUST_NOTE if static_trust else None,
         "power": None if power is None else {"table": power["table"], "hfa": round(power["hfa"], 2),
                                               "per_rank": round(team_ratings.PER_RANK, 3)},
     }

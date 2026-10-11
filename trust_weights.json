@@ -1,0 +1,271 @@
+{
+ "weights": {
+  "player_pass_attempts": 0.0,
+  "player_pass_completions": 0.0,
+  "player_pass_interceptions": 0.05,
+  "player_pass_tds": 0.0,
+  "player_pass_yds": 0.0,
+  "player_reception_longest": 0.05,
+  "player_reception_yds": 0.0,
+  "player_receptions": 0.0,
+  "player_rush_attempts": 0.05,
+  "player_rush_longest": 0.05,
+  "player_rush_reception_yds": 0.05,
+  "player_rush_yds": 0.05
+ },
+ "evidence": {
+  "player_pass_attempts": {
+   "n": 522,
+   "verdict": "model is no better than the market",
+   "change_at_best": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ],
+   "best_grid": 0.0
+  },
+  "player_pass_completions": {
+   "n": 482,
+   "verdict": "model is no better than the market",
+   "change_at_best": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ],
+   "best_grid": 0.0
+  },
+  "player_pass_interceptions": {
+   "n": 172,
+   "verdict": "model looks slightly better but not conclusively",
+   "change_at_best": -0.0010158503579168624,
+   "ci": [
+    -0.005344088675927746,
+    0.003545183762794816
+   ],
+   "best_grid": 0.25
+  },
+  "player_pass_tds": {
+   "n": 480,
+   "verdict": "model is no better than the market",
+   "change_at_best": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ],
+   "best_grid": 0.0
+  },
+  "player_pass_yds": {
+   "n": 632,
+   "verdict": "model is no better than the market",
+   "change_at_best": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ],
+   "best_grid": 0.0
+  },
+  "player_reception_longest": {
+   "n": 2701,
+   "verdict": "model looks slightly better but not conclusively",
+   "change_at_best": -3.804979277661985e-05,
+   "ci": [
+    -0.00025654920425792883,
+    0.00017658279080334988
+   ],
+   "best_grid": 0.05
+  },
+  "player_reception_yds": {
+   "n": 2344,
+   "verdict": "model is no better than the market",
+   "change_at_best": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ],
+   "best_grid": 0.0
+  },
+  "player_receptions": {
+   "n": 2460,
+   "verdict": "model is no better than the market",
+   "change_at_best": 0.0,
+   "ci": [
+    0.0,
+    0.0
+   ],
+   "best_grid": 0.0
+  },
+  "player_rush_attempts": {
+   "n": 773,
+   "verdict": "model looks slightly better but not conclusively",
+   "change_at_best": -3.773422712147635e-05,
+   "ci": [
+    -0.0006488146393757712,
+    0.0005611653716276829
+   ],
+   "best_grid": 0.05
+  },
+  "player_rush_longest": {
+   "n": 1259,
+   "verdict": "model looks slightly better but not conclusively",
+   "change_at_best": -0.00028840343964045,
+   "ci": [
+    -0.001319701802555131,
+    0.0007420988925145976
+   ],
+   "best_grid": 0.15
+  },
+  "player_rush_reception_yds": {
+   "n": 1821,
+   "verdict": "model looks slightly better but not conclusively",
+   "change_at_best": -7.231828103126111e-05,
+   "ci": [
+    -0.0003970828819821,
+    0.00023916388691704404
+   ],
+   "best_grid": 0.05
+  },
+  "player_rush_yds": {
+   "n": 1131,
+   "verdict": "model looks slightly better but not conclusively",
+   "change_at_best": -0.0011847638250372786,
+   "ci": [
+    -0.0033175959090744507,
+    0.0009936943151145816
+   ],
+   "best_grid": 0.25
+  }
+ },
+ "early": {
+  "player_pass_attempts": {
+   "qualifies": false,
+   "rel_threshold": 0.13527998927235474,
+   "roi": -0.038601813622132705,
+   "roi_ci": [
+    -0.302584911613393,
+    0.1912138460156076
+   ],
+   "hit_rate": 0.5398230088495575,
+   "n_picks": 113,
+   "n": 450,
+   "alpha_per_market": 0.004166666666666667
+  },
+  "player_pass_tds": {
+   "qualifies": false,
+   "rel_threshold": 0.429114702630707,
+   "roi": 0.0593890651874982,
+   "roi_ci": [
+    -0.14901422273860704,
+    0.2578802341739658
+   ],
+   "hit_rate": 0.6875,
+   "n_picks": 112,
+   "n": 448,
+   "alpha_per_market": 0.004166666666666667
+  },
+  "player_pass_yds": {
+   "qualifies": false,
+   "rel_threshold": 0.1360992402773798,
+   "roi": -0.15310525148563423,
+   "roi_ci": [
+    -0.35179745493412545,
+    0.039381820084874425
+   ],
+   "hit_rate": 0.5,
+   "n_picks": 152,
+   "n": 605,
+   "alpha_per_market": 0.004166666666666667
+  },
+  "player_reception_longest": {
+   "qualifies": false,
+   "rel_threshold": 0.35967766207783497,
+   "roi": -0.04601492486982081,
+   "roi_ci": [
+    -0.14651302457519563,
+    0.05943640590765712
+   ],
+   "hit_rate": 0.5200617283950617,
+   "n_picks": 648,
+   "n": 2592,
+   "alpha_per_market": 0.004166666666666667
+  },
+  "player_reception_yds": {
+   "qualifies": false,
+   "rel_threshold": 0.3641063479375607,
+   "roi": -0.042364789047832835,
+   "roi_ci": [
+    -0.1494496012556203,
+    0.057522167391676565
+   ],
+   "hit_rate": 0.5433628318584071,
+   "n_picks": 565,
+   "n": 2257,
+   "alpha_per_market": 0.004166666666666667
+  },
+  "player_receptions": {
+   "qualifies": false,
+   "rel_threshold": 0.2641334172188972,
+   "roi": 0.009034262580619493,
+   "roi_ci": [
+    -0.09731875140366501,
+    0.1084222819180691
+   ],
+   "hit_rate": 0.6156583629893239,
+   "n_picks": 562,
+   "n": 2248,
+   "alpha_per_market": 0.004166666666666667
+  },
+  "player_rush_attempts": {
+   "qualifies": false,
+   "rel_threshold": 0.20309816148226467,
+   "roi": 0.03387230003872225,
+   "roi_ci": [
+    -0.15639250246887212,
+    0.2224914135077585
+   ],
+   "hit_rate": 0.5792682926829268,
+   "n_picks": 164,
+   "n": 653,
+   "alpha_per_market": 0.004166666666666667
+  },
+  "player_rush_longest": {
+   "qualifies": false,
+   "rel_threshold": 0.4034235477863285,
+   "roi": -0.04780789596988801,
+   "roi_ci": [
+    -0.20226382702432683,
+    0.10429899130457736
+   ],
+   "hit_rate": 0.5231316725978647,
+   "n_picks": 281,
+   "n": 1123,
+   "alpha_per_market": 0.004166666666666667
+  },
+  "player_rush_reception_yds": {
+   "qualifies": false,
+   "rel_threshold": 0.2677110688227411,
+   "roi": -0.08801719877906732,
+   "roi_ci": [
+    -0.2017107278015881,
+    0.034087331848103315
+   ],
+   "hit_rate": 0.4966887417218543,
+   "n_picks": 453,
+   "n": 1809,
+   "alpha_per_market": 0.004166666666666667
+  },
+  "player_rush_yds": {
+   "qualifies": false,
+   "rel_threshold": 0.31190109799435495,
+   "roi": -0.00822466444850886,
+   "roi_ci": [
+    -0.16438321875372927,
+    0.14756555976128471
+   ],
+   "hit_rate": 0.5608856088560885,
+   "n_picks": 271,
+   "n": 1084,
+   "alpha_per_market": 0.004166666666666667
+  }
+ },
+ "note": "Static prior for the market-blend weight, fitted by market_trust.py on 2024-25 ESPN BET closing lines. `early` marks the markets whose big projection gaps vs the OPENING line have won (see early_table)."
+}
