@@ -1,24 +1,54 @@
 name: Refresh site
 
-# Sunday, Monday and Thursday mornings (NFL game days). Cron runs in UTC:
-# 13:00 UTC = 8:00 AM CDT / 7:00 AM CST. GitHub can start scheduled runs a few
-# minutes late. Edit the hour below to move it.
+# Sunday, Monday and Thursday mornings (NFL game days). Cron runs in UTC.
+# Scheduled to start at 11:17 UTC = 6:17 AM CDT / 5:17 AM CST, NOT at 8 AM sharp: GitHub queues scheduled runs
+# late under load, worst at the top of the hour (it was 4-8 hours late on three occasions), so the schedule asks early
+# and at an off-peak minute to have the page ready by 8. Run it by hand any time from the Actions tab.
+# A scheduled run that starts after a recent successful run (e.g. you ran it by hand) skips itself, see `gate`.
 on:
   schedule:
-    - cron: "0 13 * * 0,1,4"
+    - cron: "17 11 * * 0,1,4"
   workflow_dispatch:
 
 permissions:
   contents: write
   pages: write
   id-token: write
+  actions: read
 
 concurrency:
   group: pages
   cancel-in-progress: false
 
 jobs:
+  # Stops a late scheduled run from re-spending Odds API credits on a slate that was just published. Only scheduled
+  # runs can be skipped; a manual run always goes ahead.
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      skip: ${{ steps.recent.outputs.skip }}
+    steps:
+      - name: Skip a scheduled run if a refresh succeeded in the last 5 hours
+        id: recent
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          skip=false
+          if [ "$EVENT" = "schedule" ]; then
+            last=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow refresh-site.yml --status success --limit 1 --json createdAt -q '.[0].createdAt' || true)
+            if [ -n "$last" ]; then
+              age=$(( $(date -u +%s) - $(date -u -d "$last" +%s) ))
+              echo "Last successful refresh: $last (${age}s ago)"
+              if [ "$age" -lt 18000 ]; then skip=true; fi
+            fi
+          fi
+          echo "skip=$skip" >> "$GITHUB_OUTPUT"
+          echo "skip=$skip"
+
   refresh:
+    needs: gate
+    if: needs.gate.outputs.skip != 'true'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

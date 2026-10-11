@@ -2,10 +2,10 @@ name: Collect lines
 
 # The off days (Tue, Wed, Fri, Sat). The main refresh covers Sun/Mon/Thu; this adds cheap game-line
 # pulls in between so line movement and closing lines build up. One bulk call, ~2 Odds API credits,
-# no simulation, no site rebuild. 13:00 UTC = 8:00 AM CDT; GitHub may start it a few minutes late.
+# no simulation, no site rebuild. 11:43 UTC = 6:43 AM CDT; an off-peak minute because GitHub queues scheduled runs late.
 on:
   schedule:
-    - cron: "0 13 * * 2,3,5,6"
+    - cron: "43 11 * * 2,3,5,6"
   workflow_dispatch:
 
 permissions:
