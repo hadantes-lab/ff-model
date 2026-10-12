@@ -62,3 +62,4 @@ pulled_at,season,week,game,commence,stadium,roof,indoors,temp_f,wind_mph,gust_mp
 2026-10-11T13:27:11+00:00,2026,5,DET @ ARI,2026-10-11T20:25:00Z,State Farm Stadium,nan,False,85,22,31,24,Mostly clear
 2026-10-11T13:27:11+00:00,2026,5,SF @ SEA,2026-10-11T20:25:00Z,Lumen Field,outdoors,False,57,11,19,0,Clear
 2026-10-11T13:27:11+00:00,2026,5,BAL @ ATL,2026-10-12T00:20:00Z,Mercedes-Benz Stadium,nan,False,62,9,23,1,Mostly clear
+2026-10-12T20:19:46+00:00,2026,5,BUF @ LA,2026-10-13T00:15:00Z,SoFi Stadium,dome,True,,,,,
