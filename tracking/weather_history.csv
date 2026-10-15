@@ -103,3 +103,4 @@ pulled_at,season,week,game,commence,stadium,roof,indoors,temp_f,wind_mph,gust_mp
 2026-10-14T15:57:58+00:00,2026,7,LA @ LV,2026-10-25T20:25:00Z,Allegiant Stadium,dome,True,,,,,
 2026-10-14T15:57:58+00:00,2026,7,KC @ SEA,2026-10-26T00:20:00Z,Lumen Field,outdoors,False,56,3,4,7,Overcast
 2026-10-14T15:57:58+00:00,2026,7,DAL @ PHI,2026-10-27T00:15:00Z,Lincoln Financial Field,outdoors,False,51,3,6,12,Partly cloudy
+2026-10-15T15:38:29+00:00,2026,6,SEA @ DEN,2026-10-16T00:15:00Z,Empower Field at Mile High,outdoors,False,46,6,7,0,Clear
