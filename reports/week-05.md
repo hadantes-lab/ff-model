@@ -161,8 +161,6 @@ Across 166 graded props the model's raw lean was right 51% (85-81); it expected 
 
 ## What the data is teaching the model
 
-- reception yds: the model's weight against the market moved from 0.00 to 0.05 (model looks slightly better but not conclusively; measured on 2,700 props, 356 of them tracked this season).
-- receptions: the model's weight against the market moved from 0.00 to 0.05 (model looks slightly better but not conclusively; measured on 2,802 props, 342 of them tracked this season).
 - game_total: 17-14 over 31 picks is 2.1 standard deviations below what the model's own probabilities expected; its raw confidence runs too high here. That is what blending toward the market is for, so the real question is the weight (see above), not the raw number.
 - player_reception_yds:high: 97-94 over 191 picks is 6.0 standard deviations below what the model's own probabilities expected; its raw confidence runs too high here. That is what blending toward the market is for, so the real question is the weight (see above), not the raw number.
 - player_receptions:high: 118-81 over 199 picks is 3.1 standard deviations below what the model's own probabilities expected; its raw confidence runs too high here. That is what blending toward the market is for, so the real question is the weight (see above), not the raw number.
