@@ -163,3 +163,4 @@ pulled_at,season,week,game,commence,stadium,roof,indoors,temp_f,wind_mph,gust_mp
 2026-10-18T14:39:28+00:00,2026,6,BUF @ LV,2026-10-18T20:25:00Z,Allegiant Stadium,dome,True,,,,,
 2026-10-18T14:39:28+00:00,2026,6,LAC @ KC,2026-10-18T20:25:00Z,GEHA Field at Arrowhead Stadium,outdoors,False,65,12,19,0,Clear
 2026-10-18T14:39:28+00:00,2026,6,DAL @ GB,2026-10-19T00:20:00Z,Lambeau Field,outdoors,False,52,11,21,0,Clear
+2026-10-19T17:31:24+00:00,2026,6,WAS @ SF,2026-10-20T00:15:00Z,Levi's Stadium,outdoors,False,60,12,15,0,Overcast
