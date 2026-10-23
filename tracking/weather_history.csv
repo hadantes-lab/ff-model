@@ -206,3 +206,29 @@ pulled_at,season,week,game,commence,stadium,roof,indoors,temp_f,wind_mph,gust_mp
 2026-10-21T16:06:03+00:00,2026,8,PHI @ WAS,2026-11-02T01:20:00Z,Northwest Stadium,outdoors,False,58,8,23,8,Overcast
 2026-10-21T16:06:03+00:00,2026,8,CHI @ SEA,2026-11-03T01:20:00Z,Lumen Field,outdoors,False,52,2,2,28,Overcast
 2026-10-22T15:55:20+00:00,2026,7,NE @ CHI,2026-10-23T00:15:00Z,Soldier Field,outdoors,False,55,6,11,0,Clear
+2026-10-23T15:55:14+00:00,2026,7,PIT @ NO,2026-10-25T13:30:00Z,Stade de France,dome,True,,,,,
+2026-10-23T15:55:14+00:00,2026,7,SF @ ATL,2026-10-25T17:00:00Z,Mercedes-Benz Stadium,nan,False,69,11,15,0,Clear
+2026-10-23T15:55:14+00:00,2026,7,CIN @ BAL,2026-10-25T17:00:00Z,M&T Bank Stadium,outdoors,False,64,3,4,0,Clear
+2026-10-23T15:55:14+00:00,2026,7,TB @ CAR,2026-10-25T17:00:00Z,Bank of America Stadium,outdoors,False,67,9,12,0,Clear
+2026-10-23T15:55:14+00:00,2026,7,CLE @ TEN,2026-10-25T17:00:00Z,Nissan Stadium,outdoors,False,75,3,3,0,Overcast
+2026-10-23T15:55:14+00:00,2026,7,NYG @ HOU,2026-10-25T17:00:00Z,Reliant Stadium,nan,False,80,11,13,0,Overcast
+2026-10-23T15:55:14+00:00,2026,7,IND @ MIN,2026-10-25T17:00:00Z,U.S. Bank Stadium,dome,True,,,,,
+2026-10-23T15:55:14+00:00,2026,7,MIA @ NYJ,2026-10-25T17:00:00Z,MetLife Stadium,outdoors,False,65,3,5,0,Clear
+2026-10-23T15:55:14+00:00,2026,7,DEN @ ARI,2026-10-25T20:05:00Z,State Farm Stadium,nan,False,79,6,6,0,Clear
+2026-10-23T15:55:14+00:00,2026,7,GB @ DET,2026-10-25T20:25:00Z,Ford Field,dome,True,,,,,
+2026-10-23T15:55:14+00:00,2026,7,LA @ LV,2026-10-25T20:25:00Z,Allegiant Stadium,dome,True,,,,,
+2026-10-23T15:55:14+00:00,2026,7,KC @ SEA,2026-10-26T00:20:00Z,Lumen Field,outdoors,False,51,8,15,37,Overcast
+2026-10-23T15:55:14+00:00,2026,7,DAL @ PHI,2026-10-27T00:15:00Z,Lincoln Financial Field,outdoors,False,60,4,14,0,Clear
+2026-10-23T15:55:14+00:00,2026,8,CAR @ GB,2026-10-30T00:15:00Z,Lambeau Field,outdoors,False,42,8,16,10,Overcast
+2026-10-23T15:55:14+00:00,2026,8,ARI @ DAL,2026-11-01T18:00:00Z,AT&T Stadium,nan,False,76,7,7,17,Overcast
+2026-10-23T15:55:14+00:00,2026,8,BAL @ BUF,2026-11-01T18:00:00Z,Highmark Stadium,outdoors,False,59,5,10,31,Overcast
+2026-10-23T15:55:14+00:00,2026,8,TEN @ CIN,2026-11-01T18:00:00Z,Paycor Stadium,outdoors,False,62,3,5,44,Overcast
+2026-10-23T15:55:14+00:00,2026,8,CLE @ PIT,2026-11-01T18:00:00Z,Acrisure Stadium,outdoors,False,57,1,2,30,Heavy drizzle
+2026-10-23T15:55:14+00:00,2026,8,MIN @ DET,2026-11-01T18:00:00Z,Ford Field,dome,True,,,,,
+2026-10-23T15:55:14+00:00,2026,8,IND @ JAX,2026-11-01T18:00:00Z,EverBank Stadium,outdoors,False,80,5,8,23,Drizzle
+2026-10-23T15:55:14+00:00,2026,8,LV @ NYJ,2026-11-01T18:00:00Z,MetLife Stadium,outdoors,False,59,10,25,16,Drizzle
+2026-10-23T15:55:14+00:00,2026,8,LAC @ LA,2026-11-01T21:05:00Z,SoFi Stadium,dome,True,,,,,
+2026-10-23T15:55:14+00:00,2026,8,KC @ DEN,2026-11-01T21:25:00Z,Empower Field at Mile High,outdoors,False,61,4,6,9,Overcast
+2026-10-23T15:55:14+00:00,2026,8,NE @ MIA,2026-11-01T21:25:00Z,Hard Rock Stadium,outdoors,False,83,10,8,23,Overcast
+2026-10-23T15:55:14+00:00,2026,8,PHI @ WAS,2026-11-02T01:20:00Z,Northwest Stadium,outdoors,False,62,6,18,29,Drizzle
+2026-10-23T15:55:14+00:00,2026,8,CHI @ SEA,2026-11-03T01:20:00Z,Lumen Field,outdoors,False,52,3,5,18,Overcast
