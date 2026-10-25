@@ -327,6 +327,22 @@
     .su-row { grid-template-columns: 48px 1fr; row-gap: 3px; }
     .su-row > :nth-child(n+3) { grid-column: 2; }
   }
+  /* ---- parlays ---- */
+  .pcard { border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin: 10px 0; background: var(--surface); }
+  .pcard.pos { border-color: var(--pos); }
+  .phead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; }
+  .pprice { font-family: "IBM Plex Mono", monospace; font-weight: 700; font-size: 22px; color: var(--gold); }
+  .pstat { font-size: 12.5px; color: var(--text-dim); } .pstat b { color: var(--text); font-family: "IBM Plex Mono", monospace; }
+  .pev.neg { color: var(--neg); } .pev.pos { color: var(--pos); }
+  .pleg { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.2fr) 70px 56px minmax(0, 1.3fr); gap: 8px; padding: 5px 0;
+    border-top: 1px solid var(--border); font-size: 13px; align-items: baseline; }
+  .pleg .nm { font-weight: 600; } .pleg .sub { font-size: 11.5px; color: var(--text-faint); }
+  .pnote { font-size: 12px; color: var(--text-faint); margin-top: 6px; }
+  .ptbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .ptbl th, .ptbl td { padding: 5px 8px; text-align: left; border-top: 1px solid var(--border); white-space: nowrap; }
+  .ptbl th { color: var(--text-faint); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; border-top: none; }
+  .pev.neg { color: var(--neg); } .pev.pos { color: var(--pos); }
+  @media (max-width: 720px) { .pleg { grid-template-columns: 1fr auto; row-gap: 1px; } .pleg > :nth-child(n+3) { grid-column: 1 / -1; } }
 </style>
 
 <div class="topbar">
@@ -354,6 +370,7 @@
 </aside>
 <div class="wrap" id="track-record" hidden></div>
 <div class="wrap" id="top-picks" hidden style="padding-top:16px;"></div>
+<div class="wrap" id="parlay-panel" hidden></div>
 <div class="demo-banner" id="demo" hidden><div class="wrap">Demo lines &mdash; these prices were generated from the model itself to show the layout. They are not real sportsbook lines and any &ldquo;edge&rdquo; here is meaningless.</div></div>
 
 <div class="wrap controls">
@@ -928,7 +945,7 @@ function renderGames() {
   const all = DATA.games || [];
   const games = all.filter(g => g.in_window !== false);
   const later = all.length - games.length;
-  el.innerHTML = suBoardHTML() + (games.length
+  el.innerHTML = suBoardHTML() + mlParlayHTML() + teaserHTML() + (games.length
     ? pickBoardHTML() + games.map(gameCardHTML).join("") + (later ? `<div class="note" style="margin-top:10px;">${later} later game${later > 1 ? "s" : ""} (next week's slate) are tracked for line movement and will appear here on their game day.</div>` : "")
     : `<div class="empty">No games priced this run${DATA.sample ? " (demo mode has no real game lines to price against)" : " -- game lines may not have been available from the Odds API."}</div>`);
 }
@@ -1043,6 +1060,72 @@ function openProp(id) {
   renderRail(); renderList();
   const row = document.querySelector(`.row[data-id="${id}"]`);
   if (row) row.scrollIntoView({ block: "center", behavior: "smooth" });
+}
+
+/* ---------- parlays ---------- */
+const PB = DATA.parlays || null;
+const evCls = ev => ev > 0 ? "pos" : "neg";
+const fmtAm = a => (a > 0 ? "+" : "") + a;
+
+function parlayLegHTML(l) {
+  const what = l.kind === "prop" ? `${esc(l.player)}<div class="sub">${esc(l.team)} &middot; ${esc(l.game)}</div>` : `${esc(l.team)} to win<div class="sub">${esc(l.game)}</div>`;
+  const bet = l.kind === "prop" ? `${esc(l.label)} <b>${l.side === "over" ? "Over" : "Under"} ${l.line}</b>` : `<b>Moneyline</b>`;
+  const script = l.script_note ? `<span class="tag ${l.script > 0 ? "ok" : "warn"}" title="${esc(l.script_note)}">script ${l.script > 0 ? "fits" : "against"}</span>` : "";
+  return `<div class="pleg"><div class="nm">${what}</div><div>${bet}</div><div class="num">${fmtAm(l.price)}</div><div class="num">${pct(l.prob)}</div>
+    <div class="sub" style="color:var(--text-faint)">${esc(l.book || "")} ${script}</div></div>`;
+}
+
+function parlayCardHTML(p, title) {
+  const lift = Math.abs(p.correlation_lift - 1) >= 0.015 ? ` &middot; correlation ${p.correlation_lift > 1 ? "adds" : "costs"} <b>${((p.correlation_lift - 1) * 100).toFixed(0)}%</b> to the chance` : "";
+  const sg = p.same_game && p.same_game.length ? `<div class="pnote">Two legs share a game (${p.same_game.map(esc).join(", ")}). Books price same-game parlays with the correlation built in, so expect a lower payout than the product of prices shown here.</div>` : "";
+  return `<div class="pcard ${p.ev > 0 ? "pos" : ""}"><div class="phead"><span class="pprice">${fmtAm(p.price)}</span><strong>${esc(title)}</strong>
+      <span class="pstat">chance to hit <b>${pct(p.joint_prob, 1)}</b> &middot; needs <b>${pct(p.breakeven_prob, 1)}</b> to break even</span>
+      <span class="pstat">edge <b class="pev ${evCls(p.ev)}">${p.ev > 0 ? "+" : ""}${(p.ev * 100).toFixed(1)}%</b> per $1${lift}</span></div>
+    ${p.legs.map(parlayLegHTML).join("")}${sg}</div>`;
+}
+
+function renderParlayPanel() {
+  const el = $("parlay-panel");
+  const pp = PB && PB.props;
+  if (!pp) { el.hidden = true; return; }
+  el.hidden = false;
+  const best = pp.parlays.length ? Math.max(...pp.parlays.map(p => p.ev)) : null;
+  el.innerHTML = `<div class="board"><h2>Prop parlays: 4&ndash;5 legs, plus-money</h2>
+    <div class="note">Built from the markets the model has been doing best in this season, favoring the legs it is most confident in, and checked for how props in the same game move together (a quarterback's yards and his receivers' yards rise together; a quarterback's passing and his running back's rushing move against each other). Legs are mostly from different games.
+    <strong>Read the edge column first:</strong> every leg's price carries the sportsbook's margin and a parlay multiplies it, and our tests found the model has no measurable edge over the market on props, so most parlays here have a <em>negative</em> expected value. This is ranked by the least-negative (or, where there is one, the positive) edge, not a promise of value.</div>
+    ${pp.parlays.length ? pp.parlays.map((p, i) => parlayCardHTML(p, `${p.n_legs}-leg parlay #${i + 1}`)).join("") : `<div class="note" style="margin-top:8px;"><strong>None this run.</strong> ${esc((PB.notes || [])[0] || "Not enough qualifying legs.")}</div>`}
+    <div class="note">${pp.candidate_legs} legs qualified (${pp.searched.toLocaleString()} parlays searched). Market quality used to prioritize legs (shrunk hit rate of high-confidence picks this season): ${Object.entries(PB.quality || {}).sort((a, b) => b[1] - a[1]).map(([m, q]) => `${esc(m.replace("player_", "").replace(/_/g, " "))} ${Math.round(q * 100)}%`).join(", ") || "none yet"}.</div></div>`;
+}
+
+function mlParlayHTML() {
+  const ml = PB && PB.ml;
+  if (!ml) return "";
+  return `<div class="board"><h2>Moneyline parlays</h2>
+    <div class="note">Favorites at the best moneyline price across books, from different games, so the legs are independent. A leg's chance is the market's own vig-free probability, so a parlay's edge here is only what shopping for the best price earns, and it is usually negative: the parlay multiplies the margin on every leg.</div>
+    ${ml.parlays.length ? ml.parlays.map(p => parlayCardHTML(p, `${p.n_legs}-team moneyline parlay`)).join("") : `<div class="note" style="margin-top:8px;">No moneyline parlay this run (moneylines weren't available for enough games).</div>`}</div>`;
+}
+
+function teaserHTML() {
+  const t = PB && PB.teasers;
+  if (!t || !(t.legs || []).length && !PB.wong_history) return "";
+  const be = t.breakeven_leg || {};
+  const beTxt = Object.entries(be).map(([k, v]) => `${k}: <b>${(v * 100).toFixed(1)}%</b>`).join(" &middot; ");
+  const hist = Object.entries(PB.wong_history || {}).map(([sp, h]) => `<tr><td>${esc(h.name)}</td><td class="num">${h.n_recent}</td><td class="num">${h.rate_recent == null ? "&mdash;" : (h.rate_recent * 100).toFixed(1) + "%"}</td><td class="num">${h.rate_all == null ? "&mdash;" : (h.rate_all * 100).toFixed(1) + "%"} (${h.n_all})</td><td class="num"><b>${(h.rate * 100).toFixed(1)}%</b></td></tr>`).join("");
+  const legRow = l => `<tr><td><b>${esc(l.team)}</b> <span style="color:var(--text-faint)">vs ${esc(l.opp)}</span></td><td class="num">${l.spread > 0 ? "+" : ""}${l.spread} &rarr; ${l.teased > 0 ? "+" : ""}${l.teased}</td><td>${esc(l.bucket)}</td><td class="num">${(l.prob * 100).toFixed(0)}%</td><td>${l.playable ? `<span class="tag ok">clears break-even</span>` : `<span class="tag warn">below break-even</span>`}</td></tr>`;
+  const pairRow = p => `<tr><td>${esc(p.legs[0].team)} + ${esc(p.legs[1].team)}</td><td class="num">${(p.prob * 100).toFixed(0)}%</td>${Object.keys(p.ev).map(k => `<td class="num pev ${evCls(p.ev[k])}">${p.ev[k] > 0 ? "+" : ""}${(p.ev[k] * 100).toFixed(1)}%</td>`).join("")}</tr>`;
+  const rr = t.round_robin;
+  const evKeys = Object.keys((t.pairs[0] || {ev: {}}).ev);
+  return `<div class="board"><h2>Wong teasers</h2>
+    <div class="note">A 6-point teaser that moves a line across both 3 and 7, the two most common NFL margins: favorites of -7.5 or -8.5 down to -1.5 or -2.5, and underdogs of +1.5 or +2.5 up to +7.5 or +8.5. A 2-team teaser needs each leg to cover ${beTxt}. Teaser prices are assumptions (-120 and -110; sportsbook prices vary, and the Odds API doesn't supply them), so check yours. The spread must match exactly at your book.</div>
+    <div class="scroll-x"><table class="ptbl" style="margin-top:8px;"><thead><tr><th>Cover rate by leg type</th><th>Games since 2021</th><th>Covered since 2021</th><th>Since 2014</th><th>Used (shrunk)</th></tr></thead><tbody>${hist}</tbody></table></div>
+    <div class="note">The edge has not held evenly: underdog legs (+1.5, +2.5) have kept covering about 76%, while the favorite legs have slipped below the break-even in recent years, so only legs that clear it are marked and used for the round robin.</div>
+    ${(t.legs || []).length ? `<h3 style="margin:14px 0 4px; font-size:14px;">This week's Wong legs</h3><div class="scroll-x"><table class="ptbl"><thead><tr><th>Team</th><th>Line &rarr; teased</th><th>Type</th><th>Cover %</th><th></th></tr></thead><tbody>${t.legs.map(legRow).join("")}</tbody></table></div>`
+      : `<div class="note" style="margin-top:8px;"><strong>No Wong legs this week:</strong> no game's consensus spread sits exactly on -7.5, -8.5, +1.5 or +2.5.</div>`}
+    ${t.pairs.length ? `<h3 style="margin:14px 0 4px; font-size:14px;">Best pairs (2-team teasers)</h3><div class="scroll-x"><table class="ptbl"><thead><tr><th>Pair</th><th>Both cover</th>${evKeys.map(k => `<th>EV ${esc(k.replace("2-team at ", "at "))}</th>`).join("")}</tr></thead><tbody>${t.pairs.map(pairRow).join("")}</tbody></table></div>` : ""}
+    ${rr ? `<h3 style="margin:14px 0 4px; font-size:14px;">Round robin: ${rr.legs.map(l => esc(l.team)).join(", ")}</h3>
+      <div class="note">All ${rr.n_pairs} two-team pairs among these ${rr.legs.length} legs, one unit each: expected return ${evKeys.map(k => `<b>${rr.total_ev[k] >= 0 ? "+" : ""}${rr.total_ev[k].toFixed(2)} units</b> ${esc(k.replace("2-team ", ""))}`).join(", ")} (average ${evKeys.map(k => `${(rr.avg_ev[k] * 100).toFixed(1)}%`).join(" / ")} per pair). A round robin spreads the risk of one leg losing; it does not change the expected value per pair.</div>`
+      : `<div class="note" style="margin-top:8px;">No round robin this week: it needs at least three legs that clear the break-even (${t.playable_legs || 0} do).</div>`}
+    <div class="note">Pairs mix legs from different games, so the chance both cover is the product of the two. History is 2014&ndash;2026 regular seasons from nflverse, recomputed every run.</div></div>`;
 }
 
 /* ---------- straight-up winners, in tiers ---------- */
@@ -1209,5 +1292,5 @@ $("rows").addEventListener("keydown", e => {
   if ((e.key === "Enter" || e.key === " ") && e.target.classList.contains("row-head")) { e.preventDefault(); e.target.click(); }
 });
 
-renderHeader(); renderTrackRecord(); renderTopPicks(); buildControls(); renderRail(); renderList();
+renderHeader(); renderTrackRecord(); renderTopPicks(); renderParlayPanel(); buildControls(); renderRail(); renderList();
 </script>

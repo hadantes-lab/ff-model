@@ -47,7 +47,11 @@ def main():
     season = int(nfl.get_current_season())
     pulled_at = line_history.now_iso()
 
-    raw, _from_cache = odds_api.fetch_game_lines(key)        # prints its own credits line when it hits the API
+    try:
+        raw, _from_cache = odds_api.fetch_game_lines(key)    # prints its own credits line when it hits the API
+    except odds_api.OddsApiError as e:                       # out of credits (or the API is down): nothing to collect, not a failure
+        log(f"Game lines unavailable this run ({e}); nothing collected.")
+        return
     sched = nfl.load_schedules([season]).to_pandas()
     n = store_game_lines(raw, sched, season, int(nfl.get_current_week()), pulled_at)
     log(f"Backlog: appended {n} game-line rows ({n // 2} upcoming games).")

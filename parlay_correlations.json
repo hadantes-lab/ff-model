@@ -1,0 +1,1597 @@
+{
+ "note": "Latent correlation between the standardized misses of two prop legs in the same game, by relation (same player, teammates, opponents) and market/role, from 14,777 props in 2024-25 (see parlays.py). Each value is shrunk by t^2/(1+t^2); a leg that is an under flips the sign. Cross-game legs are independent.",
+ "estimated_on": "2024-2025 backtest, ESPN BET lines",
+ "n_pairs_total": 300967,
+ "pairs": {
+  "opponents|pass_attempts/QB|pass_attempts/QB": {
+   "rho": -0.0015,
+   "raw": -0.0203,
+   "n": 194
+  },
+  "opponents|pass_attempts/QB|pass_completions/QB": {
+   "rho": -0.0581,
+   "raw": -0.0822,
+   "n": 358
+  },
+  "opponents|pass_attempts/QB|pass_tds/QB": {
+   "rho": -0.0025,
+   "raw": -0.0201,
+   "n": 352
+  },
+  "opponents|pass_attempts/QB|pass_yds/QB": {
+   "rho": 0.0247,
+   "raw": 0.0483,
+   "n": 453
+  },
+  "opponents|pass_attempts/QB|reception_longest/RB": {
+   "rho": 0.0244,
+   "raw": 0.0591,
+   "n": 205
+  },
+  "opponents|pass_attempts/QB|reception_longest/WRTE": {
+   "rho": 0.0488,
+   "raw": 0.0572,
+   "n": 1791
+  },
+  "opponents|pass_attempts/QB|reception_yds/RB": {
+   "rho": 0.0323,
+   "raw": 0.069,
+   "n": 188
+  },
+  "opponents|pass_attempts/QB|reception_yds/WRTE": {
+   "rho": 0.0591,
+   "raw": 0.0677,
+   "n": 1497
+  },
+  "opponents|pass_attempts/QB|receptions/RB": {
+   "rho": -0.0774,
+   "raw": -0.0982,
+   "n": 390
+  },
+  "opponents|pass_attempts/QB|receptions/WRTE": {
+   "rho": -0.0012,
+   "raw": -0.01,
+   "n": 1404
+  },
+  "opponents|pass_attempts/QB|rush_attempts/RB": {
+   "rho": 0.0429,
+   "raw": 0.0645,
+   "n": 481
+  },
+  "opponents|pass_attempts/QB|rush_longest/QB": {
+   "rho": -0.0037,
+   "raw": -0.0265,
+   "n": 236
+  },
+  "opponents|pass_attempts/QB|rush_longest/RB": {
+   "rho": 0.0283,
+   "raw": 0.0471,
+   "n": 680
+  },
+  "opponents|pass_attempts/QB|rush_reception_yds/RB": {
+   "rho": 0.0112,
+   "raw": 0.0298,
+   "n": 684
+  },
+  "opponents|pass_attempts/QB|rush_reception_yds/WRTE": {
+   "rho": 0.1204,
+   "raw": 0.1327,
+   "n": 559
+  },
+  "opponents|pass_attempts/QB|rush_yds/QB": {
+   "rho": 0.0,
+   "raw": 0.0008,
+   "n": 160
+  },
+  "opponents|pass_attempts/QB|rush_yds/RB": {
+   "rho": 0.0233,
+   "raw": 0.0427,
+   "n": 662
+  },
+  "opponents|pass_completions/QB|pass_completions/QB": {
+   "rho": -0.046,
+   "raw": -0.0848,
+   "n": 168
+  },
+  "opponents|pass_completions/QB|pass_tds/QB": {
+   "rho": 0.0407,
+   "raw": 0.0679,
+   "n": 329
+  },
+  "opponents|pass_completions/QB|pass_yds/QB": {
+   "rho": 0.0092,
+   "raw": 0.0317,
+   "n": 415
+  },
+  "opponents|pass_completions/QB|reception_longest/RB": {
+   "rho": 0.001,
+   "raw": 0.0176,
+   "n": 197
+  },
+  "opponents|pass_completions/QB|reception_longest/WRTE": {
+   "rho": 0.0395,
+   "raw": 0.0493,
+   "n": 1648
+  },
+  "opponents|pass_completions/QB|reception_yds/RB": {
+   "rho": -0.0014,
+   "raw": -0.0204,
+   "n": 175
+  },
+  "opponents|pass_completions/QB|reception_yds/WRTE": {
+   "rho": 0.0444,
+   "raw": 0.0553,
+   "n": 1332
+  },
+  "opponents|pass_completions/QB|receptions/RB": {
+   "rho": -0.0992,
+   "raw": -0.1184,
+   "n": 372
+  },
+  "opponents|pass_completions/QB|receptions/WRTE": {
+   "rho": -0.0004,
+   "raw": -0.007,
+   "n": 1317
+  },
+  "opponents|pass_completions/QB|rush_attempts/RB": {
+   "rho": -0.0,
+   "raw": -0.0048,
+   "n": 451
+  },
+  "opponents|pass_completions/QB|rush_longest/QB": {
+   "rho": -0.0027,
+   "raw": -0.0239,
+   "n": 224
+  },
+  "opponents|pass_completions/QB|rush_longest/RB": {
+   "rho": 0.0081,
+   "raw": 0.0265,
+   "n": 631
+  },
+  "opponents|pass_completions/QB|rush_reception_yds/RB": {
+   "rho": -0.0,
+   "raw": -0.0032,
+   "n": 638
+  },
+  "opponents|pass_completions/QB|rush_reception_yds/WRTE": {
+   "rho": 0.0387,
+   "raw": 0.0588,
+   "n": 560
+  },
+  "opponents|pass_completions/QB|rush_yds/RB": {
+   "rho": 0.0003,
+   "raw": 0.0079,
+   "n": 580
+  },
+  "opponents|pass_interceptions/QB|pass_yds/QB": {
+   "rho": -0.0427,
+   "raw": -0.0827,
+   "n": 159
+  },
+  "opponents|pass_interceptions/QB|reception_longest/WRTE": {
+   "rho": 0.0102,
+   "raw": 0.0297,
+   "n": 599
+  },
+  "opponents|pass_interceptions/QB|reception_yds/WRTE": {
+   "rho": 0.0028,
+   "raw": 0.0179,
+   "n": 588
+  },
+  "opponents|pass_interceptions/QB|receptions/WRTE": {
+   "rho": -0.0225,
+   "raw": -0.0459,
+   "n": 456
+  },
+  "opponents|pass_interceptions/QB|rush_longest/RB": {
+   "rho": 0.1483,
+   "raw": 0.1701,
+   "n": 238
+  },
+  "opponents|pass_interceptions/QB|rush_reception_yds/RB": {
+   "rho": 0.018,
+   "raw": 0.0519,
+   "n": 200
+  },
+  "opponents|pass_interceptions/QB|rush_yds/RB": {
+   "rho": 0.0732,
+   "raw": 0.1014,
+   "n": 256
+  },
+  "opponents|pass_tds/QB|pass_tds/QB": {
+   "rho": 0.0151,
+   "raw": 0.0509,
+   "n": 166
+  },
+  "opponents|pass_tds/QB|pass_yds/QB": {
+   "rho": 0.0811,
+   "raw": 0.1008,
+   "n": 409
+  },
+  "opponents|pass_tds/QB|reception_longest/RB": {
+   "rho": 0.0,
+   "raw": 0.0014,
+   "n": 209
+  },
+  "opponents|pass_tds/QB|reception_longest/WRTE": {
+   "rho": 0.0285,
+   "raw": 0.0396,
+   "n": 1649
+  },
+  "opponents|pass_tds/QB|reception_yds/RB": {
+   "rho": 0.0018,
+   "raw": 0.0221,
+   "n": 179
+  },
+  "opponents|pass_tds/QB|reception_yds/WRTE": {
+   "rho": 0.0449,
+   "raw": 0.0555,
+   "n": 1379
+  },
+  "opponents|pass_tds/QB|receptions/RB": {
+   "rho": -0.0097,
+   "raw": -0.0336,
+   "n": 361
+  },
+  "opponents|pass_tds/QB|receptions/WRTE": {
+   "rho": 0.0473,
+   "raw": 0.058,
+   "n": 1311
+  },
+  "opponents|pass_tds/QB|rush_attempts/RB": {
+   "rho": 0.0008,
+   "raw": 0.0123,
+   "n": 458
+  },
+  "opponents|pass_tds/QB|rush_longest/QB": {
+   "rho": -0.0,
+   "raw": -0.0032,
+   "n": 233
+  },
+  "opponents|pass_tds/QB|rush_longest/RB": {
+   "rho": 0.0196,
+   "raw": 0.0394,
+   "n": 637
+  },
+  "opponents|pass_tds/QB|rush_reception_yds/RB": {
+   "rho": 0.0116,
+   "raw": 0.031,
+   "n": 630
+  },
+  "opponents|pass_tds/QB|rush_reception_yds/WRTE": {
+   "rho": 0.0415,
+   "raw": 0.0631,
+   "n": 486
+  },
+  "opponents|pass_tds/QB|rush_yds/RB": {
+   "rho": 0.0078,
+   "raw": 0.0264,
+   "n": 604
+  },
+  "opponents|pass_yds/QB|pass_yds/QB": {
+   "rho": 0.0684,
+   "raw": 0.0958,
+   "n": 274
+  },
+  "opponents|pass_yds/QB|reception_longest/RB": {
+   "rho": -0.0021,
+   "raw": -0.0215,
+   "n": 243
+  },
+  "opponents|pass_yds/QB|reception_longest/WRTE": {
+   "rho": 0.0261,
+   "raw": 0.0359,
+   "n": 2072
+  },
+  "opponents|pass_yds/QB|reception_yds/RB": {
+   "rho": 0.0027,
+   "raw": 0.024,
+   "n": 228
+  },
+  "opponents|pass_yds/QB|reception_yds/WRTE": {
+   "rho": 0.0669,
+   "raw": 0.0737,
+   "n": 1800
+  },
+  "opponents|pass_yds/QB|receptions/RB": {
+   "rho": -0.0171,
+   "raw": -0.0406,
+   "n": 446
+  },
+  "opponents|pass_yds/QB|receptions/WRTE": {
+   "rho": 0.0189,
+   "raw": 0.0309,
+   "n": 1645
+  },
+  "opponents|pass_yds/QB|rush_attempts/RB": {
+   "rho": -0.0031,
+   "raw": -0.0188,
+   "n": 566
+  },
+  "opponents|pass_yds/QB|rush_longest/QB": {
+   "rho": -0.0179,
+   "raw": -0.0471,
+   "n": 281
+  },
+  "opponents|pass_yds/QB|rush_longest/RB": {
+   "rho": -0.0023,
+   "raw": -0.0151,
+   "n": 802
+  },
+  "opponents|pass_yds/QB|rush_reception_yds/RB": {
+   "rho": -0.0013,
+   "raw": -0.012,
+   "n": 833
+  },
+  "opponents|pass_yds/QB|rush_reception_yds/WRTE": {
+   "rho": 0.0841,
+   "raw": 0.0969,
+   "n": 702
+  },
+  "opponents|pass_yds/QB|rush_yds/QB": {
+   "rho": 0.0026,
+   "raw": 0.0249,
+   "n": 193
+  },
+  "opponents|pass_yds/QB|rush_yds/RB": {
+   "rho": -0.0,
+   "raw": -0.0004,
+   "n": 789
+  },
+  "opponents|reception_longest/RB|reception_longest/WRTE": {
+   "rho": -0.0041,
+   "raw": -0.0175,
+   "n": 1006
+  },
+  "opponents|reception_longest/RB|reception_yds/WRTE": {
+   "rho": -0.0221,
+   "raw": -0.0395,
+   "n": 820
+  },
+  "opponents|reception_longest/RB|receptions/RB": {
+   "rho": 0.0507,
+   "raw": 0.085,
+   "n": 208
+  },
+  "opponents|reception_longest/RB|receptions/WRTE": {
+   "rho": 0.0018,
+   "raw": 0.0136,
+   "n": 808
+  },
+  "opponents|reception_longest/RB|rush_attempts/RB": {
+   "rho": -0.0043,
+   "raw": -0.0269,
+   "n": 262
+  },
+  "opponents|reception_longest/RB|rush_longest/RB": {
+   "rho": -0.0276,
+   "raw": -0.0542,
+   "n": 357
+  },
+  "opponents|reception_longest/RB|rush_reception_yds/RB": {
+   "rho": -0.0,
+   "raw": -0.0024,
+   "n": 355
+  },
+  "opponents|reception_longest/RB|rush_reception_yds/WRTE": {
+   "rho": 0.0009,
+   "raw": 0.0144,
+   "n": 339
+  },
+  "opponents|reception_longest/RB|rush_yds/RB": {
+   "rho": -0.0022,
+   "raw": -0.0195,
+   "n": 340
+  },
+  "opponents|reception_longest/WRTE|reception_longest/WRTE": {
+   "rho": 0.0075,
+   "raw": 0.0152,
+   "n": 4191
+  },
+  "opponents|reception_longest/WRTE|reception_yds/RB": {
+   "rho": -0.0007,
+   "raw": -0.0096,
+   "n": 907
+  },
+  "opponents|reception_longest/WRTE|reception_yds/WRTE": {
+   "rho": 0.0223,
+   "raw": 0.0268,
+   "n": 6908
+  },
+  "opponents|reception_longest/WRTE|receptions/RB": {
+   "rho": 0.001,
+   "raw": 0.0086,
+   "n": 1841
+  },
+  "opponents|reception_longest/WRTE|receptions/WRTE": {
+   "rho": 0.0285,
+   "raw": 0.0325,
+   "n": 6746
+  },
+  "opponents|reception_longest/WRTE|rush_attempts/QB": {
+   "rho": -0.0008,
+   "raw": -0.0127,
+   "n": 391
+  },
+  "opponents|reception_longest/WRTE|rush_attempts/RB": {
+   "rho": -0.0143,
+   "raw": -0.0248,
+   "n": 2229
+  },
+  "opponents|reception_longest/WRTE|rush_longest/QB": {
+   "rho": -0.0072,
+   "raw": -0.0212,
+   "n": 1136
+  },
+  "opponents|reception_longest/WRTE|rush_longest/RB": {
+   "rho": 0.0001,
+   "raw": 0.0031,
+   "n": 3189
+  },
+  "opponents|reception_longest/WRTE|rush_reception_yds/RB": {
+   "rho": -0.0127,
+   "raw": -0.0214,
+   "n": 3198
+  },
+  "opponents|reception_longest/WRTE|rush_reception_yds/WRTE": {
+   "rho": 0.0293,
+   "raw": 0.0373,
+   "n": 2628
+  },
+  "opponents|reception_longest/WRTE|rush_yds/QB": {
+   "rho": -0.0042,
+   "raw": -0.0196,
+   "n": 717
+  },
+  "opponents|reception_longest/WRTE|rush_yds/RB": {
+   "rho": -0.0138,
+   "raw": -0.0227,
+   "n": 3016
+  },
+  "opponents|reception_yds/RB|reception_yds/WRTE": {
+   "rho": -0.0038,
+   "raw": -0.0181,
+   "n": 813
+  },
+  "opponents|reception_yds/RB|receptions/RB": {
+   "rho": 0.0251,
+   "raw": 0.0613,
+   "n": 188
+  },
+  "opponents|reception_yds/RB|receptions/WRTE": {
+   "rho": 0.0,
+   "raw": 0.0033,
+   "n": 730
+  },
+  "opponents|reception_yds/RB|rush_attempts/RB": {
+   "rho": 0.0405,
+   "raw": 0.0731,
+   "n": 235
+  },
+  "opponents|reception_yds/RB|rush_longest/RB": {
+   "rho": -0.0252,
+   "raw": -0.052,
+   "n": 351
+  },
+  "opponents|reception_yds/RB|rush_reception_yds/RB": {
+   "rho": 0.0083,
+   "raw": 0.032,
+   "n": 346
+  },
+  "opponents|reception_yds/RB|rush_reception_yds/WRTE": {
+   "rho": 0.0068,
+   "raw": 0.0314,
+   "n": 285
+  },
+  "opponents|reception_yds/RB|rush_yds/RB": {
+   "rho": 0.0004,
+   "raw": 0.0109,
+   "n": 348
+  },
+  "opponents|reception_yds/WRTE|reception_yds/WRTE": {
+   "rho": 0.0476,
+   "raw": 0.0532,
+   "n": 3034
+  },
+  "opponents|reception_yds/WRTE|receptions/RB": {
+   "rho": -0.0039,
+   "raw": -0.0153,
+   "n": 1488
+  },
+  "opponents|reception_yds/WRTE|receptions/WRTE": {
+   "rho": 0.0373,
+   "raw": 0.0413,
+   "n": 5493
+  },
+  "opponents|reception_yds/WRTE|rush_attempts/QB": {
+   "rho": 0.0022,
+   "raw": 0.0198,
+   "n": 320
+  },
+  "opponents|reception_yds/WRTE|rush_attempts/RB": {
+   "rho": -0.0219,
+   "raw": -0.033,
+   "n": 1824
+  },
+  "opponents|reception_yds/WRTE|rush_longest/QB": {
+   "rho": -0.0324,
+   "raw": -0.0475,
+   "n": 952
+  },
+  "opponents|reception_yds/WRTE|rush_longest/RB": {
+   "rho": 0.0035,
+   "raw": 0.0123,
+   "n": 2682
+  },
+  "opponents|reception_yds/WRTE|rush_reception_yds/RB": {
+   "rho": -0.0001,
+   "raw": -0.0034,
+   "n": 2723
+  },
+  "opponents|reception_yds/WRTE|rush_reception_yds/WRTE": {
+   "rho": 0.0879,
+   "raw": 0.0929,
+   "n": 2063
+  },
+  "opponents|reception_yds/WRTE|rush_yds/QB": {
+   "rho": -0.0,
+   "raw": -0.0013,
+   "n": 645
+  },
+  "opponents|reception_yds/WRTE|rush_yds/RB": {
+   "rho": -0.0005,
+   "raw": -0.0059,
+   "n": 2664
+  },
+  "opponents|receptions/RB|receptions/RB": {
+   "rho": 0.0034,
+   "raw": 0.0275,
+   "n": 189
+  },
+  "opponents|receptions/RB|receptions/WRTE": {
+   "rho": -0.0169,
+   "raw": -0.0298,
+   "n": 1472
+  },
+  "opponents|receptions/RB|rush_attempts/RB": {
+   "rho": 0.042,
+   "raw": 0.0636,
+   "n": 483
+  },
+  "opponents|receptions/RB|rush_longest/QB": {
+   "rho": 0.0001,
+   "raw": 0.0075,
+   "n": 251
+  },
+  "opponents|receptions/RB|rush_longest/RB": {
+   "rho": 0.045,
+   "raw": 0.062,
+   "n": 691
+  },
+  "opponents|receptions/RB|rush_reception_yds/RB": {
+   "rho": 0.0411,
+   "raw": 0.0587,
+   "n": 678
+  },
+  "opponents|receptions/RB|rush_reception_yds/WRTE": {
+   "rho": -0.0281,
+   "raw": -0.0479,
+   "n": 619
+  },
+  "opponents|receptions/RB|rush_yds/QB": {
+   "rho": -0.0025,
+   "raw": -0.0253,
+   "n": 172
+  },
+  "opponents|receptions/RB|rush_yds/RB": {
+   "rho": 0.0522,
+   "raw": 0.0693,
+   "n": 638
+  },
+  "opponents|receptions/WRTE|receptions/WRTE": {
+   "rho": 0.0041,
+   "raw": 0.013,
+   "n": 2708
+  },
+  "opponents|receptions/WRTE|rush_attempts/QB": {
+   "rho": 0.0,
+   "raw": 0.0003,
+   "n": 321
+  },
+  "opponents|receptions/WRTE|rush_attempts/RB": {
+   "rho": -0.0217,
+   "raw": -0.0329,
+   "n": 1779
+  },
+  "opponents|receptions/WRTE|rush_longest/QB": {
+   "rho": -0.0554,
+   "raw": -0.0683,
+   "n": 927
+  },
+  "opponents|receptions/WRTE|rush_longest/RB": {
+   "rho": 0.0015,
+   "raw": 0.009,
+   "n": 2551
+  },
+  "opponents|receptions/WRTE|rush_reception_yds/RB": {
+   "rho": -0.004,
+   "raw": -0.0132,
+   "n": 2533
+  },
+  "opponents|receptions/WRTE|rush_reception_yds/WRTE": {
+   "rho": 0.0604,
+   "raw": 0.0668,
+   "n": 2109
+  },
+  "opponents|receptions/WRTE|rush_yds/QB": {
+   "rho": -0.0299,
+   "raw": -0.0503,
+   "n": 583
+  },
+  "opponents|receptions/WRTE|rush_yds/RB": {
+   "rho": -0.0255,
+   "raw": -0.0345,
+   "n": 2402
+  },
+  "opponents|rush_attempts/QB|rush_reception_yds/RB": {
+   "rho": 0.0002,
+   "raw": 0.0099,
+   "n": 159
+  },
+  "opponents|rush_attempts/RB|rush_attempts/RB": {
+   "rho": -0.1379,
+   "raw": -0.1571,
+   "n": 294
+  },
+  "opponents|rush_attempts/RB|rush_longest/QB": {
+   "rho": 0.0023,
+   "raw": 0.0205,
+   "n": 305
+  },
+  "opponents|rush_attempts/RB|rush_longest/RB": {
+   "rho": -0.0411,
+   "raw": -0.0566,
+   "n": 832
+  },
+  "opponents|rush_attempts/RB|rush_reception_yds/RB": {
+   "rho": -0.1343,
+   "raw": -0.1421,
+   "n": 863
+  },
+  "opponents|rush_attempts/RB|rush_reception_yds/WRTE": {
+   "rho": -0.036,
+   "raw": -0.0525,
+   "n": 795
+  },
+  "opponents|rush_attempts/RB|rush_yds/QB": {
+   "rho": 0.0367,
+   "raw": 0.0736,
+   "n": 187
+  },
+  "opponents|rush_attempts/RB|rush_yds/RB": {
+   "rho": -0.174,
+   "raw": -0.1807,
+   "n": 795
+  },
+  "opponents|rush_longest/QB|rush_longest/RB": {
+   "rho": 0.0008,
+   "raw": 0.0129,
+   "n": 424
+  },
+  "opponents|rush_longest/QB|rush_reception_yds/RB": {
+   "rho": -0.0009,
+   "raw": -0.013,
+   "n": 431
+  },
+  "opponents|rush_longest/QB|rush_reception_yds/WRTE": {
+   "rho": -0.0375,
+   "raw": -0.0634,
+   "n": 363
+  },
+  "opponents|rush_longest/QB|rush_yds/RB": {
+   "rho": 0.0001,
+   "raw": 0.0063,
+   "n": 391
+  },
+  "opponents|rush_longest/RB|rush_longest/RB": {
+   "rho": -0.0005,
+   "raw": -0.0096,
+   "n": 598
+  },
+  "opponents|rush_longest/RB|rush_reception_yds/RB": {
+   "rho": -0.0493,
+   "raw": -0.0606,
+   "n": 1202
+  },
+  "opponents|rush_longest/RB|rush_reception_yds/WRTE": {
+   "rho": -0.0124,
+   "raw": -0.0283,
+   "n": 989
+  },
+  "opponents|rush_longest/RB|rush_yds/QB": {
+   "rho": -0.0001,
+   "raw": -0.0065,
+   "n": 265
+  },
+  "opponents|rush_longest/RB|rush_yds/RB": {
+   "rho": -0.0415,
+   "raw": -0.054,
+   "n": 1149
+  },
+  "opponents|rush_reception_yds/RB|rush_reception_yds/RB": {
+   "rho": -0.0905,
+   "raw": -0.1035,
+   "n": 652
+  },
+  "opponents|rush_reception_yds/RB|rush_reception_yds/WRTE": {
+   "rho": -0.0473,
+   "raw": -0.0586,
+   "n": 1231
+  },
+  "opponents|rush_reception_yds/RB|rush_yds/QB": {
+   "rho": -0.0003,
+   "raw": -0.0096,
+   "n": 297
+  },
+  "opponents|rush_reception_yds/RB|rush_yds/RB": {
+   "rho": -0.1204,
+   "raw": -0.1267,
+   "n": 1200
+  },
+  "opponents|rush_reception_yds/WRTE|rush_reception_yds/WRTE": {
+   "rho": 0.1005,
+   "raw": 0.1098,
+   "n": 896
+  },
+  "opponents|rush_reception_yds/WRTE|rush_yds/QB": {
+   "rho": -0.029,
+   "raw": -0.0643,
+   "n": 202
+  },
+  "opponents|rush_reception_yds/WRTE|rush_yds/RB": {
+   "rho": -0.042,
+   "raw": -0.0561,
+   "n": 951
+  },
+  "opponents|rush_yds/QB|rush_yds/RB": {
+   "rho": -0.032,
+   "raw": -0.0625,
+   "n": 271
+  },
+  "opponents|rush_yds/RB|rush_yds/RB": {
+   "rho": -0.1067,
+   "raw": -0.1194,
+   "n": 594
+  },
+  "same_player|pass_attempts/QB|pass_completions/QB": {
+   "rho": 0.8614,
+   "raw": 0.8645,
+   "n": 384
+  },
+  "same_player|pass_attempts/QB|pass_tds/QB": {
+   "rho": 0.1704,
+   "raw": 0.184,
+   "n": 371
+  },
+  "same_player|pass_attempts/QB|pass_yds/QB": {
+   "rho": 0.7108,
+   "raw": 0.7138,
+   "n": 471
+  },
+  "same_player|pass_attempts/QB|rush_longest/QB": {
+   "rho": 0.0348,
+   "raw": 0.0655,
+   "n": 267
+  },
+  "same_player|pass_attempts/QB|rush_yds/QB": {
+   "rho": 0.1756,
+   "raw": 0.2021,
+   "n": 165
+  },
+  "same_player|pass_completions/QB|pass_tds/QB": {
+   "rho": 0.3215,
+   "raw": 0.3299,
+   "n": 355
+  },
+  "same_player|pass_completions/QB|pass_yds/QB": {
+   "rho": 0.777,
+   "raw": 0.78,
+   "n": 438
+  },
+  "same_player|pass_completions/QB|rush_longest/QB": {
+   "rho": 0.0921,
+   "raw": 0.1196,
+   "n": 238
+  },
+  "same_player|pass_completions/QB|rush_yds/QB": {
+   "rho": 0.2219,
+   "raw": 0.2466,
+   "n": 151
+  },
+  "same_player|pass_interceptions/QB|pass_yds/QB": {
+   "rho": 0.0228,
+   "raw": 0.0602,
+   "n": 171
+  },
+  "same_player|pass_tds/QB|pass_yds/QB": {
+   "rho": 0.393,
+   "raw": 0.3987,
+   "n": 433
+  },
+  "same_player|pass_tds/QB|rush_longest/QB": {
+   "rho": 0.0005,
+   "raw": 0.0125,
+   "n": 259
+  },
+  "same_player|pass_tds/QB|rush_yds/QB": {
+   "rho": 0.0869,
+   "raw": 0.1247,
+   "n": 151
+  },
+  "same_player|pass_yds/QB|rush_longest/QB": {
+   "rho": 0.0116,
+   "raw": 0.0384,
+   "n": 297
+  },
+  "same_player|pass_yds/QB|rush_yds/QB": {
+   "rho": 0.1358,
+   "raw": 0.1616,
+   "n": 204
+  },
+  "same_player|reception_longest/RB|reception_yds/RB": {
+   "rho": 0.8284,
+   "raw": 0.8347,
+   "n": 190
+  },
+  "same_player|reception_longest/RB|receptions/RB": {
+   "rho": 0.4306,
+   "raw": 0.4399,
+   "n": 240
+  },
+  "same_player|reception_longest/RB|rush_attempts/RB": {
+   "rho": 0.0,
+   "raw": 0.0039,
+   "n": 202
+  },
+  "same_player|reception_longest/RB|rush_longest/RB": {
+   "rho": 0.0508,
+   "raw": 0.082,
+   "n": 245
+  },
+  "same_player|reception_longest/RB|rush_reception_yds/RB": {
+   "rho": 0.4705,
+   "raw": 0.4779,
+   "n": 282
+  },
+  "same_player|reception_longest/RB|rush_yds/RB": {
+   "rho": 0.0679,
+   "raw": 0.0981,
+   "n": 237
+  },
+  "same_player|reception_longest/WRTE|reception_yds/WRTE": {
+   "rho": 0.7445,
+   "raw": 0.7452,
+   "n": 1846
+  },
+  "same_player|reception_longest/WRTE|receptions/WRTE": {
+   "rho": 0.343,
+   "raw": 0.3446,
+   "n": 1788
+  },
+  "same_player|reception_longest/WRTE|rush_reception_yds/WRTE": {
+   "rho": 0.7522,
+   "raw": 0.7541,
+   "n": 724
+  },
+  "same_player|reception_yds/RB|receptions/RB": {
+   "rho": 0.6041,
+   "raw": 0.6117,
+   "n": 214
+  },
+  "same_player|reception_yds/RB|rush_attempts/RB": {
+   "rho": -0.0002,
+   "raw": -0.01,
+   "n": 186
+  },
+  "same_player|reception_yds/RB|rush_longest/RB": {
+   "rho": 0.0296,
+   "raw": 0.0631,
+   "n": 224
+  },
+  "same_player|reception_yds/RB|rush_reception_yds/RB": {
+   "rho": 0.5383,
+   "raw": 0.5452,
+   "n": 265
+  },
+  "same_player|reception_yds/RB|rush_yds/RB": {
+   "rho": 0.0008,
+   "raw": 0.015,
+   "n": 240
+  },
+  "same_player|reception_yds/WRTE|receptions/WRTE": {
+   "rho": 0.7633,
+   "raw": 0.7641,
+   "n": 1581
+  },
+  "same_player|reception_yds/WRTE|rush_reception_yds/WRTE": {
+   "rho": 0.9914,
+   "raw": 0.993,
+   "n": 633
+  },
+  "same_player|receptions/RB|rush_attempts/RB": {
+   "rho": -0.0003,
+   "raw": -0.0096,
+   "n": 365
+  },
+  "same_player|receptions/RB|rush_longest/RB": {
+   "rho": 0.0278,
+   "raw": 0.0514,
+   "n": 449
+  },
+  "same_player|receptions/RB|rush_reception_yds/RB": {
+   "rho": 0.3268,
+   "raw": 0.3325,
+   "n": 515
+  },
+  "same_player|receptions/RB|rush_yds/RB": {
+   "rho": -0.0145,
+   "raw": -0.0378,
+   "n": 439
+  },
+  "same_player|receptions/WRTE|rush_reception_yds/WRTE": {
+   "rho": 0.7474,
+   "raw": 0.7496,
+   "n": 618
+  },
+  "same_player|rush_attempts/RB|rush_longest/RB": {
+   "rho": 0.3232,
+   "raw": 0.3286,
+   "n": 558
+  },
+  "same_player|rush_attempts/RB|rush_reception_yds/RB": {
+   "rho": 0.6284,
+   "raw": 0.631,
+   "n": 612
+  },
+  "same_player|rush_attempts/RB|rush_yds/RB": {
+   "rho": 0.7049,
+   "raw": 0.7074,
+   "n": 560
+  },
+  "same_player|rush_longest/QB|rush_yds/QB": {
+   "rho": 0.7336,
+   "raw": 0.7419,
+   "n": 164
+  },
+  "same_player|rush_longest/RB|rush_reception_yds/RB": {
+   "rho": 0.6011,
+   "raw": 0.6032,
+   "n": 769
+  },
+  "same_player|rush_longest/RB|rush_yds/RB": {
+   "rho": 0.6928,
+   "raw": 0.6948,
+   "n": 736
+  },
+  "same_player|rush_reception_yds/RB|rush_yds/RB": {
+   "rho": 0.8508,
+   "raw": 0.8523,
+   "n": 789
+  },
+  "teammates|pass_attempts/QB|reception_longest/RB": {
+   "rho": 0.0591,
+   "raw": 0.0935,
+   "n": 200
+  },
+  "teammates|pass_attempts/QB|reception_longest/WRTE": {
+   "rho": 0.0346,
+   "raw": 0.0444,
+   "n": 1795
+  },
+  "teammates|pass_attempts/QB|reception_yds/RB": {
+   "rho": 0.1731,
+   "raw": 0.1974,
+   "n": 185
+  },
+  "teammates|pass_attempts/QB|reception_yds/WRTE": {
+   "rho": 0.1861,
+   "raw": 0.1896,
+   "n": 1505
+  },
+  "teammates|pass_attempts/QB|receptions/RB": {
+   "rho": 0.2498,
+   "raw": 0.2595,
+   "n": 388
+  },
+  "teammates|pass_attempts/QB|receptions/WRTE": {
+   "rho": 0.2487,
+   "raw": 0.2515,
+   "n": 1426
+  },
+  "teammates|pass_attempts/QB|rush_attempts/RB": {
+   "rho": -0.1202,
+   "raw": -0.1342,
+   "n": 479
+  },
+  "teammates|pass_attempts/QB|rush_longest/RB": {
+   "rho": -0.0798,
+   "raw": -0.0934,
+   "n": 675
+  },
+  "teammates|pass_attempts/QB|rush_reception_yds/RB": {
+   "rho": -0.0259,
+   "raw": -0.0448,
+   "n": 684
+  },
+  "teammates|pass_attempts/QB|rush_reception_yds/WRTE": {
+   "rho": 0.1559,
+   "raw": 0.1659,
+   "n": 575
+  },
+  "teammates|pass_attempts/QB|rush_yds/RB": {
+   "rho": -0.1003,
+   "raw": -0.1124,
+   "n": 658
+  },
+  "teammates|pass_completions/QB|reception_longest/RB": {
+   "rho": 0.0595,
+   "raw": 0.0955,
+   "n": 185
+  },
+  "teammates|pass_completions/QB|reception_longest/WRTE": {
+   "rho": 0.0741,
+   "raw": 0.0809,
+   "n": 1667
+  },
+  "teammates|pass_completions/QB|reception_yds/RB": {
+   "rho": 0.1337,
+   "raw": 0.1632,
+   "n": 173
+  },
+  "teammates|pass_completions/QB|reception_yds/WRTE": {
+   "rho": 0.2298,
+   "raw": 0.2329,
+   "n": 1351
+  },
+  "teammates|pass_completions/QB|receptions/RB": {
+   "rho": 0.3054,
+   "raw": 0.3138,
+   "n": 372
+  },
+  "teammates|pass_completions/QB|receptions/WRTE": {
+   "rho": 0.3094,
+   "raw": 0.3118,
+   "n": 1336
+  },
+  "teammates|pass_completions/QB|rush_attempts/RB": {
+   "rho": -0.1026,
+   "raw": -0.1186,
+   "n": 456
+  },
+  "teammates|pass_completions/QB|rush_longest/RB": {
+   "rho": -0.1305,
+   "raw": -0.1409,
+   "n": 637
+  },
+  "teammates|pass_completions/QB|rush_reception_yds/RB": {
+   "rho": -0.0174,
+   "raw": -0.0372,
+   "n": 639
+  },
+  "teammates|pass_completions/QB|rush_reception_yds/WRTE": {
+   "rho": 0.1934,
+   "raw": 0.2018,
+   "n": 565
+  },
+  "teammates|pass_completions/QB|rush_yds/RB": {
+   "rho": -0.1113,
+   "raw": -0.1235,
+   "n": 599
+  },
+  "teammates|pass_interceptions/QB|reception_longest/WRTE": {
+   "rho": -0.0234,
+   "raw": -0.0437,
+   "n": 609
+  },
+  "teammates|pass_interceptions/QB|reception_yds/WRTE": {
+   "rho": -0.0408,
+   "raw": -0.0599,
+   "n": 601
+  },
+  "teammates|pass_interceptions/QB|receptions/WRTE": {
+   "rho": -0.077,
+   "raw": -0.095,
+   "n": 480
+  },
+  "teammates|pass_interceptions/QB|rush_longest/RB": {
+   "rho": 0.0793,
+   "raw": 0.1073,
+   "n": 249
+  },
+  "teammates|pass_interceptions/QB|rush_reception_yds/RB": {
+   "rho": 0.0395,
+   "raw": 0.0738,
+   "n": 215
+  },
+  "teammates|pass_interceptions/QB|rush_yds/RB": {
+   "rho": 0.0214,
+   "raw": 0.0521,
+   "n": 259
+  },
+  "teammates|pass_tds/QB|reception_longest/RB": {
+   "rho": -0.0,
+   "raw": -0.0004,
+   "n": 202
+  },
+  "teammates|pass_tds/QB|reception_longest/WRTE": {
+   "rho": 0.1414,
+   "raw": 0.1453,
+   "n": 1687
+  },
+  "teammates|pass_tds/QB|reception_yds/RB": {
+   "rho": 0.0253,
+   "raw": 0.0627,
+   "n": 175
+  },
+  "teammates|pass_tds/QB|reception_yds/WRTE": {
+   "rho": 0.1535,
+   "raw": 0.1579,
+   "n": 1396
+  },
+  "teammates|pass_tds/QB|receptions/RB": {
+   "rho": 0.0215,
+   "raw": 0.0478,
+   "n": 360
+  },
+  "teammates|pass_tds/QB|receptions/WRTE": {
+   "rho": 0.1171,
+   "raw": 0.1229,
+   "n": 1344
+  },
+  "teammates|pass_tds/QB|rush_attempts/RB": {
+   "rho": -0.0077,
+   "raw": -0.0288,
+   "n": 441
+  },
+  "teammates|pass_tds/QB|rush_longest/RB": {
+   "rho": 0.0,
+   "raw": 0.0018,
+   "n": 652
+  },
+  "teammates|pass_tds/QB|rush_reception_yds/RB": {
+   "rho": 0.0,
+   "raw": 0.0001,
+   "n": 633
+  },
+  "teammates|pass_tds/QB|rush_reception_yds/WRTE": {
+   "rho": 0.2157,
+   "raw": 0.2244,
+   "n": 494
+  },
+  "teammates|pass_tds/QB|rush_yds/RB": {
+   "rho": -0.0058,
+   "raw": -0.0233,
+   "n": 607
+  },
+  "teammates|pass_yds/QB|reception_longest/RB": {
+   "rho": 0.1112,
+   "raw": 0.1368,
+   "n": 235
+  },
+  "teammates|pass_yds/QB|reception_longest/WRTE": {
+   "rho": 0.2152,
+   "raw": 0.2174,
+   "n": 2090
+  },
+  "teammates|pass_yds/QB|reception_yds/RB": {
+   "rho": 0.1845,
+   "raw": 0.2038,
+   "n": 233
+  },
+  "teammates|pass_yds/QB|reception_yds/WRTE": {
+   "rho": 0.308,
+   "raw": 0.3098,
+   "n": 1816
+  },
+  "teammates|pass_yds/QB|receptions/RB": {
+   "rho": 0.1744,
+   "raw": 0.1857,
+   "n": 449
+  },
+  "teammates|pass_yds/QB|receptions/WRTE": {
+   "rho": 0.2202,
+   "raw": 0.2229,
+   "n": 1661
+  },
+  "teammates|pass_yds/QB|rush_attempts/RB": {
+   "rho": -0.0112,
+   "raw": -0.0316,
+   "n": 555
+  },
+  "teammates|pass_yds/QB|rush_longest/RB": {
+   "rho": -0.0872,
+   "raw": -0.0985,
+   "n": 803
+  },
+  "teammates|pass_yds/QB|rush_reception_yds/RB": {
+   "rho": 0.0238,
+   "raw": 0.0409,
+   "n": 836
+  },
+  "teammates|pass_yds/QB|rush_reception_yds/WRTE": {
+   "rho": 0.3329,
+   "raw": 0.3371,
+   "n": 706
+  },
+  "teammates|pass_yds/QB|rush_yds/RB": {
+   "rho": -0.0594,
+   "raw": -0.0733,
+   "n": 798
+  },
+  "teammates|reception_longest/RB|reception_longest/WRTE": {
+   "rho": 0.0022,
+   "raw": 0.0141,
+   "n": 955
+  },
+  "teammates|reception_longest/RB|reception_yds/WRTE": {
+   "rho": -0.013,
+   "raw": -0.0308,
+   "n": 776
+  },
+  "teammates|reception_longest/RB|receptions/WRTE": {
+   "rho": -0.0469,
+   "raw": -0.0622,
+   "n": 794
+  },
+  "teammates|reception_longest/RB|rush_longest/RB": {
+   "rho": -0.0001,
+   "raw": -0.009,
+   "n": 156
+  },
+  "teammates|reception_longest/RB|rush_reception_yds/WRTE": {
+   "rho": 0.0053,
+   "raw": 0.0271,
+   "n": 331
+  },
+  "teammates|reception_longest/WRTE|reception_longest/WRTE": {
+   "rho": -0.014,
+   "raw": -0.0224,
+   "n": 3336
+  },
+  "teammates|reception_longest/WRTE|reception_yds/RB": {
+   "rho": 0.0005,
+   "raw": 0.0085,
+   "n": 877
+  },
+  "teammates|reception_longest/WRTE|reception_yds/WRTE": {
+   "rho": -0.0211,
+   "raw": -0.0266,
+   "n": 5427
+  },
+  "teammates|reception_longest/WRTE|receptions/RB": {
+   "rho": -0.0064,
+   "raw": -0.0176,
+   "n": 1835
+  },
+  "teammates|reception_longest/WRTE|receptions/WRTE": {
+   "rho": -0.0149,
+   "raw": -0.0212,
+   "n": 5306
+  },
+  "teammates|reception_longest/WRTE|rush_attempts/QB": {
+   "rho": 0.0001,
+   "raw": 0.0057,
+   "n": 415
+  },
+  "teammates|reception_longest/WRTE|rush_attempts/RB": {
+   "rho": 0.0055,
+   "raw": 0.0156,
+   "n": 2262
+  },
+  "teammates|reception_longest/WRTE|rush_longest/QB": {
+   "rho": 0.0162,
+   "raw": 0.0309,
+   "n": 1164
+  },
+  "teammates|reception_longest/WRTE|rush_longest/RB": {
+   "rho": -0.0058,
+   "raw": -0.0145,
+   "n": 3208
+  },
+  "teammates|reception_longest/WRTE|rush_reception_yds/RB": {
+   "rho": -0.0055,
+   "raw": -0.0141,
+   "n": 3234
+  },
+  "teammates|reception_longest/WRTE|rush_reception_yds/WRTE": {
+   "rho": -0.0009,
+   "raw": -0.008,
+   "n": 2041
+  },
+  "teammates|reception_longest/WRTE|rush_yds/QB": {
+   "rho": 0.0021,
+   "raw": 0.015,
+   "n": 749
+  },
+  "teammates|reception_longest/WRTE|rush_yds/RB": {
+   "rho": -0.0028,
+   "raw": -0.0108,
+   "n": 3042
+  },
+  "teammates|reception_yds/RB|reception_yds/WRTE": {
+   "rho": -0.0134,
+   "raw": -0.031,
+   "n": 790
+  },
+  "teammates|reception_yds/RB|receptions/WRTE": {
+   "rho": -0.062,
+   "raw": -0.0766,
+   "n": 726
+  },
+  "teammates|reception_yds/RB|rush_reception_yds/WRTE": {
+   "rho": -0.0157,
+   "raw": -0.0444,
+   "n": 279
+  },
+  "teammates|reception_yds/WRTE|reception_yds/WRTE": {
+   "rho": -0.0074,
+   "raw": -0.0176,
+   "n": 2347
+  },
+  "teammates|reception_yds/WRTE|receptions/RB": {
+   "rho": -0.0087,
+   "raw": -0.0215,
+   "n": 1470
+  },
+  "teammates|reception_yds/WRTE|receptions/WRTE": {
+   "rho": -0.0004,
+   "raw": -0.0047,
+   "n": 4243
+  },
+  "teammates|reception_yds/WRTE|rush_attempts/QB": {
+   "rho": 0.0,
+   "raw": 0.0009,
+   "n": 324
+  },
+  "teammates|reception_yds/WRTE|rush_attempts/RB": {
+   "rho": -0.0,
+   "raw": -0.0009,
+   "n": 1836
+  },
+  "teammates|reception_yds/WRTE|rush_longest/QB": {
+   "rho": 0.0108,
+   "raw": 0.0268,
+   "n": 945
+  },
+  "teammates|reception_yds/WRTE|rush_longest/RB": {
+   "rho": -0.0278,
+   "raw": -0.0359,
+   "n": 2676
+  },
+  "teammates|reception_yds/WRTE|rush_reception_yds/RB": {
+   "rho": -0.0376,
+   "raw": -0.0446,
+   "n": 2738
+  },
+  "teammates|reception_yds/WRTE|rush_reception_yds/WRTE": {
+   "rho": 0.0035,
+   "raw": 0.0144,
+   "n": 1550
+  },
+  "teammates|reception_yds/WRTE|rush_yds/QB": {
+   "rho": 0.0083,
+   "raw": 0.0264,
+   "n": 660
+  },
+  "teammates|reception_yds/WRTE|rush_yds/RB": {
+   "rho": -0.0321,
+   "raw": -0.0397,
+   "n": 2692
+  },
+  "teammates|receptions/RB|receptions/WRTE": {
+   "rho": 0.0,
+   "raw": 0.0019,
+   "n": 1523
+  },
+  "teammates|receptions/RB|rush_attempts/RB": {
+   "rho": -0.0548,
+   "raw": -0.0927,
+   "n": 171
+  },
+  "teammates|receptions/RB|rush_longest/QB": {
+   "rho": -0.0,
+   "raw": -0.0038,
+   "n": 249
+  },
+  "teammates|receptions/RB|rush_longest/RB": {
+   "rho": -0.157,
+   "raw": -0.1751,
+   "n": 286
+  },
+  "teammates|receptions/RB|rush_reception_yds/RB": {
+   "rho": -0.1598,
+   "raw": -0.1795,
+   "n": 255
+  },
+  "teammates|receptions/RB|rush_reception_yds/WRTE": {
+   "rho": -0.0051,
+   "raw": -0.0224,
+   "n": 597
+  },
+  "teammates|receptions/RB|rush_yds/RB": {
+   "rho": -0.1292,
+   "raw": -0.1514,
+   "n": 256
+  },
+  "teammates|receptions/WRTE|receptions/WRTE": {
+   "rho": 0.0056,
+   "raw": 0.016,
+   "n": 2108
+  },
+  "teammates|receptions/WRTE|rush_attempts/QB": {
+   "rho": 0.03,
+   "raw": 0.0589,
+   "n": 303
+  },
+  "teammates|receptions/WRTE|rush_attempts/RB": {
+   "rho": -0.0352,
+   "raw": -0.0449,
+   "n": 1807
+  },
+  "teammates|receptions/WRTE|rush_longest/QB": {
+   "rho": 0.0036,
+   "raw": 0.0171,
+   "n": 924
+  },
+  "teammates|receptions/WRTE|rush_longest/RB": {
+   "rho": -0.0387,
+   "raw": -0.0458,
+   "n": 2581
+  },
+  "teammates|receptions/WRTE|rush_reception_yds/RB": {
+   "rho": -0.0441,
+   "raw": -0.0507,
+   "n": 2589
+  },
+  "teammates|receptions/WRTE|rush_reception_yds/WRTE": {
+   "rho": 0.0002,
+   "raw": 0.0054,
+   "n": 1622
+  },
+  "teammates|receptions/WRTE|rush_yds/QB": {
+   "rho": 0.0218,
+   "raw": 0.0429,
+   "n": 564
+  },
+  "teammates|receptions/WRTE|rush_yds/RB": {
+   "rho": -0.0407,
+   "raw": -0.048,
+   "n": 2420
+  },
+  "teammates|rush_attempts/QB|rush_reception_yds/RB": {
+   "rho": 0.0389,
+   "raw": 0.0784,
+   "n": 163
+  },
+  "teammates|rush_attempts/RB|rush_longest/QB": {
+   "rho": 0.001,
+   "raw": 0.0151,
+   "n": 299
+  },
+  "teammates|rush_attempts/RB|rush_longest/RB": {
+   "rho": 0.0016,
+   "raw": 0.0168,
+   "n": 378
+  },
+  "teammates|rush_attempts/RB|rush_reception_yds/RB": {
+   "rho": -0.0057,
+   "raw": -0.0274,
+   "n": 350
+  },
+  "teammates|rush_attempts/RB|rush_reception_yds/WRTE": {
+   "rho": 0.0005,
+   "raw": 0.0089,
+   "n": 804
+  },
+  "teammates|rush_attempts/RB|rush_yds/QB": {
+   "rho": -0.0096,
+   "raw": -0.0411,
+   "n": 183
+  },
+  "teammates|rush_attempts/RB|rush_yds/RB": {
+   "rho": -0.0164,
+   "raw": -0.0432,
+   "n": 332
+  },
+  "teammates|rush_longest/QB|rush_longest/RB": {
+   "rho": -0.008,
+   "raw": -0.0293,
+   "n": 439
+  },
+  "teammates|rush_longest/QB|rush_reception_yds/RB": {
+   "rho": -0.0232,
+   "raw": -0.0471,
+   "n": 438
+  },
+  "teammates|rush_longest/QB|rush_reception_yds/WRTE": {
+   "rho": 0.0418,
+   "raw": 0.0682,
+   "n": 345
+  },
+  "teammates|rush_longest/QB|rush_yds/RB": {
+   "rho": -0.0001,
+   "raw": -0.0058,
+   "n": 408
+  },
+  "teammates|rush_longest/RB|rush_longest/RB": {
+   "rho": 0.0765,
+   "raw": 0.1024,
+   "n": 284
+  },
+  "teammates|rush_longest/RB|rush_reception_yds/RB": {
+   "rho": 0.0077,
+   "raw": 0.0272,
+   "n": 537
+  },
+  "teammates|rush_longest/RB|rush_reception_yds/WRTE": {
+   "rho": -0.0356,
+   "raw": -0.0502,
+   "n": 976
+  },
+  "teammates|rush_longest/RB|rush_yds/QB": {
+   "rho": -0.0402,
+   "raw": -0.0707,
+   "n": 267
+  },
+  "teammates|rush_longest/RB|rush_yds/RB": {
+   "rho": 0.0077,
+   "raw": 0.0274,
+   "n": 522
+  },
+  "teammates|rush_reception_yds/RB|rush_reception_yds/RB": {
+   "rho": -0.002,
+   "raw": -0.0202,
+   "n": 272
+  },
+  "teammates|rush_reception_yds/RB|rush_reception_yds/WRTE": {
+   "rho": -0.037,
+   "raw": -0.0494,
+   "n": 1220
+  },
+  "teammates|rush_reception_yds/RB|rush_yds/QB": {
+   "rho": -0.0392,
+   "raw": -0.0691,
+   "n": 277
+  },
+  "teammates|rush_reception_yds/RB|rush_yds/RB": {
+   "rho": -0.0002,
+   "raw": -0.0069,
+   "n": 505
+  },
+  "teammates|rush_reception_yds/WRTE|rush_reception_yds/WRTE": {
+   "rho": 0.0038,
+   "raw": 0.0199,
+   "n": 604
+  },
+  "teammates|rush_reception_yds/WRTE|rush_yds/QB": {
+   "rho": -0.0055,
+   "raw": -0.0318,
+   "n": 211
+  },
+  "teammates|rush_reception_yds/WRTE|rush_yds/RB": {
+   "rho": -0.0362,
+   "raw": -0.051,
+   "n": 942
+  },
+  "teammates|rush_yds/QB|rush_yds/RB": {
+   "rho": -0.0806,
+   "raw": -0.1073,
+   "n": 265
+  },
+  "teammates|rush_yds/RB|rush_yds/RB": {
+   "rho": -0.0005,
+   "raw": -0.0125,
+   "n": 249
+  }
+ }
+}

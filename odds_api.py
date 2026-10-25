@@ -159,16 +159,16 @@ def fetch_event_props(key, event_id, markets, regions="us", bookmakers=None):
 
 def fetch_game_lines(key, regions="us"):
     """
-    Spreads and totals for every upcoming game in ONE call. Costs (2 markets x regions) credits
+    Spreads, totals and moneylines for every upcoming game in ONE call. Costs (3 markets x regions) credits
     per run, regardless of how many games are on the slate. -> (odds json, from_cache)
     """
     def fetch():
         data, headers = _get(f"/sports/{SPORT}/odds",
-                             {"regions": regions, "markets": "totals,spreads", "oddsFormat": "american"}, key)
+                             {"regions": regions, "markets": "totals,spreads,h2h", "oddsFormat": "american"}, key)
         print(f"  game lines: {credits_line(headers)}", file=sys.stderr)
         return data
 
-    return _cached(f"gamelines_{regions}", fetch)
+    return _cached(f"gamelines3_{regions}", fetch)
 
 
 def _median(xs):
@@ -234,7 +234,22 @@ def consensus_game_prices(games):
             name = max(book, key=lambda b: american_to_decimal(book[b]))
             return {"price": book[name], "book": name}
 
+        # moneylines: the best price on each side and the vig-free home win probability (per-book devig, averaged)
+        ml_home, ml_away = {}, {}
+        for bk in g.get("bookmakers", []):
+            for mk in bk.get("markets", []):
+                if mk["key"] != "h2h":
+                    continue
+                for o in mk.get("outcomes", []):
+                    if o["name"] == home:
+                        ml_home[bk["title"]] = o["price"]
+                    elif o["name"] == away:
+                        ml_away[bk["title"]] = o["price"]
+        out_ml = {"fair_home_win": fair(ml_home, ml_away), "best_home_ml": best(ml_home), "best_away_ml": best(ml_away),
+                  "n_ml_books": len(set(ml_home) & set(ml_away))}
+
         out[g["id"]] = {
+            **out_ml,
             "total": line["total"], "home_spread": line["home_spread"],
             "fair_home_cover": fair(home_book, away_book), "fair_over": fair(over_book, under_book),
             "best_home": best(home_book), "best_away": best(away_book),

@@ -20,6 +20,7 @@ import re
 import sys
 
 import numpy as np
+import pandas as pd
 import nflreadpy as nfl
 
 import depth_chart as dc
@@ -28,6 +29,8 @@ import context_data
 import espn_lines
 import game_odds as go
 import line_history
+import parlay_track
+import parlays
 import market_trust
 import player_confidence
 import straight_up
@@ -284,6 +287,8 @@ def build_game(event, home, away, home_fits, away_fits, line, prices, live_weigh
         "proj_home": round(raw["proj_home"], 1), "proj_away": round(raw["proj_away"], 1),
         "proj_margin": round(raw["proj_margin"], 1), "proj_total": round(raw["proj_total"], 1),
         "model_home_win": round(model_home_win, 4),
+        "fair_home_win": prices.get("fair_home_win"), "best_home_ml": prices.get("best_home_ml"),
+        "best_away_ml": prices.get("best_away_ml"),
         "predicted_spread": predicted_spread, "predicted_total": predicted_total,
         "spread_gap": spread_gap, "total_gap": total_gap,
         "n_players": len(home_fits) + len(away_fits), "n_eff": round(n_eff, 1),
@@ -387,6 +392,30 @@ def build_context(props, games, history, season, sample=False) -> dict:
     except Exception as e:
         log(f"Defense vs position unavailable ({e}); the page omits it.")
     return ctx
+
+
+# ---- staying inside the Odds API credit budget -----------------------------------------
+GAME_LINES_COST = 3          # the bulk spreads + totals + moneyline call, one region
+DEFAULT_RESERVE = 10         # credits left untouched for the next game day's pull (Monday night, Thursday night)
+
+
+def plan_props_pull(events, n_markets, remaining, reserve=DEFAULT_RESERVE, fixed_costs=GAME_LINES_COST, regions=1):
+    """
+    How many games' props the credits can afford. Props cost n_markets x regions credits per game (only markets that
+    return data are charged, so this is an upper bound). Soonest kickoff first, so a short balance drops the latest
+    games, not the ones about to start. -> (events to pull, events skipped, plain-language note). With an unknown
+    balance everything is pulled (as before).
+    """
+    ordered = sorted(events, key=lambda e: e["commence_time"])
+    if remaining is None:
+        return ordered, [], "credit balance unknown: pulling every game"
+    per_game = max(1, n_markets * regions)
+    n = max(0, (remaining - fixed_costs - reserve) // per_game)
+    pull, skip = ordered[:n], ordered[n:]
+    if not skip:
+        return pull, [], f"{remaining} credits left: enough for all {len(pull)} games (about {len(pull) * per_game} credits)"
+    return pull, skip, (f"{remaining} credits left, keeping {reserve} in reserve for the next game day: props pulled for the first "
+                        f"{len(pull)} of {len(ordered)} games, {len(skip)} later games skipped")
 
 
 # ---- how much to trust the model, market by market --------------------------------
@@ -520,6 +549,8 @@ def main():
                     help="skip the man/zone coverage matchup (saves ~1 min of play-by-play loading)")
     ap.add_argument("--max-events", type=int, help="only the first N games (saves credits)")
     ap.add_argument("--days", type=int, default=7, help="games starting within N days")
+    ap.add_argument("--reserve", type=int, default=DEFAULT_RESERVE,
+                    help="Odds API credits to leave unspent for the next game day (props for later games are skipped to keep them)")
     ap.add_argument("--extended", choices=["auto", "on", "off"], default="auto",
                     help="also pull pass attempts/completions, rush attempts, rush+rec yards, longest reception "
                          "and rush. auto = only when plenty of credits remain (never on the free plan)")
@@ -580,6 +611,7 @@ def main():
     priors.setdefault("player_anytime_td", position_priors(history, MARKETS["player_anytime_td"]))
 
     credits = None
+    credit_note, skipped_events = None, []
     if args.sample:
         sched = nfl.load_schedules([season]).to_pandas()
         wk = sched[(sched["week"] == week) & (sched["gameday"] >= str(datetime.date.today()))]
@@ -590,6 +622,9 @@ def main():
     else:
         credits = odds_api.credits_line(headers)
         regions = -(-len(books) // 10) if books else 1
+        bal = None if headers is None or headers.get("x-requests-remaining") is None else int(headers.get("x-requests-remaining"))
+        events, skipped_events, credit_note = plan_props_pull(events, len(markets), bal, args.reserve, regions=regions)
+        log("Credit plan: " + credit_note)
         log(f"{len(events)} games in the next {args.days} days. Worst-case cost this run: "
             f"{len(events) * len(markets) * regions} credits ({len(events)} games x {len(markets)} markets x "
             f"{regions} region(s); only markets that return data are charged, cached games cost 0). {credits}")
@@ -623,7 +658,12 @@ def main():
         if args.sample:
             odds = sample_event_odds(ev, history, idx, rng_for("sample", ev["id"]), priors, markets)
         else:
-            odds, cached = odds_api.fetch_event_props(key, ev["id"], markets, bookmakers=books)
+            try:
+                odds, cached = odds_api.fetch_event_props(key, ev["id"], markets, bookmakers=books)
+            except odds_api.OddsApiError as e:       # most likely out of credits: keep what we have and finish the page
+                credit_note = f"Props pull stopped at {away} @ {home} ({e}); later games have no props this run."
+                log("  " + credit_note)
+                break
             log(f"  {away} @ {home}: {'cached' if cached else 'fetched'}")
         cons = odds_api.consensus(odds_api.flatten(odds))
         for (name, market), c in cons.items():
@@ -750,6 +790,24 @@ def main():
                 f"({sum(e['status'] == 'upcoming' for e in entries)} still to come).")
     except Exception as e:
         log(f"Straight-up pool unavailable ({e}); the page omits it.")
+    parlay_block = None
+    try:
+        if args.sample:                       # demo only: invent moneyline prices from the spread with a flat 4.5% vig
+            for g in games:
+                if g.get("fair_home_win") is None:
+                    ph = straight_up.win_prob(g["home_spread"])
+                    price = lambda q: parlays.to_american(1 / min(q * 1.045, 0.97))
+                    g["fair_home_win"] = round(ph, 4)
+                    g["best_home_ml"] = {"price": price(ph), "book": "DemoBook"}
+                    g["best_away_ml"] = {"price": price(1 - ph), "book": "DemoBook"}
+        import weekly_report
+        summary = pd.read_csv(weekly_report.SUMMARY_FILE) if weekly_report.SUMMARY_FILE.exists() else None
+        sched_hist = nfl.load_schedules(list(range(2014, int(season) + 1))).to_pandas()
+        parlay_block = parlays.build_all(props, games, summary, sched=sched_hist, season=int(season), week=int(week))
+        log(f"Parlays: {len(parlay_block['props']['parlays'])} prop, {len(parlay_block['ml']['parlays'])} moneyline, "
+            f"{len(parlay_block['teasers']['legs'])} Wong teaser legs.")
+    except Exception as e:
+        log(f"Parlays unavailable ({e}); the page omits them.")
     top = rank_top_props(props)
     game_picks = rank_game_picks(games)
     log(f"Top {len(top)} props and {len(game_picks)} ranked game picks.")
@@ -764,7 +822,9 @@ def main():
         "credits": credits, "markets": markets, "n_games": len(events), "props": props, "games": games,
         "game_picks": game_picks, "rating_backtest": rating_backtest, "context": context,
         "trust_note": TRUST_NOTE if static_trust else None,
+        "credit_note": credit_note if (skipped_events or (credit_note or "").startswith("Props pull stopped")) else None,
         "su_pool": su_pool,
+        "parlays": parlay_block,
         "power": None if power is None else {"table": power["table"], "hfa": round(power["hfa"], 2),
                                               "per_rank": round(team_ratings.PER_RANK, 3)},
     }
@@ -776,6 +836,9 @@ def main():
         n = props_tracker.log_predictions(snapshot)
         log(f"Tracker: logged/updated {n} props for later grading (tracking/props_log.csv)")
         # The backlog: append-only, one row per prop/game per pull (see line_history.py).
+        if snapshot.get("parlays"):
+            n = parlay_track.log_parlays(parlay_track.rows_from_block(snapshot["parlays"], int(season), int(week), snapshot["generated"]))
+            log(f"Tracker: logged/updated {n} recommended parlays (tracking/parlay_log.csv)")
         n = line_history.append_rows(line_history.rows_from_snapshot(snapshot, snapshot["generated"]))
         log(f"Backlog: appended {n} rows to tracking/line_history.csv")
         if power is not None and rgames is not None:

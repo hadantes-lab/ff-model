@@ -45,6 +45,7 @@ import sys
 import numpy as np
 import pandas as pd
 
+import parlay_track
 import straight_up
 
 MIN_FOR_SHARPER = 30               # games needed before the report says whether the model or the market was sharper
@@ -230,7 +231,7 @@ def prop_section(log: pd.DataFrame, season: int, week: int, market: str) -> dict
 
 
 def build_report(log: pd.DataFrame, sched: pd.DataFrame, season: int, week: int, history: pd.DataFrame = None,
-                 learning: list = None, generated: str = None) -> dict:
+                 learning: list = None, generated: str = None, parlay_log: pd.DataFrame = None) -> dict:
     """The whole report for one week as plain data (see render_markdown / render_html for the readable forms)."""
     sections = [moneyline_section(log, sched, season, week)]
     sections += [game_section(log, season, week, m) for m in GAME_GROUPS]
@@ -243,6 +244,7 @@ def build_report(log: pd.DataFrame, sched: pd.DataFrame, season: int, week: int,
     # the log only holds games that have been graded; say plainly what is still to come
     due = log[(log["season"] == season) & (log["week"] == week) & log["result"].isna() & log["market"].isin(list(GAME_GROUPS) + ["game_su"])]
     rep["games_pending"] = int(due["game"].nunique())
+    rep["parlays"] = parlay_track.section(parlay_log, log, sched, season, week) if parlay_log is not None else None
     rep["season_to_date"] = season_to_date(history, rep) if history is not None else {}
     for sec in sections + props:
         sec["writeup"] = blurb(sec)
@@ -264,6 +266,9 @@ def summary_rows(rep: dict) -> list:
                      "n_acc": acc.get("n_acc", 0), "mae_model": acc.get("mae_model"), "mae_market": acc.get("mae_market"), "generated": gen})
     for s in rep["sections"]:
         row(s["key"], s, s)
+    for k, v in ((rep.get("parlays") or {}).get("groups") or {}).items():
+        row(f"parlays_{k}", {"n": v["n"], "wins": v["cashed"], "losses": v["lost"], "pushes": v["push"],
+                             "expected_wins": v["expected_cash"], "var": v["var"]})
     for p in rep["props"]:
         row(p["key"] + ":all", p["all"], p)
         row(p["key"] + ":high", p["high"])
@@ -393,6 +398,12 @@ def render_markdown(rep: dict) -> str:
         L += [f"## {s['title']}", "", s["writeup"], ""]
         fmt = (lambda v: f"{v:g}") if s["key"] == "game_total" else (lambda v: f"{v:+g}")
         L += [f"- {i['game']}: {i['pick']} {fmt(i['line'])}, {_pct(i['prob'])}: {i['result']}" for i in s["items"]] + [""]
+    pz = rep.get("parlays")
+    if pz:
+        L += ["## Parlays", "", pz["writeup"], ""]
+        for it in pz["items"]:
+            L.append(f"- {it['kind']} {it['price']:+d}: {it['status'].upper()} ({it['legs_won']} of {len(it['legs'])} legs hit)")
+        L.append("")
     L += ["## Player props", ""]
     for p in rep["props"]:
         L += [f"### {p['title']}", "", p["writeup"], ""]
@@ -436,6 +447,12 @@ table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;p
     for s in rep["sections"][1:]:
         out.append(f'<h2>{e(s["title"])}</h2><div class="card"><p>{e(s["writeup"])}</p><ul>' + "".join(
             f'<li>{e(i["game"])}: {e(i["pick"])} {(format(i["line"], "g") if s["key"] == "game_total" else format(i["line"], "+g"))} ({_pct(i["prob"])}): {res(i["result"])}</li>' for i in s["items"]) + "</ul></div>")
+    pz = rep.get("parlays")
+    if pz:
+        sym = {"win": '<span class="ok">hit</span>', "loss": '<span class="bad">missed</span>', "pending": "pending", "push": "push", "void": "void"}
+        out.append(f'<h2>Parlays</h2><div class="card"><p>{e(pz["writeup"])}</p><ul>' + "".join(
+            f'<li>{e(it["kind"])} {it["price"]:+d}: <b>{e(it["status"])}</b> ({it["legs_won"]} of {len(it["legs"])} legs): ' + "; ".join(
+                f'{e(l["label"])} {sym[l["result"]]}' for l in it["legs"]) + "</li>" for it in pz["items"]) + "</ul></div>")
     out.append("<h2>Player props</h2>")
     for p in rep["props"]:
         out.append(f'<div class="card"><h3>{e(p["title"])}</h3><p>{e(p["writeup"])}</p>' + ("<ul>" + "".join(
@@ -495,7 +512,7 @@ def main():
     if week is None:
         print("Nothing graded yet this season.")
         return
-    rep = build_report(log, sched, season, week)
+    rep = build_report(log, sched, season, week, parlay_log=parlay_track.load())
     hist = upsert_summary(summary_rows(rep))
     rep["season_to_date"] = season_to_date(hist, rep)
     try:

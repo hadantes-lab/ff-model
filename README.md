@@ -494,6 +494,36 @@ if it moves by at least 0.025, only for markets with 40+ newly tracked props, an
 model's own probabilities expected is flagged. The first run of it moved receptions and receiving yards from a weight of 0 to 0.05 on this season's
 tracked results, a tiny step, shown as such. Both pieces are built to be cautious: with a few weeks of data they will mostly say "nothing moved".
 
+**Parlays (`parlays.py`, `parlay_track.py`).** Three recommendation sets, each shown with its price, its chance to hit, the chance it needs to break
+even, and its edge (expected value per $1). **Read the edge first**: a parlay multiplies the sportsbook's margin on every leg, and our tests found the
+model carries no measurable edge over the market on props, so most parlays here have a *negative* expected value; the lists are ranked least-negative
+(or positive, where one exists) first, not offered as value.
+- *Prop parlays* (This Week tab, under the Top 10): 3-4 parlays of 4-5 legs at plus-money prices. Legs are props the model and the market agree on,
+  ranked by confidence times *market quality*, the shrunk hit rate of the model's high-confidence picks in that market this season (`tracking/weekly_summary.csv`),
+  so legs come from the markets doing best and a losing market is down-weighted (passing yards is currently penalized). **Correlation** is measured, not
+  assumed (`parlay_correlations.json`, from 14,777 past props): a QB's passing yards and his teammates' receiving yards correlate +0.31 (receptions +0.22,
+  passing TDs +0.16), his yards against his RB's rushing -0.07, opposing RBs' rushing -0.12, a receiver's receptions and yards +0.76; cross-game legs are
+  independent. The joint chance is a Gaussian copula over those (the sign flips for an under); a parlay never pairs legs that are negatively correlated in
+  the same game, never uses one player twice, and has at most two legs per game. **Game script** tags each leg (a favorite's rushing over fits; a trailing
+  team's passing over fits) and gives aligned legs a small bonus. Legs are mostly from different games, as asked; where two share a game the page warns
+  that books price same-game parlays with the correlation built in. On a light slate (Monday or Thursday night) there are too few games and it says so.
+- *Moneyline parlays* (Game Lines tab): favorites at the best moneyline price across books, 2-4 legs from different games. A leg's chance is the market's
+  vig-free consensus (the straight-up probabilities are the market's by construction), so the edge is just what price shopping earns, usually slightly negative.
+  This is why the bulk game-lines call now also requests moneylines (3 credits instead of 2).
+- *Wong teasers* (Game Lines tab): 6-point teasers across 3 and 7: favorites of -7.5/-8.5 down to -1.5/-2.5 and underdogs of +1.5/+2.5 up to +7.5/+8.5. Cover rates
+  come from nflverse history and are recomputed every run: 75.5% overall (2014-2026), but the edge has not held evenly. Since 2021 underdog legs cover about 76-77%,
+  above the 73.9% a 2-team teaser needs at -120 (72.4% at -110), while the -7.5/-8.5 favorite legs have slipped to 62-67% and are marked below break-even, so the
+  page uses the last five seasons shrunk toward the pooled rate and only marks legs that clear the bar. It lists the best pairs (EV at -120 and -110, assumed prices; the
+  Odds API supplies none) and a round robin (every pair among up to five playable legs, needing at least three). Different games, so a pair's chance is the product.
+
+Parlays are logged (`tracking/parlay_log.csv`) and graded from the leg results already tracked; the Monday report shows how many cashed against how many the stated chances
+expected, and how many *legs* hit against how many were expected (the steadier measure), plus profit per $1 at the prices shown.
+
+**Staying inside the Odds API credit budget.** The free plan is 500 credits a month and a Sunday props pull costs about 65, so `export_props.py` plans the pull from the
+balance the free events call reports: props for as many games as the credits cover after the game-lines call and a reserve of 10 for the next game day (`--reserve`),
+soonest kickoffs first, with a note on the page for any skipped games; if a call fails mid-pull (out of credits) it stops, keeps what it has and still builds the page
+instead of crashing, and the off-day collector exits cleanly when it can't pull. This is why Sunday may show props for the first 10 of 13 games when the balance is low.
+
 How the model works, and what it still can't see: `props_model.py`. It does not know about
 weather or in-game injuries, and it simulates players independently of each other (aside from
 the shared game-script factor `game_odds.py` uses for team totals). Treat large model-vs-market
