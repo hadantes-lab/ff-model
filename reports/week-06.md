@@ -87,6 +87,11 @@ Went 9-5 (64%) on straight-up winners; the market's probabilities expected about
 - DAL @ GB: home cover -1, 61%: win
 - WAS @ SF: home cover -7.5, 59%: loss
 
+## Parlays
+
+No parlays were logged for this week (parlay logging started after it, or the slate was too thin to build any).
+
+
 ## Player props
 
 ### Passing yards

@@ -258,3 +258,14 @@ pulled_at,season,week,game,commence,stadium,roof,indoors,temp_f,wind_mph,gust_mp
 2026-10-24T14:53:17+00:00,2026,8,NE @ MIA,2026-11-01T21:25:00Z,Hard Rock Stadium,outdoors,False,78,12,14,30,Light drizzle
 2026-10-24T14:53:17+00:00,2026,8,PHI @ WAS,2026-11-02T01:20:00Z,Northwest Stadium,outdoors,False,48,4,5,18,Partly cloudy
 2026-10-24T14:53:17+00:00,2026,8,CHI @ SEA,2026-11-03T01:20:00Z,Lumen Field,outdoors,False,55,3,2,28,Partly cloudy
+2026-10-25T14:32:11+00:00,2026,7,SF @ ATL,2026-10-25T17:00:00Z,Mercedes-Benz Stadium,nan,False,68,12,17,0,Clear
+2026-10-25T14:32:11+00:00,2026,7,CIN @ BAL,2026-10-25T17:00:00Z,M&T Bank Stadium,outdoors,False,64,5,5,0,Clear
+2026-10-25T14:32:11+00:00,2026,7,TB @ CAR,2026-10-25T17:00:00Z,Bank of America Stadium,outdoors,False,66,12,17,0,Clear
+2026-10-25T14:32:11+00:00,2026,7,CLE @ TEN,2026-10-25T17:00:00Z,Nissan Stadium,outdoors,False,72,4,4,0,Clear
+2026-10-25T14:32:11+00:00,2026,7,NYG @ HOU,2026-10-25T17:00:00Z,Reliant Stadium,nan,False,81,12,17,0,Overcast
+2026-10-25T14:32:11+00:00,2026,7,IND @ MIN,2026-10-25T17:00:00Z,U.S. Bank Stadium,dome,True,,,,,
+2026-10-25T14:32:11+00:00,2026,7,MIA @ NYJ,2026-10-25T17:00:00Z,MetLife Stadium,outdoors,False,67,4,6,0,Clear
+2026-10-25T14:32:11+00:00,2026,7,DEN @ ARI,2026-10-25T20:05:00Z,State Farm Stadium,nan,False,80,3,4,0,Clear
+2026-10-25T14:32:11+00:00,2026,7,GB @ DET,2026-10-25T20:25:00Z,Ford Field,dome,True,,,,,
+2026-10-25T14:32:11+00:00,2026,7,LA @ LV,2026-10-25T20:25:00Z,Allegiant Stadium,dome,True,,,,,
+2026-10-25T14:32:11+00:00,2026,7,KC @ SEA,2026-10-26T00:20:00Z,Lumen Field,outdoors,False,51,10,21,23,Overcast
