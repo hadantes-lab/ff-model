@@ -269,3 +269,4 @@ pulled_at,season,week,game,commence,stadium,roof,indoors,temp_f,wind_mph,gust_mp
 2026-10-25T14:32:11+00:00,2026,7,GB @ DET,2026-10-25T20:25:00Z,Ford Field,dome,True,,,,,
 2026-10-25T14:32:11+00:00,2026,7,LA @ LV,2026-10-25T20:25:00Z,Allegiant Stadium,dome,True,,,,,
 2026-10-25T14:32:11+00:00,2026,7,KC @ SEA,2026-10-26T00:20:00Z,Lumen Field,outdoors,False,51,10,21,23,Overcast
+2026-10-26T17:25:59+00:00,2026,7,DAL @ PHI,2026-10-27T00:15:00Z,Lincoln Financial Field,outdoors,False,56,5,10,0,Clear
