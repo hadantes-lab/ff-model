@@ -312,3 +312,4 @@ pulled_at,season,week,game,commence,stadium,roof,indoors,temp_f,wind_mph,gust_mp
 2026-10-28T17:23:36+00:00,2026,9,GB @ NE,2026-11-08T21:25:00Z,Gillette Stadium,outdoors,False,40,3,3,14,Clear
 2026-10-28T17:23:36+00:00,2026,9,TB @ CHI,2026-11-09T01:20:00Z,Soldier Field,outdoors,False,48,6,13,10,Mostly clear
 2026-10-28T17:23:36+00:00,2026,9,BUF @ MIN,2026-11-10T01:15:00Z,U.S. Bank Stadium,dome,True,,,,,
+2026-10-29T17:27:53+00:00,2026,8,CAR @ GB,2026-10-30T00:15:00Z,Lambeau Field,outdoors,False,48,7,21,0,Mostly clear

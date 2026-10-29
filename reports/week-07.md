@@ -1,21 +1,22 @@
 # Week 7, 2026: how the picks did
 
-Week 7: moneyline 9-4, game spread 8-5, game total 8-5, high-confidence props 99-67. (1 games still to be graded)
+Week 7: moneyline 10-4, game spread 8-6, game total 9-5, high-confidence props 99-67.
 
 ## Moneyline winners (straight up)
 
-Went 9-4 (69%) on straight-up winners; the market's probabilities expected about 8.2 wins, so that is right about where its own probabilities expected. The clear favorites (S, A and B tiers) went 1-1. Biggest miss: HOU (A tier, 82%) in NYG @ HOU.
+Went 10-4 (71%) on straight-up winners; the market's probabilities expected about 8.9 wins, so that is right about where its own probabilities expected. The clear favorites (S, A and B tiers) went 1-1. Biggest miss: HOU (A tier, 82%) in NYG @ HOU.
 
 | Tier | Range | Right | Wrong | Expected right |
 |---|---|---|---|---|
 | A | 76-84% | 0 | 1 | 0.8 |
 | B | 70-76% | 1 | 0 | 0.7 |
-| C | 65-70% | 1 | 0 | 0.7 |
+| C | 65-70% | 2 | 0 | 1.3 |
 | D | 60-65% | 6 | 2 | 4.9 |
 | E | 55-60% | 1 | 1 | 1.2 |
 
 - A HOU (82%) in NYG @ HOU: WRONG
 - B MIN (73%) in IND @ MIN: right
+- C DAL (65%) in DAL @ PHI: right
 - C DEN (65%) in DEN @ ARI: right
 - D NYJ (64%) in MIA @ NYJ: WRONG
 - D DET (62%) in GB @ DET: right
@@ -30,7 +31,7 @@ Went 9-4 (69%) on straight-up winners; the market's probabilities expected about
 
 ## Game spread picks
 
-8-5 (62%) against the posted line. The model's own probabilities expected 8.0 wins, so that is right about where its own probabilities expected. On probability quality the model scored 0.256 against the market's 0.253, but with only 13 games that is too few to say which was sharper.
+8-6 (57%) against the posted line. The model's own probabilities expected 8.7 wins, so that is right about where its own probabilities expected. On probability quality the model scored 0.271 against the market's 0.254, but with only 14 games that is too few to say which was sharper.
 
 - NE @ CHI: away cover -3, 74%: loss
 - PIT @ NO: away cover +3.5, 50%: win
@@ -45,10 +46,11 @@ Went 9-4 (69%) on straight-up winners; the market's probabilities expected about
 - GB @ DET: away cover -3.5, 70%: win
 - LA @ LV: away cover +3.5, 64%: win
 - KC @ SEA: away cover -3, 53%: loss
+- DAL @ PHI: home cover +4.5, 68%: loss
 
 ## Game total picks
 
-8-5 (62%) against the posted line. The model's own probabilities expected 9.3 wins, so that is right about where its own probabilities expected. On probability quality the model scored 0.245 against the market's 0.248, but with only 13 games that is too few to say which was sharper. Watch out: 13 of 13 picks were on Over. A lean that one-sided usually means a built-in bias, not that many games independently pointed the same way. Totals are the hardest game market to beat; a week of 15 games says very little.
+9-5 (64%) against the posted line. The model's own probabilities expected 10.1 wins, so that is right about where its own probabilities expected. On probability quality the model scored 0.230 against the market's 0.249, but with only 14 games that is too few to say which was sharper. Watch out: 14 of 14 picks were on Over. A lean that one-sided usually means a built-in bias, not that many games independently pointed the same way. Totals are the hardest game market to beat; a week of 15 games says very little.
 
 - NE @ CHI: Over 50.5, 64%: win
 - PIT @ NO: Over 44.5, 82%: loss
@@ -63,10 +65,11 @@ Went 9-4 (69%) on straight-up winners; the market's probabilities expected about
 - GB @ DET: Over 55.5, 69%: loss
 - LA @ LV: Over 48.5, 67%: win
 - KC @ SEA: Over 42.5, 81%: loss
+- DAL @ PHI: Over 44.5, 82%: win
 
 ## Power-rating spread picks
 
-7-6 (54%) against the posted line. The model's own probabilities expected 7.6 wins, so that is right about where its own probabilities expected. On probability quality the model scored 0.247 against the market's 0.253, but with only 13 games that is too few to say which was sharper.
+7-7 (50%) against the posted line. The model's own probabilities expected 8.3 wins, so that is right about where its own probabilities expected. On probability quality the model scored 0.267 against the market's 0.254, but with only 14 games that is too few to say which was sharper.
 
 - NE @ CHI: away cover -3, 68%: loss
 - PIT @ NO: home cover +3.5, 51%: loss
@@ -81,20 +84,22 @@ Went 9-4 (69%) on straight-up winners; the market's probabilities expected about
 - GB @ DET: home cover -3.5, 51%: loss
 - LA @ LV: away cover +3.5, 65%: win
 - KC @ SEA: home cover -3, 59%: win
+- DAL @ PHI: home cover +4.5, 73%: loss
 
 ## Parlays
 
-Prop parlays: 0 of 4 settled cashed; the stated chances expected 0.6. Individual legs: 11 of 16 hit against 9.9 expected. Flat $1 on each returned -4.00 (-100% per parlay). Moneyline parlays: 0 of 0 settled cashed (3 still pending). Individual legs: 5 of 5 hit against 3.0 expected. Wong teasers (pairs): 0 of 0 settled cashed (2 still pending). Individual legs: 2 of 2 hit against 1.5 expected. A parlay needs every leg, so a week of four or five of them says very little; the leg-level numbers and the season-to-date table are the ones to read.
+Prop parlays: 0 of 4 settled cashed; the stated chances expected 0.6. Individual legs: 11 of 16 hit against 9.9 expected. Flat $1 on each returned -4.00 (-100% per parlay). Moneyline parlays: 1 of 1 settled cashed (3 still pending); the stated chances expected 0.4. Individual legs: 8 of 8 hit against 5.0 expected. Flat $1 on each returned +1.37 (+137% per parlay). Wong teasers (pairs): 0 of 0 settled cashed (2 still pending). Individual legs: 2 of 2 hit against 1.5 expected. A parlay needs every leg, so a week of four or five of them says very little; the leg-level numbers and the season-to-date table are the ones to read.
 
 - props +513: LOST (2 of 4 legs hit)
 - props +547: LOST (3 of 4 legs hit)
 - props +468: LOST (3 of 4 legs hit)
 - props +508: LOST (3 of 4 legs hit)
-- ml +137: PENDING (1 of 2 legs hit)
-- ml +293: PENDING (1 of 3 legs hit)
+- ml +137: CASHED (2 of 2 legs hit)
+- ml +293: PENDING (2 of 3 legs hit)
 - ml +547: PENDING (3 of 4 legs hit)
 - teaser -120: PENDING (1 of 2 legs hit)
 - teaser -120: PENDING (1 of 2 legs hit)
+- ml +213: PENDING (1 of 3 legs hit)
 
 ## Player props
 
@@ -157,10 +162,11 @@ Across 115 graded props the model's raw lean was right 62% (71-44); it expected 
 
 | Group | Record | Win rate | Expected |
 |---|---|---|---|
-| game_rank_spread | 20-20 | 50% | 23.1 wins |
-| game_spread | 34-20 | 63% | 32.4 wins |
-| game_total | 32-25 | 56% | 40.8 wins |
-| moneyline | 36-20 | 64% | 36.0 wins |
+| game_rank_spread | 20-21 | 49% | 23.8 wins |
+| game_spread | 34-21 | 62% | 33.1 wins |
+| game_total | 33-25 | 57% | 41.7 wins |
+| moneyline | 37-20 | 65% | 36.6 wins |
+| parlays_ml | 1-0 | 100% | 0.4 wins |
 | parlays_props | 0-4 | 0% | 0.6 wins |
 | player_pass_tds:high | 40-17 | 70% | 38.7 wins |
 | player_pass_yds:high | 19-37 | 34% | 38.5 wins |
@@ -170,7 +176,7 @@ Across 115 graded props the model's raw lean was right 62% (71-44); it expected 
 
 ## What the data is teaching the model
 
-- game_total: 32-25 over 57 picks is 2.6 standard deviations below what the model's own probabilities expected; its raw confidence runs too high here. That is what blending toward the market is for, so the real question is the weight (see above), not the raw number.
+- game_total: 33-25 over 58 picks is 2.6 standard deviations below what the model's own probabilities expected; its raw confidence runs too high here. That is what blending toward the market is for, so the real question is the weight (see above), not the raw number.
 - player_pass_yds:high: 19-37 over 56 picks is 5.7 standard deviations below what the model's own probabilities expected; its raw confidence runs too high here. That is what blending toward the market is for, so the real question is the weight (see above), not the raw number.
 - player_reception_yds:high: 173-143 over 316 picks is 6.0 standard deviations below what the model's own probabilities expected; its raw confidence runs too high here. That is what blending toward the market is for, so the real question is the weight (see above), not the raw number.
 - player_receptions:high: 207-129 over 336 picks is 2.9 standard deviations below what the model's own probabilities expected; its raw confidence runs too high here. That is what blending toward the market is for, so the real question is the weight (see above), not the raw number.
