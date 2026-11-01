@@ -246,7 +246,8 @@ DVP_GROUP = {"QB": "QB", "RB": "RB", "FB": "RB", "WR": "WR", "TE": "TE"}
 def dvp_table(history: pd.DataFrame, season: int, last_n: int = 4) -> dict:
     """
     What every defense has allowed, per game, in the stats a props bettor looks at, as raw numbers (the page does the ranking, so a
-    filter changes the ranks): {"windows": {"season"|"last4"|"prev": {"ALL"|"QB"|"RB"|"WR"|"TE": {defense: {"g": games, <stat>: per game}}}},
+    filter changes the ranks): {"windows": {"season"|"last4"|"prev": {"ALL"|"QB"|"RB"|"WR"|"TE": {defense: {"g": games, <stat>: per game,
+    "adj": {<stat>: the same, adjusted for the offenses faced}}}}},
     "games": {defense: [[week, opponent, {pos: [stat, ...]}], ...]} (current season, in DVP_STATS order), "stats": DVP_STATS, "through": last week}.
     "ALL" is the team total (every QB/RB/WR/TE/FB), which is what a team-level 'passes allowed' view needs.
     """
@@ -260,17 +261,42 @@ def dvp_table(history: pd.DataFrame, season: int, last_n: int = 4) -> dict:
     # one row per (defense, game) so a position that did nothing in a game counts as zeros, not a missing game
     games = tot[["opponent_team", "season", "week"]].sort_values(["opponent_team", "season", "week"])
 
+    # who each defense faced, and what each OFFENSE produced in every game (the same numbers seen from the other side)
+    opp_of = h.groupby(["opponent_team", "season", "week"])["team"].agg(lambda x: x.mode().iloc[0]).to_dict()
+    off_by = pd.concat([h.groupby(["team", "season", "week", "grp"])[DVP_STATS].sum().reset_index(),
+                        h.groupby(["team", "season", "week"])[DVP_STATS].sum().reset_index().assign(grp="ALL")], ignore_index=True)
+    weeks_of = {t: g.groupby("season")["week"].apply(list).to_dict() for t, g in games.groupby("opponent_team")}
+
     def window(rows_for):
         out = {}
         for pos in ("ALL", "QB", "RB", "WR", "TE"):
             d = by[by["grp"] == pos].set_index(["opponent_team", "season", "week"])
+            o = off_by[off_by["grp"] == pos].set_index(["team", "season", "week"])
             res = {}
             for defense, gm in games.groupby("opponent_team"):
                 keys = rows_for(gm)
                 if not len(keys):
                     continue
                 vals = d.reindex([(defense, s, w) for s, w in keys])[DVP_STATS].fillna(0.0)
-                res[defense] = {"g": int(len(keys)), **{k: round(float(vals[k].mean()), 2) for k in DVP_STATS}}
+                own = o.reindex([(defense, s, w) for s, w in keys])[DVP_STATS].fillna(0.0)       # what this team's OFFENSE did in the same games
+                res[defense] = {"g": int(len(keys)), **{k: round(float(vals[k].mean()), 2) for k in DVP_STATS},
+                                "off": {k: round(float(own[k].mean()), 2) for k in DVP_STATS}, "_keys": keys, "_vals": vals}
+            # schedule adjustment: each game's number minus what that opponent's offense normally produces (its other games that
+            # season), averaged, added to the league mean. Hard schedules lift a defense's number, soft ones lower it.
+            lg = {k: float(np.mean([r[k] for r in res.values()])) for k in DVP_STATS} if res else {}
+            for defense, r in res.items():
+                diffs = {k: [] for k in DVP_STATS}
+                for (s, w), (_, row) in zip(r["_keys"], r["_vals"].iterrows()):
+                    t = opp_of.get((defense, s, w))
+                    others = [x for x in weeks_of.get(t, {}).get(s, []) if x != w] if t else []
+                    if not others:
+                        continue
+                    base = o.reindex([(t, s, x) for x in others])[DVP_STATS].fillna(0.0).mean()
+                    for k in DVP_STATS:
+                        diffs[k].append(float(row[k]) - float(base[k]))
+                r["adj"] = {k: round(lg[k] + float(np.mean(diffs[k])), 2) if diffs[k] else r[k] for k in DVP_STATS}
+                r["adj_games"] = len(diffs["pass_att"])
+                del r["_keys"], r["_vals"]
             out[pos] = res
         return out
 

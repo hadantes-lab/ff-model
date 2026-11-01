@@ -922,13 +922,17 @@ def main():
     except Exception as e:
         log(f"Target projections unavailable ({e}); the page omits them.")
 
-    profiles, lg_ypp, lg_plays, power, rgames = {}, 5.4, 62.0, None, None
+    profiles, lg_ypp, lg_plays, power, rgames, team_breakdown = {}, 5.4, 62.0, None, None, None
     try:   # informational matchup stats + power rankings; a data hiccup here must never block the odds page
         tg = team_stats.team_game_stats(team_stats.load_pbp(range(int(season) - 2, int(season) + 1)))
         profiles, lg_ypp, lg_plays = team_stats.current_profiles(tg), float(tg["ypp"].mean()), float(tg["plays"].mean())
         sched_all = nfl.load_schedules(list(range(int(season) - 2, int(season) + 1))).to_pandas()
         rgames = team_ratings.build_games(tg, sched_all[sched_all["game_type"] == "REG"])
         power = team_ratings.power_table(rgames, int(season), None)
+        try:
+            team_breakdown = team_stats.team_breakdown(tg, int(season))
+        except Exception as e:
+            log(f"Team breakdown unavailable ({e}); the page omits it.")
         log(f"Power rankings built from {len(rgames)} games (top: "
             + ", ".join(f"{r['rank']}. {r['team']}" for r in power["table"][:3]) + ")")
     except Exception as e:
@@ -1041,6 +1045,7 @@ def main():
         "trust_note": TRUST_NOTE if static_trust else None,
         "credit_note": credit_note if (skipped_events or (credit_note or "").startswith("Props pull stopped")) else None,
         "su_pool": su_pool,
+        "team_breakdown": team_breakdown,
         "parlays": parlay_block,
         "power": None if power is None else {"table": power["table"], "hfa": round(power["hfa"], 2),
                                               "per_rank": round(team_ratings.PER_RANK, 3)},

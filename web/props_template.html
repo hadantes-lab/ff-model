@@ -351,6 +351,14 @@
   .tgt input { width: 70px; }
   @media (max-width: 720px) { .gsec-head { grid-template-columns: 1fr 18px; } .gsec-head .gm, .gsec-head .gc { grid-column: 1; } .gsec-head .caret { grid-column: 2; grid-row: 1; } }
   .uleg-line { font-size: 12px; color: var(--text-faint); }
+  .bgame { border: 1px solid var(--border); border-radius: 12px; margin: 10px 0; }
+  .bgame > summary { cursor: pointer; padding: 12px 14px; list-style: none; }
+  .bgame > summary::-webkit-details-marker { display: none; }
+  .bgame[open] > summary { border-bottom: 1px solid var(--border); }
+  .bgame .bs { font-size: 12.5px; color: var(--text-faint); margin-top: 2px; }
+  .bgame .bbody { padding: 6px 12px 12px; }
+  .bgame h4 { margin: 14px 0 2px; font-size: 14px; }
+  .bgame td .sub { font-size: 10.5px; color: var(--text-faint); } .bgame td.adj { background: rgba(127,127,127,.07); }
   .dvp td.dvc .sub { font-size: 10.5px; color: var(--text-faint); } .dvp td.soft { background: rgba(92,184,138,.13); } .dvp td.tough { background: rgba(217,164,65,.13); }
   .dvh { color: inherit; font: inherit; text-transform: inherit; letter-spacing: inherit; cursor: pointer; background: none; border: 0; padding: 0; }
   .ptbl { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -1026,13 +1034,117 @@ function gameCardHTML(g) {
   </div>`;
 }
 
+/* ---------- game-by-game breakdown (game lines tab) ---------- */
+const BD = { vals: "both", open: false };
+const DEF_ROWS = [["pass_att", "pass attempts"], ["cmp", "completions"], ["pass_yds", "passing yards"], ["pass_td", "passing TDs"], ["rush_att", "rush attempts"],
+  ["rush_yds", "rushing yards"], ["rush_td", "rushing TDs"], ["tgt", "targets"], ["rec", "receptions"], ["rec_yds", "receiving yards"], ["rec_td", "receiving TDs"]];
+const TEAM_ROWS = [["Offense", null], ["Plays / game", "plays", "off"], ["Yards / game", "yards", "off"], ["Yards / play", "ypp", "off"], ["First downs", "first_downs", "off"],
+  ["3rd-down conv. %", "third_rate", "off"], ["EPA / play", "epa_pp", "off"], ["Giveaways", "giveaways", "off"], ["Pass rate %", "pass_rate", "off"],
+  ["Neutral pass rate %", "neutral_pass_rate", "off"], ["Pass rate over expected", "proe", "off"], ["Time of possession (min)", "top_min", "off"],
+  ["Defense (what it allows)", null], ["Plays / game", "plays", "def"], ["Yards / game", "yards", "def"], ["Yards / play allowed", "ypp", "def"], ["First downs", "first_downs", "def"],
+  ["3rd-down conv. % allowed", "third_rate", "def"], ["EPA / play allowed", "epa_pp", "def"], ["Takeaways", "giveaways", "def"]];
+const EXP_ROWS = [["pass_att", "Pass attempts"], ["rush_att", "Rush attempts"], ["tgt", "Targets"], ["pass_yds", "Pass yards"], ["rush_yds", "Rush yards"]];
+
+function etTime(commence) {
+  return new Date(commence).toLocaleString("en-US", { timeZone: "America/New_York", weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) + " ET";
+}
+function bdVal(x, k) { return x == null ? "&mdash;" : (k === "yards" || k === "plays" ? x.toFixed(1) : k === "epa_pp" ? x.toFixed(3) : x.toFixed(1)); }
+
+function defTableHTML(team, row, rk, rkAdj, n) {
+  const cols = DV_COLS[DV.pos], show = BD.vals;
+  const rows = DEF_ROWS.filter(([k]) => cols.includes(k));
+  return `<h4>${esc(TEAM_NAMES[team] || team)} defense has allowed the following</h4>
+    <div class="scroll-x"><table class="ptbl"><thead><tr><th></th>${show !== "adj" ? "<th>Per game</th><th>Rank</th>" : ""}${show !== "raw" ? "<th>Schedule-adj.</th><th>Rank</th>" : ""}</tr></thead><tbody>
+    ${rows.map(([k, lbl]) => `<tr><td>${lbl} per game</td>${show !== "adj" ? `<td class="num"><b>${row[k].toFixed(1)}</b></td><td class="sub">${dvRankLabel(rk[k][team], n)}</td>` : ""}${show !== "raw" ? `<td class="num adj"><b>${row.adj[k].toFixed(1)}</b></td><td class="sub adj">${dvRankLabel(rkAdj[k][team], n)}</td>` : ""}</tr>`).join("")}
+    </tbody></table></div>`;
+}
+
+function teamTableHTML(g, tb, ranks) {
+  const [a, h] = [g.away, g.home], show = BD.vals;
+  const win = (tb.windows || {})[DV.win] || {};
+  if (!win[a] || !win[h]) return "";
+  const cell = (team, k, side) => {
+    const t = win[team], raw = t[side][k], adj = t[side + "_adj"][k];
+    const rr = ranks[side + k], ra = ranks[side + "adj" + k];
+    const part = (v, rk, cls) => `<td class="num ${cls}">${bdVal(v, k)}${rk ? `<div class="sub">${dvRankLabel(rk, rr.n)}</div>` : ""}</td>`;
+    return (show !== "adj" ? part(raw, rr.of[team], "") : "") + (show !== "raw" ? (adj == null || t[side + "_adj"][k] === undefined ? `<td class="num adj">&mdash;</td>` : part(adj, ra && ra.of[team], "adj")) : "");
+  };
+  const span = (show === "both" ? 2 : 1);
+  return `<h4>Team stats: yards per play and more <span class="note" style="font-weight:400;">(${winLbl(DV.win)}, per game)</span></h4>
+    <div class="scroll-x"><table class="ptbl"><thead><tr><th></th><th colspan="${span}">${esc(a)}</th><th colspan="${span}">${esc(h)}</th></tr>
+      ${show === "both" ? `<tr><th></th><th>Per game</th><th>Adj.</th><th>Per game</th><th>Adj.</th></tr>` : ""}</thead><tbody>
+    ${TEAM_ROWS.map(([lbl, k, side]) => k == null ? `<tr><td colspan="${1 + 2 * span}"><b>${lbl}</b></td></tr>`
+      : `<tr><td>${lbl}</td>${cell(a, k, side)}${cell(h, k, side)}</tr>`).join("")}
+    </tbody></table></div>`;
+}
+function winLbl(w) { return { season: "season to date", last4: "last 4 games", prev: `${DATA.season - 1} season` }[w]; }
+
+function expectedTableHTML(g, rowsByTeam, lg) {
+  const [a, h] = [g.away, g.home];
+  const A = rowsByTeam[a], H = rowsByTeam[h];
+  if (!A || !H || !A.off) return "";
+  const side = (offT, defT) => EXP_ROWS.map(([k]) => dvExpected(offT.off[k], defT[k], lg[k]));
+  const ea = side(A, H), eh = side(H, A);
+  return `<h4>Expected volume in this game <span class="note" style="font-weight:400;">(each offense's own average and the defense it faces, each counted half; league average ${winLbl(DV.win)})</span></h4>
+    <div class="scroll-x"><table class="ptbl"><thead><tr><th></th><th>${esc(a)} offense</th><th>${esc(h)} offense</th></tr></thead><tbody>
+    ${EXP_ROWS.map(([k, lbl], i) => `<tr><td>${lbl}</td><td class="num"><b>${ea[i].toFixed(1)}</b><div class="sub">avg ${A.off[k].toFixed(1)}</div></td><td class="num"><b>${eh[i].toFixed(1)}</b><div class="sub">avg ${H.off[k].toFixed(1)}</div></td></tr>`).join("")}
+    </tbody></table></div>`;
+}
+
+function breakdownHTML() {
+  const table = (DATA.context || {}).dvp_table, tb = DATA.team_breakdown;
+  const games = (DATA.games || []).filter(g => g.in_window !== false).sort((x, y) => x.commence.localeCompare(y.commence));
+  if (!table || !games.length) return "";
+  const rows = dvRows(table, DV.win, DV.pos), n = rows.length, byTeam = {};
+  rows.forEach(r => { byTeam[r.team] = r; });
+  const rk = {}, rkAdj = {};
+  DV_COLS[DV.pos].forEach(c => { rk[c] = dvRanks(rows, c); rkAdj[c] = dvRanks(rows, r => r.adj[c]); });
+  const allRows = dvRows(table, DV.win, "ALL"), allBy = {};
+  allRows.forEach(r => { allBy[r.team] = r; });
+  const rkH = {}, rkHAdj = {};                                   // the headline always reads the overall (all positions) ranks
+  ["pass_yds", "rush_yds"].forEach(c => { rkH[c] = dvRanks(allRows, c); rkHAdj[c] = dvRanks(allRows, r => r.adj[c]); });
+  const lg = {}; EXP_ROWS.forEach(([k]) => { lg[k] = allRows.reduce((s, r) => s + r[k], 0) / Math.max(allRows.length, 1); });
+  // ranks for the team-stat table: across all teams, per side and stat, raw and adjusted
+  const ranks = {};
+  if (tb) {
+    const win = (tb.windows || {})[DV.win] || {};
+    const teams = Object.keys(win);
+    TEAM_ROWS.forEach(([lbl, k, side]) => {
+      if (!k) return;
+      [["", side], ["adj", side + "_adj"]].forEach(([tag, src]) => {
+        const rr = teams.filter(t => win[t][src][k] != null && win[t][src][k] !== undefined).map(t => ({ team: t, v: win[t][src][k] }));
+        ranks[side + tag + k] = { of: dvRanks(rr, "v"), n: rr.length };
+      });
+    });
+  }
+  const seg = (items, cur, key) => `<div class="seg" data-bd="${key}">${items.map(([v, l]) => `<button data-v="${v}" class="${v === cur ? "active" : ""}">${l}</button>`).join("")}</div>`;
+  const body = games.map(g => {
+    const hd = allBy[g.home] && allBy[g.away]
+      ? [g.home, g.away].map(t => dvHeadline(t, allBy[t], BD.vals === "adj" ? rkHAdj : rkH, allRows.length, BD.vals === "adj")) : [];
+    return `<details class="bgame" ${BD.open ? "open" : ""}><summary><strong>${esc(g.away)} @ ${esc(g.home)}</strong> <span style="color:var(--text-faint)">${etTime(g.commence)}</span>
+      ${hd.map(t => `<div class="bs">${esc(t)}</div>`).join("")}</summary>
+      <div class="bbody">${byTeam[g.home] && byTeam[g.away] ? defTableHTML(g.home, byTeam[g.home], rk, rkAdj, n) + defTableHTML(g.away, byTeam[g.away], rk, rkAdj, n) : `<div class="note">Not enough games yet.</div>`}
+      ${tb ? teamTableHTML(g, tb, ranks) : ""}${expectedTableHTML(g, allBy, lg)}
+      ${g.profile ? `<div class="note" style="margin-top:8px;">Our recency-weighted view (last ${g.profile.home.games} games): expected plays here ${g.profile.away.exp_plays}/${g.profile.home.exp_plays}, yards per play ${g.profile.away.exp_ypp}/${g.profile.home.exp_ypp}, yards ${g.profile.away.exp_yards}/${g.profile.home.exp_yards} (${esc(g.away)}/${esc(g.home)}).</div>` : ""}</div></details>`;
+  }).join("");
+  return `<div class="board"><h2>Game-by-game breakdown</h2>
+    <div class="note">As of week ${DATA.week}, data through week ${table.through}. What each defense has allowed (the Defense vs Position numbers) and the team stats behind a game, both as played and <b>adjusted for schedule</b>: each game's number minus what that opponent normally does or allows in its other games, averaged, added to the league mean, so a defense that has faced strong passing offenses reads better than its raw yardage. Rank 1 = the most.</div>
+    <div class="ctl-row" style="display:flex; gap:10px; flex-wrap:wrap; margin:10px 0; align-items:center;">
+      ${seg([["season", "Season to date"], ["last4", "Last 4"], ["prev", `${DATA.season - 1} season`]], DV.win, "win")}
+      ${seg([["ALL", "Overall"], ["QB", "QB"], ["RB", "RB"], ["WR", "WR"], ["TE", "TE"]], DV.pos, "pos")}
+      ${seg([["both", "Both"], ["raw", "As played"], ["adj", "Schedule-adjusted"]], BD.vals, "vals")}
+      <button class="chip-btn" id="bd-toggle" aria-pressed="${BD.open}">${BD.open ? "Collapse all" : "Expand all"}</button>
+    </div>${body}
+    <div class="note"><strong>What it is worth:</strong> tested on 1,522 team-games (2022-25), a defense's own average allowed predicted its next game <em>worse</em> than the league average, but combining it with the opposing offense's own average (each counted half) beat the league average by about 4-5% (pass attempts missed by 6.0 vs 6.3, rushing yards by 39.1 vs 41.1): the expected-volume table is that. The posted lines already hold most of this, so it is context for props and game script, not a pick.</div></div>`;
+}
+
 function renderGames() {
   const el = $("games-list");
   const all = DATA.games || [];
   const games = all.filter(g => g.in_window !== false);
   const later = all.length - games.length;
   el.innerHTML = suBoardHTML() + mlParlayHTML() + teaserHTML() + (games.length
-    ? pickBoardHTML() + games.map(gameCardHTML).join("") + (later ? `<div class="note" style="margin-top:10px;">${later} later game${later > 1 ? "s" : ""} (next week's slate) are tracked for line movement and will appear here on their game day.</div>` : "")
+    ? pickBoardHTML() + games.map(gameCardHTML).join("") + breakdownHTML() + (later ? `<div class="note" style="margin-top:10px;">${later} later game${later > 1 ? "s" : ""} (next week's slate) are tracked for line movement and will appear here on their game day.</div>` : "")
     : `<div class="empty">No games priced this run${DATA.sample ? " (demo mode has no real game lines to price against)" : " -- game lines may not have been available from the Odds API."}</div>`);
 }
 
@@ -1328,10 +1440,11 @@ const DV_LABEL = { pass_att: "Pass att", cmp: "Cmp", pass_yds: "Pass yds", pass_
   tgt: "Tgt", rec: "Rec", rec_yds: "Rec yds", rec_td: "Rec TD" };
 function ordinal(n) { const v = n % 100; return n + (["th", "st", "nd", "rd"][(v - 20) % 10] || ["th", "st", "nd", "rd"][v] || "th"); }
 /* rank 1 = allowed the most; ties share the better rank */
-function dvRanks(rows, stat) {
-  const sorted = rows.map(r => r[stat]).sort((a, b) => b - a);
+function dvRanks(rows, stat) {                    // `stat` is a key, or a function row -> value (for the adjusted numbers)
+  const val = typeof stat === "function" ? stat : r => r[stat];
+  const sorted = rows.map(val).sort((a, b) => b - a);
   const out = {};
-  rows.forEach(r => { out[r.team] = sorted.indexOf(r[stat]) + 1; });
+  rows.forEach(r => { out[r.team] = sorted.indexOf(val(r)) + 1; });
   return out;
 }
 function dvRankLabel(rank, n) {
@@ -1343,6 +1456,19 @@ function dvRows(table, win, pos) {
   const w = ((table.windows || {})[win] || {})[pos] || {};
   return Object.entries(w).map(([team, v]) => Object.assign({ team }, v));
 }
+const TEAM_NAMES = { ARI: "Cardinals", ATL: "Falcons", BAL: "Ravens", BUF: "Bills", CAR: "Panthers", CHI: "Bears", CIN: "Bengals", CLE: "Browns", DAL: "Cowboys",
+  DEN: "Broncos", DET: "Lions", GB: "Packers", HOU: "Texans", IND: "Colts", JAX: "Jaguars", KC: "Chiefs", LA: "Rams", LAC: "Chargers", LV: "Raiders",
+  MIA: "Dolphins", MIN: "Vikings", NE: "Patriots", NO: "Saints", NYG: "Giants", NYJ: "Jets", PHI: "Eagles", PIT: "Steelers", SEA: "Seahawks", SF: "49ers",
+  TB: "Buccaneers", TEN: "Titans", WAS: "Commanders" };
+/* the one-line summary above a defense's table: whichever of passing or rushing yards allowed sits furthest from the middle of the league */
+function dvHeadline(team, row, ranks, n, useAdj) {
+  const v = k => (useAdj && row.adj ? row.adj[k] : row[k]);
+  const cands = [["pass_yds", "passing yards"], ["rush_yds", "rushing yards"]].map(([k, lbl]) => ({ k, lbl, r: ranks[k][team], d: Math.abs(ranks[k][team] - (n + 1) / 2) }));
+  const c = cands.sort((a, b) => b.d - a.d)[0];
+  return `${TEAM_NAMES[team] || team} defense has allowed ${v(c.k).toFixed(1)} ${c.lbl} per game (${dvRankLabel(c.r, n)})`;
+}
+/* expected volume for one offense against one defense: the league mean, moved half way toward each side's own tendency (tested 2022-25: beats the league average by about 4-5% on every volume stat; the defense alone does not) */
+function dvExpected(offAvg, defAllowed, league, w = 0.5) { return league + w * (defAllowed - league) + w * (offAvg - league); }
 /* DVP:END */
 const DV = { win: "season", pos: "ALL", slateOnly: true, view: "rank", sort: null, team: null };
 function dvMatchups() {
@@ -1464,6 +1590,13 @@ $("pos-seg").addEventListener("click", e => {
   S.pos = b.dataset.pos; S.limit = 80; renderList();
 });
 $("games-list").addEventListener("click", e => {
+  const sg = e.target.closest("[data-bd] button");
+  if (sg) {
+    const key = sg.parentElement.dataset.bd;
+    if (key === "vals") BD.vals = sg.dataset.v; else { DV[key] = sg.dataset.v; if (key === "pos") DV.sort = null; }
+    renderGames(); return;
+  }
+  if (e.target.closest("#bd-toggle")) { BD.open = !BD.open; renderGames(); return; }
   const b = e.target.closest("#su-copy"); if (!b) return;
   const done = () => { const n = $("su-copied"); if (n) { n.style.display = ""; setTimeout(() => { n.style.display = "none"; }, 1500); } };
   try { navigator.clipboard.writeText(b.dataset.paste).then(done, done); } catch (err) { done(); }

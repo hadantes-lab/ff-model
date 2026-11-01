@@ -85,6 +85,87 @@ class TestDvpTable(unittest.TestCase):
         self.assertAlmostEqual(cd.dvp_table(h, 2026)["windows"]["season"]["ALL"]["DEF"]["pass_att"], 40.0)
 
 
+def _two_defense_history():
+    """DEF1 faces the pass-happy OFF1 (50 attempts every week); DEF2 faces the run-heavy OFF2 (20 attempts a week). Same raw 'allowed' pattern otherwise."""
+    rows = []
+    for wk in range(1, 5):
+        rows += [_row("OFF1", "DEF1", 2026, wk, "QB", attempts=50), _row("DEF1", "OFF1", 2026, wk, "QB", attempts=30),
+                 _row("OFF2", "DEF2", 2026, wk, "QB", attempts=20), _row("DEF2", "OFF2", 2026, wk, "QB", attempts=30)]
+    return pd.DataFrame(rows)
+
+
+class TestScheduleAdjustment(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.w = cd.dvp_table(_two_defense_history(), 2026)["windows"]["season"]["ALL"]
+
+    def test_raw_values_are_just_the_average(self):
+        self.assertEqual(self.w["DEF1"]["pass_att"], 50.0)
+        self.assertEqual(self.w["DEF2"]["pass_att"], 20.0)
+
+    def test_a_defense_that_met_a_normal_offense_reads_as_the_league_average(self):
+        # OFF1 throws 50 every week, so DEF1 allowing 50 is exactly what that offense always does: adjusted = the league mean
+        league = sum(r["pass_att"] for r in self.w.values()) / len(self.w)
+        self.assertAlmostEqual(self.w["DEF1"]["adj"]["pass_att"], league, places=1)
+        self.assertAlmostEqual(self.w["DEF2"]["adj"]["pass_att"], league, places=1)
+
+    def test_adjustment_moves_a_defense_toward_the_league_when_its_schedule_was_extreme(self):
+        raw_gap = abs(self.w["DEF1"]["pass_att"] - self.w["DEF2"]["pass_att"])
+        adj_gap = abs(self.w["DEF1"]["adj"]["pass_att"] - self.w["DEF2"]["adj"]["pass_att"])
+        self.assertLess(adj_gap, raw_gap)
+
+    def test_the_offense_columns_are_the_teams_own_output(self):
+        self.assertEqual(self.w["DEF1"]["off"]["pass_att"], 30.0)           # DEF1's own offense threw 30 a game
+        self.assertEqual(self.w["OFF1"]["off"]["pass_att"], 50.0)
+
+    def test_a_single_game_opponent_with_no_other_games_falls_back_to_raw(self):
+        h = pd.DataFrame([_row("A", "B", 2026, 1, "QB", attempts=40), _row("B", "A", 2026, 1, "QB", attempts=30)])
+        w = cd.dvp_table(h, 2026)["windows"]["season"]["ALL"]
+        self.assertEqual(w["B"]["adj"]["pass_att"], w["B"]["pass_att"])
+
+
+def _tg_rows():
+    """Two teams that only play each other, twice a season-long pair of games plus a third team to give baselines."""
+    rows = []
+    for gid, (a, b, ya, yb) in enumerate([("A", "B", 6.0, 4.0), ("A", "C", 6.0, 5.0), ("B", "C", 4.0, 5.0)] * 2):
+        for team, opp, y, y_allowed in ((a, b, ya, yb), (b, a, yb, ya)):
+            rows.append({"game_id": f"g{gid}", "season": 2026, "week": gid + 1, "team": team, "opp": opp, "plays": 60.0, "yards": 60.0 * y, "ypp": y,
+                         "first_downs": 20.0, "third_rate": 0.4, "top_sec": 1800.0, "pass_rate": 0.55, "neutral_pass_rate": 0.55, "proe": 0.0,
+                         "epa_pp": 0.0, "giveaways": 1.0, "plays_allowed": 60.0, "yards_allowed": 60.0 * y_allowed, "ypp_allowed": y_allowed,
+                         "first_downs_allowed": 20.0, "third_rate_allowed": 0.4, "epa_pp_allowed": 0.0, "giveaways_allowed": 1.0})
+    return pd.DataFrame(rows)
+
+
+class TestTeamBreakdown(unittest.TestCase):
+    def test_raw_and_adjusted_exist_for_every_window_and_team(self):
+        import team_stats as ts
+        b = ts.team_breakdown(_tg_rows(), 2026)
+        for win in ("season", "last4", "prev"):
+            self.assertIn(win, b["windows"])
+        a = b["windows"]["season"]["A"]
+        self.assertAlmostEqual(a["off"]["ypp"], 6.0)
+        self.assertEqual(a["g"], 4)
+        self.assertIn("ypp", a["off_adj"])
+        self.assertIn("ypp", a["def_adj"])
+        self.assertAlmostEqual(a["off"]["third_rate"], 40.0)             # shown as a percentage
+        self.assertAlmostEqual(a["off"]["top_min"], 30.0)
+        self.assertNotIn("pass_rate", a["def"])                          # no opponent-side version of pass rate
+
+    def test_an_offense_that_beat_strong_defenses_is_adjusted_up(self):
+        import team_stats as ts
+        w = ts.team_breakdown(_tg_rows(), 2026)["windows"]["season"]
+        # B's defense allows 6.0 ypp... A scores 6.0 against defenses that allow 4-5: A's adjusted rate is above the league mean
+        league = sum(w[t]["off"]["ypp"] for t in w) / len(w)
+        self.assertGreater(w["A"]["off_adj"]["ypp"], league)
+
+    def test_last4_takes_each_teams_latest_games(self):
+        import team_stats as ts
+        t = _tg_rows()
+        t.loc[(t["team"] == "A") & (t["week"] <= 2), "ypp"] = 9.0
+        b = ts.team_breakdown(t, 2026, last_n=2)["windows"]
+        self.assertGreater(b["season"]["A"]["off"]["ypp"], b["last4"]["A"]["off"]["ypp"])
+
+
 @unittest.skipUnless(shutil.which("node"), "node is not installed")
 class TestDvpBlock(unittest.TestCase):
     @classmethod
@@ -121,6 +202,34 @@ class TestDvpBlock(unittest.TestCase):
         self.assertEqual(self._run("DV_COLS.WR"), ["tgt", "rec", "rec_yds", "rec_td"])
         self.assertEqual(len(self._run("DV_COLS.ALL")), 11)
         self.assertEqual(self._run("DV_COLS.QB")[0], "pass_att")
+
+    def test_ranks_accept_a_function_for_the_adjusted_numbers(self):
+        rows = [{"team": "A", "x": 10, "adj": {"x": 30}}, {"team": "B", "x": 30, "adj": {"x": 10}}]
+        self.assertEqual(self._run(f"dvRanks({json.dumps(rows)}, r => r.adj.x)"), {"A": 1, "B": 2})
+
+    def test_headline_picks_whichever_of_passing_or_rushing_is_furthest_from_the_middle(self):
+        row = {"pass_yds": 222.6, "rush_yds": 115.0}
+        ranks = {"pass_yds": {"GB": 24}, "rush_yds": {"GB": 16}}                  # 9th least vs a middling rushing rank
+        out = self._run(f"dvHeadline('GB', {json.dumps(row)}, {json.dumps(ranks)}, 32, false)")
+        self.assertEqual(out, "Packers defense has allowed 222.6 passing yards per game (9th least)")
+        ranks = {"pass_yds": {"GB": 15}, "rush_yds": {"GB": 7}}
+        out = self._run(f"dvHeadline('GB', {json.dumps(row)}, {json.dumps(ranks)}, 32, false)")
+        self.assertEqual(out, "Packers defense has allowed 115.0 rushing yards per game (7th most)")
+
+    def test_headline_uses_the_adjusted_value_when_asked(self):
+        row = {"pass_yds": 300.0, "rush_yds": 100.0, "adj": {"pass_yds": 280.0, "rush_yds": 105.0}}
+        ranks = {"pass_yds": {"X": 2}, "rush_yds": {"X": 16}}
+        self.assertIn("280.0 passing yards", self._run(f"dvHeadline('X', {json.dumps(row)}, {json.dumps(ranks)}, 32, true)"))
+
+    def test_expected_volume_moves_half_way_to_each_side(self):
+        self.assertAlmostEqual(self._run("dvExpected(40, 36, 32)"), 32 + 0.5 * 4 + 0.5 * 8)
+        self.assertAlmostEqual(self._run("dvExpected(32, 32, 32)"), 32.0)
+        self.assertAlmostEqual(self._run("dvExpected(40, 36, 32, 0)"), 32.0)
+
+    def test_every_team_has_a_nickname(self):
+        names = self._run("TEAM_NAMES")
+        self.assertEqual(len(names), 32)
+        self.assertEqual(names["LA"], "Rams")
 
     def test_rows_come_from_the_chosen_window_and_position(self):
         table = {"windows": {"last4": {"WR": {"DET": {"g": 4, "tgt": 20.0}}}}}

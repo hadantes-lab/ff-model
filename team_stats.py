@@ -173,6 +173,67 @@ def matchup_expectation(off: dict, opp: dict, lg_ypp: float, lg_plays: float) ->
     return {"exp_plays": float(plays), "exp_ypp": float(ypp), "exp_yards": float(plays * ypp)}
 
 
+# ---- season/last-4 breakdown, raw and adjusted for schedule -----------------------------------------
+# (display name, offense column, defense (allowed) column or None, scale for display)
+BREAKDOWN_STATS = [
+    ("plays", "plays", "plays_allowed", 1), ("yards", "yards", "yards_allowed", 1), ("ypp", "ypp", "ypp_allowed", 1),
+    ("first_downs", "first_downs", "first_downs_allowed", 1), ("third_rate", "third_rate", "third_rate_allowed", 100),
+    ("epa_pp", "epa_pp", "epa_pp_allowed", 1), ("giveaways", "giveaways", "giveaways_allowed", 1),
+    ("pass_rate", "pass_rate", None, 100), ("neutral_pass_rate", "neutral_pass_rate", None, 100), ("proe", "proe", None, 1),
+    ("top_min", "top_sec", None, 1 / 60),
+]
+
+
+def team_breakdown(tg: pd.DataFrame, season: int, last_n: int = 4) -> dict:
+    """
+    {"windows": {"season"|"last4"|"prev": {team: {"g": n, "off": {stat: value}, "def": {stat: value}, "off_adj": {...}, "def_adj": {...}}}}}.
+    Raw = the per-game average over the window. Adjusted = league mean + the average, over the team's games, of (what it did minus what
+    that opponent normally does or allows in ITS other games that season): an offense's output is judged against the defenses it
+    faced, a defense's against the offenses. Stats with no opponent-side version (pass rate, PROE, time of possession) are raw only.
+    """
+    tg = tg.copy()
+    tg["top_sec"] = tg["top_sec"].astype(float)
+    tg = tg.sort_values(["season", "week"])
+    # a lookup of every team's other games within a season, for leave-one-out opponent baselines
+    by_team = {t: g.reset_index(drop=True) for t, g in tg.groupby("team")}
+
+    def baseline(opp, s, gid, col):
+        g = by_team.get(opp)
+        if g is None:
+            return np.nan
+        g = g[(g["season"] == s) & (g["game_id"] != gid)]
+        v = g[col].dropna()
+        return float(v.mean()) if len(v) else np.nan
+
+    def window(select):
+        sel = select(tg)
+        res = {}
+        lg = {c: float(sel[c].mean()) for _, c, _, _ in BREAKDOWN_STATS if c in sel} | {a: float(sel[a].mean()) for _, _, a, _ in BREAKDOWN_STATS if a and a in sel}
+        for team, g in sel.groupby("team"):
+            off, dfn, off_adj, dfn_adj = {}, {}, {}, {}
+            for name, ocol, dcol, scale in BREAKDOWN_STATS:
+                off[name] = _r(g[ocol].mean() * scale, 3)
+                if dcol:
+                    dfn[name] = _r(g[dcol].mean() * scale, 3)
+                    d_o, d_d = [], []
+                    for r in g.itertuples(index=False):
+                        bo = baseline(r.opp, r.season, r.game_id, dcol)       # what that opponent's defense normally allows
+                        if np.isfinite(bo) and np.isfinite(getattr(r, ocol)):
+                            d_o.append(getattr(r, ocol) - bo)
+                        bd = baseline(r.opp, r.season, r.game_id, ocol)       # what that opponent's offense normally does
+                        if np.isfinite(bd) and np.isfinite(getattr(r, dcol)):
+                            d_d.append(getattr(r, dcol) - bd)
+                    off_adj[name] = _r((lg[ocol] + np.mean(d_o)) * scale, 3) if d_o else off[name]
+                    dfn_adj[name] = _r((lg[dcol] + np.mean(d_d)) * scale, 3) if d_d else dfn[name]
+            res[team] = {"g": int(len(g)), "off": off, "def": dfn, "off_adj": off_adj, "def_adj": dfn_adj}
+        return res
+
+    cur = lambda d: d[d["season"] == season]
+    wins = {"season": window(cur), "last4": window(lambda d: cur(d).groupby("team", group_keys=False).tail(last_n)),
+            "prev": window(lambda d: d[d["season"] == season - 1])}
+    return {"windows": wins, "stats": [n for n, *_ in BREAKDOWN_STATS]}
+
+
 def _r(x, nd=1):
     return None if x is None or not np.isfinite(x) else round(float(x), nd)
 
