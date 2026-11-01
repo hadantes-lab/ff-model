@@ -237,6 +237,17 @@ class TestPickem(unittest.TestCase):
         relaxed = pl.pickem_legs(props, [], require_agree=False)
         self.assertEqual({l["player_id"] for l in relaxed}, {"a", "b"})
 
+    def test_a_lopsided_sportsbook_line_with_no_underdog_line_is_not_a_pickem_leg(self):
+        lopsided = _pk_prop("x", prob=0.64, pickem={"line": 1.5, "book": None, "side": "under", "prob": 0.64, "sportsbook_prob": 0.64,
+                                                    "line_edge": 0.0, "agree": True, "grade": "high"})
+        near_even = _pk_prop("y", prob=0.53, pickem={"line": 4.5, "book": None, "side": "over", "prob": 0.53, "sportsbook_prob": 0.53,
+                                                     "line_edge": 0.0, "agree": True, "grade": "low"})
+        listed = _pk_prop("z", prob=0.64)                                   # Underdog posts it, so its stated chance counts
+        legs = pl.pickem_legs([lopsided, near_even, listed], [])
+        self.assertEqual({l["player_id"] for l in legs}, {"y", "z"})
+        self.assertTrue(next(l for l in legs if l["player_id"] == "z")["listed"])
+        self.assertFalse(next(l for l in legs if l["player_id"] == "y")["listed"])
+
     def test_volume_markets_get_the_bigger_script_bonus(self):
         game = {"game": "ZZZ @ Ta", "home": "Ta", "away": "ZZZ", "home_spread": -7.0, "total": 44.0}      # Ta favored by 7
         run = _pk_prop("a", market="player_rush_attempts", team="Ta", game="ZZZ @ Ta", pickem={"line": 17.5, "book": "Underdog", "side": "over", "prob": 0.6,

@@ -575,7 +575,11 @@ bookmakers, which costs the same as one region; if the API rejects the list the 
 probability is the market's probability for that side moved by how far the model says the line sits from the sportsbooks' (capped at 12 points). Entries: two 4-pick
 **high confidence** sets (the most likely to hit in full, flex-friendly) and two 5-pick **high upside** sets (best 20x standard-entry value), sorted by confidence, from picks where
 the model's lean matches the market's, with measured same-game correlation, a game-script bonus (bigger for volume markets) and the market-quality factor. Each shows the chance every
-pick hits, the chance of at most one miss, the per-pick break-even, and the EV of a standard and a flex entry. Payout tables (`parlays.PICKEM_PAYOUTS`) are assumptions: confirm yours.
+pick hits, the chance of at most one miss, the per-pick break-even, and the EV of a standard and a flex entry. Payout tables (`parlays.PICKEM_PAYOUTS`) are assumptions: confirm yours. **Only props Underdog actually lists count at full strength.** The first live run showed why: built from sportsbook
+props, the entries scored +56% EV on legs like an under at 64%, but that 64% was lopsided sportsbook juice, not a pick'em line (Underdog's own picks are near coin flips, median 51%, and it would
+not pay a flat 10x on a 64% leg). Now a prop with no Underdog line is used only when its sportsbook line is near even (<= 54%), is ranked a little lower and is marked "check app"; with that
+fix the entries average ~54% a pick and sit between -3% and +4% EV, the soft Underdog lines being the only source of any plus. Underdog may also shade the multiplier on a pick whose line is
+soft, which the Odds API doesn't show, so a plus here is an upper bound.
 Same logging/grading as other parlays (`tracking/parlay_log.csv`, flex pays on partial hits).
 
 *The By-game page.* This Week is now one section per game (kickoff, spread, total, weather, count and best of its props, a defense-vs-position strip showing how soft each

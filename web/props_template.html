@@ -1287,10 +1287,11 @@ function parlayCardHTML(p, title) {
 
 function pickemLegHTML(l) {
   const script = l.script_note ? `<span class="tag ${l.script > 0 ? "ok" : "warn"}" title="${esc(l.script_note)}">script ${l.script > 0 ? "fits" : "against"}</span>` : "";
+  const unlisted = l.listed === false ? `<span class="tag warn" title="Underdog had no line on this prop in the pull; the sportsbook line stands in because it is near even. Check the app before using it.">check app</span>` : "";
   const soft = l.line_edge >= 0.01 ? `<span class="tag ok" title="This line is softer than the sportsbooks' by ${pct(l.line_edge, 1)}">soft line</span>` : "";
   return `<div class="pleg"><div class="nm">${esc(l.player)}<div class="sub">${esc(l.team)} &middot; ${esc(l.game)}</div></div>
     <div>${esc(l.label)} <b>${l.side === "over" ? "Higher" : "Lower"} ${l.line}</b></div><div class="num">${pct(l.prob)}</div><div class="uleg-line">${esc(l.book)}</div>
-    <div class="sub" style="color:var(--text-faint)">${script} ${soft}</div></div>`;
+    <div class="sub" style="color:var(--text-faint)">${script} ${soft} ${unlisted}</div></div>`;
 }
 
 function pickemCardHTML(e, i) {
@@ -1313,7 +1314,7 @@ function renderParlayPanel() {
   const be = pk && pk.breakeven_leg ? Object.entries(pk.breakeven_leg).map(([k, v]) => `${k}-pick ${(v * 100).toFixed(1)}%`).join(", ") : "";
   const udCount = P.filter(p => p.pickem && p.pickem.book).length;
   const pickemHTML = pk ? `<div class="board"><h2>Underdog pick'em entries: 4&ndash;5 picks, ranked by confidence</h2>
-    <div class="note">Each pick is a line and a side (Higher/Lower). <b>${udCount ? `${udCount} props here use Underdog's own line` : "No Underdog line was in this pull, so picks are priced at the sportsbook consensus line"}</b>; a pick's chance is the market's own probability for that side, moved by how far the model says the line sits from the sportsbooks' (capped at a few points), and the chance every pick hits uses measured same-game correlations. <b>High confidence</b> entries are the 4-pick sets most likely to hit in full (and the ones a flex entry suits); <b>high upside</b> entries are 5-pick sets for the 20x payout. Volume markets (attempts, completions, receptions) get extra weight when the game script fits: rushing when a team is favored, passing when it trails. A pick needs about ${be} to break even on a standard entry.
+    <div class="note">Each pick is a line and a side (Higher/Lower). <b>${udCount ? `${udCount} props here use Underdog's own line` : "No Underdog line was in this pull, so picks are priced at the sportsbook consensus line"}</b>; a pick's chance is the market's own probability for that side, moved by how far the model says the line sits from the sportsbooks' (capped at a few points), and the chance every pick hits uses measured same-game correlations. <b>High confidence</b> entries are the 4-pick sets most likely to hit in full (and the ones a flex entry suits); <b>high upside</b> entries are 5-pick sets for the 20x payout. Volume markets (attempts, completions, receptions) get extra weight when the game script fits: rushing when a team is favored, passing when it trails. Only props Underdog actually lists count at full strength: a lopsided sportsbook price is not a pick'em line (Underdog would not offer it at the flat payout), and a near-even sportsbook line only stands in, marked "check app", when Underdog's board lacked the prop. A pick needs about ${be} to break even on a standard entry.
     <strong>Read the EV first:</strong> the model has not beaten the market on props (see the track record), so expect these to be near or below break-even unless a pick'em line really is soft; "soft line" marks where one is. Payout tables are assumptions (${Object.entries(pk.payouts.standard).map(([k, v]) => `${k}-pick ${v}x`).join(", ")}; flex 4-pick 6x / 1.5x, 5-pick 10x / 2x / 0.4x): confirm yours in the app, they change with promotions.</div>
     ${pk.entries.length ? pk.entries.map(pickemCardHTML).join("") : `<div class="note" style="margin-top:8px;"><strong>None this run.</strong> Fewer than four qualifying picks (the slate is light, or the props pull was limited by credits).</div>`}
     <div class="note">${pk.candidate_legs} picks qualified (${(pk.searched || 0).toLocaleString()} entries searched).</div></div>` : "";

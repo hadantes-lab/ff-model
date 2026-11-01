@@ -407,7 +407,9 @@ PICKEM_PAYOUTS = {
 }
 VOLUME_MARKETS = {"player_rush_attempts", "player_pass_attempts", "player_pass_completions", "player_receptions", "player_targets"}
 PICKEM_POOL = 14
-PICKEM_MIN_PROB = 0.52
+PICKEM_MIN_PROB = 0.505        # Underdog's own lines are near coin flips (median pick ~51%), so the floor sits just above 50%
+UNLISTED_PENALTY = 0.01        # a stand-in leg ranks a little below one Underdog actually lists
+UNLISTED_MAX_PROB = 0.54       # a sportsbook-only line (Underdog posts nothing on it) can only stand in if it is near even, as a pick'em line would be
 SCRIPT_BONUS, SCRIPT_BONUS_VOLUME = 0.01, 0.025      # volume markets are the ones game script moves most
 
 
@@ -447,7 +449,8 @@ def pickem_evs(dist: list) -> dict:
 def pickem_legs(props: list, games: list, quality: dict = None, require_agree: bool = True) -> list:
     """
     One leg per qualifying prop: its pick'em line (Underdog's when the pull had it), on the side with the better chance, where
-    the model's own lean agrees with that side. Skips thin samples, injured players and anytime TDs. Score rewards a high
+    the model's own lean agrees with that side. Skips thin samples, injured players and anytime TDs, and any prop with no Underdog line unless
+    its sportsbook line is near even (see UNLISTED_MAX_PROB). Score rewards a high
     chance, a market the model has been doing well in, a game script that fits (more for the volume markets), and a pick'em
     line that is softer than the sportsbooks'.
     """
@@ -460,6 +463,10 @@ def pickem_legs(props: list, games: list, quality: dict = None, require_agree: b
             continue
         if (require_agree and not pk["agree"]) or pk["prob"] < PICKEM_MIN_PROB:
             continue
+        if not pk.get("book") and pk["prob"] > UNLISTED_MAX_PROB:
+            # A lopsided sportsbook price (an under at 64% because of the juice) is not a pick'em line: Underdog would not offer it at the
+            # flat payout, so counting it there would invent value. Only Underdog's own posted lines count in full.
+            continue
         g = gm.get(p["game"], {})
         team_margin = None
         if g.get("home_spread") is not None:
@@ -469,10 +476,10 @@ def pickem_legs(props: list, games: list, quality: dict = None, require_agree: b
         bonus = SCRIPT_BONUS_VOLUME if p["market"] in VOLUME_MARKETS else SCRIPT_BONUS
         legs.append({"id": f"{p['player_id']}|{p['market']}|{pk['side']}", "kind": "pickem", "player_id": p["player_id"], "player": p["player"],
                      "team": p["team"], "opp": p["opp"], "game": p["game"], "pos": p["pos"], "market": p["market"], "label": p["label"],
-                     "side": pk["side"], "line": pk["line"], "book": pk["book"] or "sportsbook line", "prob": pk["prob"],
+                     "side": pk["side"], "line": pk["line"], "book": pk["book"] or "sportsbook line", "listed": bool(pk.get("book")), "prob": pk["prob"],
                      "sportsbook_prob": pk["sportsbook_prob"], "line_edge": pk["line_edge"], "quality": q, "script": align,
                      "script_note": why, "volume": p["market"] in VOLUME_MARKETS,
-                     "score": (pk["prob"] - 0.5) * quality_factor(q) + bonus * align + 0.5 * max(pk["line_edge"], 0)})
+                     "score": (pk["prob"] - 0.5) * quality_factor(q) + bonus * align + 0.5 * max(pk["line_edge"], 0) - (0.0 if pk.get("book") else UNLISTED_PENALTY)})
     legs.sort(key=lambda l: -l["score"])
     return legs
 
