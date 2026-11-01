@@ -351,6 +351,8 @@
   .tgt input { width: 70px; }
   @media (max-width: 720px) { .gsec-head { grid-template-columns: 1fr 18px; } .gsec-head .gm, .gsec-head .gc { grid-column: 1; } .gsec-head .caret { grid-column: 2; grid-row: 1; } }
   .uleg-line { font-size: 12px; color: var(--text-faint); }
+  .dvp td.dvc .sub { font-size: 10.5px; color: var(--text-faint); } .dvp td.soft { background: rgba(92,184,138,.13); } .dvp td.tough { background: rgba(217,164,65,.13); }
+  .dvh { color: inherit; font: inherit; text-transform: inherit; letter-spacing: inherit; cursor: pointer; background: none; border: 0; padding: 0; }
   .ptbl { width: 100%; border-collapse: collapse; font-size: 13px; }
   .ptbl th, .ptbl td { padding: 5px 8px; text-align: left; border-top: 1px solid var(--border); white-space: nowrap; }
   .ptbl th { color: var(--text-faint); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; border-top: none; }
@@ -371,6 +373,7 @@
   <div class="seg" id="view-tabs" role="group" aria-label="View">
     <button class="active" data-view="week">This Week</button>
     <button data-view="games">Game Lines</button>
+    <button data-view="dvp">Defense vs Position</button>
     <button data-view="power">Power Rankings</button>
     <button data-view="history">Player History</button>
   </div>
@@ -412,6 +415,7 @@
   <div id="games-list"></div>
 </div>
 
+<div class="wrap" id="dvp-view" hidden style="padding-top:18px; padding-bottom:60px;"></div>
 <div class="wrap" id="power-view" hidden style="padding-top:18px; padding-bottom:60px;"></div>
 
 <div class="wrap" id="history-view" hidden style="padding-top:18px; padding-bottom:60px;">
@@ -1312,6 +1316,83 @@ function rankLineHTML(g) {
   return `<div class="note" style="margin-top:4px;">Power rankings: ${esc(g.home)} <strong>#${r.home_rank}</strong> vs ${esc(g.away)} <strong>#${r.away_rank}</strong> &rarr; rank spread <strong>${esc(spreadTxt)}</strong> (${signed(r.rank_gap, 1)} vs posted)${qb}</div>`;
 }
 
+/* ---------- defense vs position: what every defense has allowed, per game ---------- */
+/* DVP:BEGIN -- pure functions (no DOM); tests/test_dvp_page.py runs these under node */
+const DV_COLS = {
+  ALL: ["pass_att", "cmp", "pass_yds", "pass_td", "rush_att", "rush_yds", "rush_td", "tgt", "rec", "rec_yds", "rec_td"],
+  QB: ["pass_att", "cmp", "pass_yds", "pass_td", "rush_att", "rush_yds", "rush_td"],
+  RB: ["rush_att", "rush_yds", "rush_td", "tgt", "rec", "rec_yds", "rec_td"],
+  WR: ["tgt", "rec", "rec_yds", "rec_td"], TE: ["tgt", "rec", "rec_yds", "rec_td"],
+};
+const DV_LABEL = { pass_att: "Pass att", cmp: "Cmp", pass_yds: "Pass yds", pass_td: "Pass TD", rush_att: "Rush att", rush_yds: "Rush yds", rush_td: "Rush TD",
+  tgt: "Tgt", rec: "Rec", rec_yds: "Rec yds", rec_td: "Rec TD" };
+function ordinal(n) { const v = n % 100; return n + (["th", "st", "nd", "rd"][(v - 20) % 10] || ["th", "st", "nd", "rd"][v] || "th"); }
+/* rank 1 = allowed the most; ties share the better rank */
+function dvRanks(rows, stat) {
+  const sorted = rows.map(r => r[stat]).sort((a, b) => b - a);
+  const out = {};
+  rows.forEach(r => { out[r.team] = sorted.indexOf(r[stat]) + 1; });
+  return out;
+}
+function dvRankLabel(rank, n) {
+  if (rank <= 10) return ordinal(rank) + " most";
+  if (rank > n - 10) return ordinal(n - rank + 1) + " least";
+  return ordinal(rank) + " of " + n;
+}
+function dvRows(table, win, pos) {
+  const w = ((table.windows || {})[win] || {})[pos] || {};
+  return Object.entries(w).map(([team, v]) => Object.assign({ team }, v));
+}
+/* DVP:END */
+const DV = { win: "season", pos: "ALL", slateOnly: true, view: "rank", sort: null, team: null };
+function dvMatchups() {
+  const m = {};
+  (DATA.games || []).filter(g => g.in_window !== false).forEach(g => { m[g.home] = "vs " + g.away; m[g.away] = "@ " + g.home; });
+  return m;
+}
+function renderDvp() {
+  const el = $("dvp-view"), table = (DATA.context || {}).dvp_table;
+  if (!table) { el.innerHTML = `<div class="empty">Defense-vs-position data wasn't available for this run.</div>`; return; }
+  const cols = DV_COLS[DV.pos], match = dvMatchups(), hasSlate = Object.keys(match).length > 0;
+  const winLbl = { season: "Season to date", last4: "Last 4", prev: `${DATA.season - 1} season` };
+  const seg = (items, cur, key) => `<div class="seg" data-dv="${key}">${items.map(([v, l]) => `<button data-v="${v}" class="${v === cur ? "active" : ""}">${l}</button>`).join("")}</div>`;
+  let body = "";
+  if (DV.view === "rank") {
+    let rows = dvRows(table, DV.win, DV.pos);
+    const ranks = {};
+    cols.forEach(c => { ranks[c] = dvRanks(rows, c); });
+    const sortCol = DV.sort && cols.includes(DV.sort) ? DV.sort : cols[0];
+    rows.sort((a, b) => b[sortCol] - a[sortCol] || a.team.localeCompare(b.team));
+    const n = rows.length;
+    if (DV.slateOnly && hasSlate) rows = rows.filter(r => match[r.team]);
+    const cell = (r, c) => {
+      const rk = ranks[c][r.team], cls = rk <= 10 ? "soft" : rk > n - 10 ? "tough" : "";
+      return `<td class="num dvc ${cls}"><b>${r[c].toFixed(c.endsWith("_td") ? 1 : 1)}</b><div class="sub">${dvRankLabel(rk, n)}</div></td>`;
+    };
+    body = `<div class="scroll-x"><table class="ptbl dvp"><thead><tr><th>#</th><th>Defense</th>${hasSlate ? "<th>This week</th>" : ""}${cols.map(c => `<th><button class="lnk dvh" data-sort="${c}">${DV_LABEL[c]}${c === sortCol ? " &darr;" : ""}</button></th>`).join("")}<th>G</th></tr></thead><tbody>
+      ${rows.map((r, i) => `<tr><td class="num">${i + 1}</td><td><b>${esc(r.team)}</b></td>${hasSlate ? `<td>${esc(match[r.team] || "")}</td>` : ""}${cols.map(c => cell(r, c)).join("")}<td class="num">${r.g}</td></tr>`).join("")}
+      </tbody></table></div>
+      <div class="note">${winLbl[DV.win]}, per game, ${DV.pos === "ALL" ? "all positions (team totals)" : DV.pos + "s only"}. Sorted most allowed first; rank 1 = allowed the most. <span class="tag ok">green</span> = a defense that gives a lot (top 10), <span class="tag warn">amber</span> = one that gives little (bottom 10). Click a column header to sort by it.</div>`;
+  } else {
+    const teams = Object.keys(table.games || {}).sort();
+    const team = DV.team && table.games[DV.team] ? DV.team : (teams[0] || "");
+    const games = (table.games || {})[team] || [];
+    body = `<div style="margin:8px 0;"><select class="field" id="dv-team" aria-label="Defense">${teams.map(t => `<option ${t === team ? "selected" : ""}>${t}</option>`).join("")}</select></div>
+      <div class="scroll-x"><table class="ptbl"><thead><tr><th>Week</th><th>Opponent offense</th>${cols.map(c => `<th>${DV_LABEL[c]}</th>`).join("")}</tr></thead><tbody>
+      ${games.map(([wk, opp, cells]) => `<tr><td class="num">${wk}</td><td>${esc(opp)}</td>${cols.map(c => `<td class="num">${cells[DV.pos][table.stats.indexOf(c)]}</td>`).join("")}</tr>`).join("")}
+      </tbody></table></div><div class="note">What ${esc(team)}'s defense allowed in each game this season, to ${DV.pos === "ALL" ? "all positions" : DV.pos + "s"}.</div>`;
+  }
+  el.innerHTML = `<div class="board"><h2>Defense vs position</h2>
+    <div class="note">As of week ${DATA.week}, data through week ${table.through}. The volume each defense allows, the way a prop bettor reads it: attempts, completions, yards, targets, receptions and touchdowns per game, by position.</div>
+    <div class="ctl-row" style="display:flex; gap:10px; flex-wrap:wrap; margin:10px 0; align-items:center;">
+      ${seg([["season", "Season to date"], ["last4", "Last 4"], ["prev", `${DATA.season - 1} season`]], DV.win, "win")}
+      ${seg([["ALL", "Overall"], ["QB", "QB"], ["RB", "RB"], ["WR", "WR"], ["TE", "TE"]], DV.pos, "pos")}
+      ${seg([["rank", "Rankings"], ["games", "Game by game"]], DV.view, "view")}
+      ${DV.view === "rank" && hasSlate ? `<label class="check"><input type="checkbox" id="dv-slate" ${DV.slateOnly ? "checked" : ""}> This week's games only</label>` : ""}
+    </div>${body}
+    <div class="note"><strong>Does it predict?</strong> Tested on 1,534 defense-games (2022-25): a defense's season-to-date volume allowed forecast its <em>next</em> game no better than the league average (pass attempts: off by 6.45 vs 6.25 for the league average), and its last four games did worse (6.81); a 50/50 blend with the league average was level (6.21). Allowed volume depends as much on the offenses faced and the game script as on the defense, so read this as a description of what has happened. The matchup multipliers already in the projections use it, shrunk heavily.</div></div>`;
+}
+
 function renderPower() {
   const pw = DATA.power, el = $("power-view");
   if (!pw || !pw.table || !pw.table.length) { el.innerHTML = `<div class="empty">Power rankings were not available this run.</div>`; return; }
@@ -1338,6 +1419,8 @@ $("view-tabs").addEventListener("click", e => {
   $("games-view").hidden = view !== "games";
   $("history-view").hidden = view !== "history";
   $("power-view").hidden = view !== "power";
+  $("dvp-view").hidden = view !== "dvp";
+  if (view === "dvp") renderDvp();
   if (view === "games") renderGames();
   if (view === "power") renderPower();
   if (view === "history") { renderHistoryList(); renderHistoryDetail(); }
@@ -1384,6 +1467,15 @@ $("games-list").addEventListener("click", e => {
   const b = e.target.closest("#su-copy"); if (!b) return;
   const done = () => { const n = $("su-copied"); if (n) { n.style.display = ""; setTimeout(() => { n.style.display = "none"; }, 1500); } };
   try { navigator.clipboard.writeText(b.dataset.paste).then(done, done); } catch (err) { done(); }
+});
+$("dvp-view").addEventListener("click", e => {
+  const seg = e.target.closest("[data-dv] button");
+  if (seg) { DV[seg.parentElement.dataset.dv] = seg.dataset.v; if (seg.parentElement.dataset.dv === "pos") DV.sort = null; renderDvp(); return; }
+  const h = e.target.closest("[data-sort]"); if (h) { DV.sort = h.dataset.sort; renderDvp(); }
+});
+$("dvp-view").addEventListener("change", e => {
+  if (e.target.id === "dv-slate") { DV.slateOnly = e.target.checked; renderDvp(); }
+  if (e.target.id === "dv-team") { DV.team = e.target.value; renderDvp(); }
 });
 $("rail-list").addEventListener("click", e => {
   const b = e.target.closest("button"); if (!b) return;

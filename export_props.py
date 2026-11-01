@@ -410,7 +410,7 @@ def build_context(props, games, history, season, sample=False) -> dict:
     Information shown beside a prop; none of it feeds the projection. Each part is independent and
     guarded, so a failed weather call or a missing pbp file drops that panel, never the page.
     """
-    ctx = {"weather": {}, "targets": {}, "dvp": {}}
+    ctx = {"weather": {}, "targets": {}, "dvp": {}, "dvp_table": None}
     # games on the page: label -> (home, away, commence)
     seen = {}
     for p in props:
@@ -441,6 +441,11 @@ def build_context(props, games, history, season, sample=False) -> dict:
         specs = {m: MARKETS[m] for m in {p["market"] for p in props} if not m.endswith("_longest")}
         ctx["dvp"] = context_data.defense_vs_position(history, season, specs)
         log(f"Defense vs position for {len(ctx['dvp'])} defenses.")
+    except Exception as e:
+        log(f"Defense vs position unavailable ({e}); the page omits it.")
+    try:
+        ctx["dvp_table"] = context_data.dvp_table(history, season)
+        log(f"Defense-vs-position table: {len(ctx['dvp_table']['windows']['season']['ALL'])} defenses through week {ctx['dvp_table']['through']}.")
     except Exception as e:
         log(f"Defense vs position unavailable ({e}); the page omits it.")
     return ctx

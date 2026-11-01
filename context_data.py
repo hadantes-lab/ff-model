@@ -235,6 +235,65 @@ def defense_vs_position(history: pd.DataFrame, season: int, markets: dict, min_g
     return out
 
 
+# ---- defense vs position: the full volume table ------------------------------------------------
+DVP_STATS = ["pass_att", "cmp", "pass_yds", "pass_td", "rush_att", "rush_yds", "rush_td", "tgt", "rec", "rec_yds", "rec_td"]
+DVP_COLS = {"pass_att": "attempts", "cmp": "completions", "pass_yds": "passing_yards", "pass_td": "passing_tds", "rush_att": "carries",
+            "rush_yds": "rushing_yards", "rush_td": "rushing_tds", "tgt": "targets", "rec": "receptions", "rec_yds": "receiving_yards",
+            "rec_td": "receiving_tds"}
+DVP_GROUP = {"QB": "QB", "RB": "RB", "FB": "RB", "WR": "WR", "TE": "TE"}
+
+
+def dvp_table(history: pd.DataFrame, season: int, last_n: int = 4) -> dict:
+    """
+    What every defense has allowed, per game, in the stats a props bettor looks at, as raw numbers (the page does the ranking, so a
+    filter changes the ranks): {"windows": {"season"|"last4"|"prev": {"ALL"|"QB"|"RB"|"WR"|"TE": {defense: {"g": games, <stat>: per game}}}},
+    "games": {defense: [[week, opponent, {pos: [stat, ...]}], ...]} (current season, in DVP_STATS order), "stats": DVP_STATS, "through": last week}.
+    "ALL" is the team total (every QB/RB/WR/TE/FB), which is what a team-level 'passes allowed' view needs.
+    """
+    h = history[history["position"].isin(DVP_GROUP)].copy()
+    h["grp"] = h["position"].map(DVP_GROUP)
+    for k, c in DVP_COLS.items():
+        h[k] = h[c].fillna(0.0) if c in h else 0.0
+    by = h.groupby(["opponent_team", "season", "week", "grp"])[DVP_STATS].sum().reset_index()
+    tot = h.groupby(["opponent_team", "season", "week"])[DVP_STATS].sum().reset_index().assign(grp="ALL")
+    by = pd.concat([by, tot], ignore_index=True)
+    # one row per (defense, game) so a position that did nothing in a game counts as zeros, not a missing game
+    games = tot[["opponent_team", "season", "week"]].sort_values(["opponent_team", "season", "week"])
+
+    def window(rows_for):
+        out = {}
+        for pos in ("ALL", "QB", "RB", "WR", "TE"):
+            d = by[by["grp"] == pos].set_index(["opponent_team", "season", "week"])
+            res = {}
+            for defense, gm in games.groupby("opponent_team"):
+                keys = rows_for(gm)
+                if not len(keys):
+                    continue
+                vals = d.reindex([(defense, s, w) for s, w in keys])[DVP_STATS].fillna(0.0)
+                res[defense] = {"g": int(len(keys)), **{k: round(float(vals[k].mean()), 2) for k in DVP_STATS}}
+            out[pos] = res
+        return out
+
+    cur = lambda gm: list(gm[gm["season"] == season][["season", "week"]].itertuples(index=False, name=None))
+    wins = {"season": window(cur),
+            "last4": window(lambda gm: cur(gm)[-last_n:]),
+            "prev": window(lambda gm: list(gm[gm["season"] == season - 1][["season", "week"]].itertuples(index=False, name=None)))}
+    cg = games[games["season"] == season]
+    per_game = {}
+    for defense, gm in cg.groupby("opponent_team"):
+        rows = []
+        for w in gm["week"]:
+            opp = h[(h["opponent_team"] == defense) & (h["season"] == season) & (h["week"] == w)]["team"].mode()
+            cells = {}
+            for pos in ("ALL", "QB", "RB", "WR", "TE"):
+                r = by[(by["opponent_team"] == defense) & (by["season"] == season) & (by["week"] == w) & (by["grp"] == pos)]
+                cells[pos] = [round(float(r[k].sum()), 1) for k in DVP_STATS]
+            rows.append([int(w), opp.iloc[0] if len(opp) else "", cells])
+        per_game[defense] = rows
+    through = int(cg["week"].max()) if len(cg) else 0
+    return {"windows": wins, "games": per_game, "stats": DVP_STATS, "through": through}
+
+
 # ---- weather backlog ---------------------------------------------------------------
 WEATHER_HISTORY_FILE = pathlib.Path(__file__).parent / "tracking" / "weather_history.csv"
 WEATHER_COLUMNS = ["pulled_at", "season", "week", "game", "commence", "stadium", "roof", "indoors", "temp_f",

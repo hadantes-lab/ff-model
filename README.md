@@ -578,8 +578,7 @@ Same logging/grading as other parlays (`tracking/parlay_log.csv`, flex pays on p
 opponent is by position), opening to that game's props sorted by confidence (the chance the better side hits at the pick'em line; the other sorts remain). The top-10 board, track
 record and parlay panels sit above; the left rail still jumps to a game or player.
 
-*"Betting models" from other sites.* The site named, mysportsedge.com, turned out to cover only NBA and NHL (a no-vig consensus edge scanner), so nothing was copied from it; the
-defense-vs-position view is built from the nflverse data already here.
+*Defense vs Position tab (modelled on myspariedge.com's tool).* The site's table is behind a login, so it was rebuilt from a pasted copy of it: per defense, per game, pass attempts, completions, yards and TDs, rush attempts/yards/TDs, targets, receptions, receiving yards and TDs, for Overall/QB/RB/WR/TE, over Season to date, Last 4 or last season, ranked most-allowed first ("3rd most", "10th least"), filterable to this week's games, with a game-by-game view (`context_data.dvp_table`; Detroit's season row matches the site's exactly). **It does not forecast:** on 1,534 defense-games (2022-25) a defense's season-to-date volume allowed predicted its next game slightly worse than the league average (pass attempts off by 6.45 vs 6.25), its last four games worse again (6.81), and a 50/50 blend with the league average was level (6.21), so the page says it is a description, and the projections keep using it only through the shrunken opponent multipliers.
 
 *The Monday review.* Added: a **top 10 prop picks** write-up (record, flat-$1 profit at the logged prices, best call, biggest miss, season to date), **streaks** (players whose
 market the model's lean has been right 3+ weeks running, next to how many such streaks luck alone produces: a streak is a talking point, not a signal; the record on a player has
