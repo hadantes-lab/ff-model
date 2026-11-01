@@ -101,6 +101,29 @@ Prop parlays: 0 of 4 settled cashed; the stated chances expected 0.6. Individual
 - teaser -120: PENDING (1 of 2 legs hit)
 - ml +213: PENDING (1 of 3 legs hit)
 
+## Top 10 prop picks
+
+The week's top 10 prop picks went 0-1, about 0.6 wins by their stated chances. At the prices logged, $1 flat on each returned -1.00 (-100% per pick). Biggest miss: Kenny Gainwell Receptions over 2.5, finished 0. Season to date over 3 weeks: 6-6 (50%), against 5.9 expected wins and +1.64 units at logged prices. Ten picks a week is a small sample: judge the model on the season line, not one week.
+
+- #1 Kenny Gainwell Receptions over 2.5 (56%), finished 0: MISSED
+
+## Streaks
+
+The model's lean has been right 3+ weeks running on 61 player-markets: Bucky Irving Rec Yds (5 in a row); Jaylen Waddle Rec Yds (5 in a row); Mark Andrews Rec Yds (5 in a row). Of 461 player-markets tracked that long, about 77 such streaks would come from luck (about what chance alone gives), so a streak is a talking point, not a signal; the model's record on a player has not predicted his next result.
+
+- Bucky Irving Rec Yds: 5 straight (wk 3 under 16.5, wk 4 under 11.5, wk 5 under 12.5, wk 6 under 10.5, wk 7 under 17.5)
+- Jaylen Waddle Rec Yds: 5 straight (wk 3 under 60.5, wk 4 under 58.5, wk 5 under 55.5, wk 6 under 47.5, wk 7 under 50.5)
+- Mark Andrews Rec Yds: 5 straight (wk 3 under 39.5, wk 4 under 33.5, wk 5 under 30.5, wk 6 under 27.5, wk 7 under 29.5)
+- Michael Wilson Rec Yds: 5 straight (wk 3 over 46.5, wk 4 over 60.5, wk 5 under 79.5, wk 6 under 61.5, wk 7 over 48.5)
+- RJ Harvey Receptions: 5 straight (wk 3 over 2.5, wk 4 over 3.5, wk 5 under 3.5, wk 6 under 3.5, wk 7 under 3.5)
+- TreVeyon Henderson Receptions: 5 straight (wk 3 under 1.5, wk 4 under 1.5, wk 5 under 1.5, wk 6 under 1.5, wk 7 over 0.5)
+- Alvin Kamara Rush Yds: 4 straight (wk 3 over 26.5, wk 4 under 35.5, wk 5 under 32.5, wk 6 over 24.5)
+- Bo Nix Pass TDs: 4 straight (wk 4 under 1.5, wk 5 under 1.5, wk 6 under 1.5, wk 7 under 1.5)
+- Brock Purdy Rush Yds: 4 straight (wk 4 over 17.5, wk 5 under 24.5, wk 6 over 19.5, wk 7 under 20.5)
+- Bryce Young Rush Yds: 4 straight (wk 3 under 10.5, wk 4 under 11.5, wk 6 under 10.5, wk 7 under 10.5)
+- Dak Prescott Pass TDs: 4 straight (wk 3 under 1.5, wk 4 under 1.5, wk 5 under 2.5, wk 6 under 1.5)
+- Darren Waller Rec Yds: 4 straight (wk 3 over 16.5, wk 4 under 36.5, wk 6 under 26.5, wk 7 over 22.5)
+
 ## Player props
 
 ### Passing yards
