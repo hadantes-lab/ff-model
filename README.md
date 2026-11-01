@@ -124,11 +124,11 @@ cached for 30 minutes so re-running is free. `--all-markets` adds attempts,
 completions, interceptions and rush+rec yards; `--max-events N` limits games.
 Whether player props are included on a free plan is up to the Odds API, not this code.
 
-**Scheduled refresh.** `.github/workflows/refresh-site.yml` rebuilds the site every Sunday,
+**Scheduled refresh.** `.github/workflows/refresh-site.yml` rebuilds the site every Saturday,
 Monday and Thursday morning (scheduled for 6:17 AM Central, because GitHub starts scheduled runs late, sometimes by hours, so asking at 8 sharp meant a late page; a scheduled run is skipped if a refresh already succeeded in the last 5 hours, so a late start never re-spends Odds API credits) and publishes it to GitHub Pages: the draft board
 at `/draft/` (always) and the props page at `/props/` (when the key below exists), using only
-games starting in the next 24 hours. Each run shows only games starting in the next 24 hours, so Sunday's page is the Sunday slate,
-Monday's is Monday night's game, and Thursday's is Thursday night's. The game-lines call also
+games starting soon: **Saturday's run looks 2 days ahead, so its page is the whole Sunday slate (and Sunday night) with every game's props pulled in one go;
+Monday's is Monday night's game alone, and Thursday's is Thursday night's** (game lines, defense vs position and the game-by-game breakdown included). The game-lines call also
 returns next week's posted games; their week is read from the schedule (not assumed to be the
 current one), they are logged for line-movement tracking, and the Game Lines tab shows them only
 once they fall inside the window. Add the key as a repository secret:
@@ -327,9 +327,9 @@ overwrites it each pull, so on its own it loses the path a line took. Three appe
   then added to each week.
 - `tracking/props_log.csv`: graded predictions, as before.
 
-Schedule: the main refresh runs Sun/Mon/Thu (props for games in the next 24 hours, plus the whole slate's game
-lines); `.github/workflows/collect-lines.yml` adds Tue/Wed/Fri/Sat game-line pulls at a flat ~2 Odds API credits
-each, so a game's spread and total are seen roughly daily instead of three times a week. Props stay on the main
+Schedule: the main refresh runs Sat/Mon/Thu (props for the games in the next 24 hours, or 48 on Saturday, plus the whole slate's game
+lines); `.github/workflows/collect-lines.yml` adds Wednesday and Sunday game-line pulls at a flat 3 Odds API credits
+each: Wednesday for the week's opening numbers, Sunday morning for the Sunday games' closing lines. Props stay on the main
 schedule since they are the expensive call (about 5 credits per game). Everything is committed back to the
 repo, because Actions runs are ephemeral. Roughly 2 MB per season at this rate.
 
@@ -406,7 +406,7 @@ python espn_lines.py summary
 ```
 Rows go to `tracking/espn_lines.csv` (kept apart from `line_history.csv` so it stays clear these are one book's numbers, with a
 `provider` and a `priced` flag; DraftKings lines come without prices). The hit-rate chart's "Line then" uses our own pulls first and
-falls back to ESPN's closing line. The off-day collector (`collect-lines.yml`, Tue/Wed/Fri/Sat) runs `collect` for the current season, picking up each newly finished game; a game with no props is retried until it is a week old, then recorded as having none.
+falls back to ESPN's closing line. The off-day collector (`collect-lines.yml`, Wed/Sun) runs `collect` for the current season, picking up each newly finished game; a game with no props is retried until it is a week old, then recorded as having none.
 
 How good is it? Checked against 955 props where we also logged the Odds API consensus before kickoff: the lines correlate at 0.996,
 counts (receptions, pass TDs) match exactly 83-84% of the time, yardage lines differ by ~3 yards on average (pass yards ~9). ESPN's
@@ -552,9 +552,13 @@ sample the legs clearing it were break-even (EV about 0.0% at -120), i.e. teaser
 
 *Volume markets and the credit budget.* The pull is now `receptions, rush attempts, receiving yards, pass attempts, rush yards, pass completions, pass yards,
 pass TDs` in that order of priority, and `export_props.props_budget` decides how many of them a run can afford: the credits left are spread over the weeks left in the
-month (the free plan resets around the 1st), less 24 a week of fixed game-lines pulls, and a run gets the share of the week's games it covers, so a Thursday-night
-run spends a few credits and the Sunday run most of the week's. With an even 500 credits that is about six to eight markets for a full Sunday slate; with fewer, fewer
-markets for every game (floor of three, then later games are dropped). Rush attempts, pass attempts and completions already carry measured game-script effects in
+month (the free plan resets around the 1st), less 18 a week of fixed game-lines pulls (three refresh runs, two collector runs). A week has three props runs: the small
+ones (Thursday night, Monday night: at most two games) always get every priority market (8 credits a game), and the big Saturday run takes the weekly allowance minus the
+Monday-night markets it holds back, so the Sunday slate can never starve Monday. With an even 500 credits that is about six markets for all 13 Sunday games (about 78
+credits) plus 8 + 8 for the night games and 15 for game lines: roughly 110 a week, 470 a month; with fewer credits, fewer markets for every game (floor of three, then later
+games are dropped). **Credit-saving choices:** props only on game day for the games being played (never next week's), ten bookmakers per call (one region's price), the
+free events call to read the balance, cached responses for 30 minutes, one bulk game-lines call for the whole slate (3 credits whatever the number of games), two collector
+pulls a week instead of four, and no props pull at all when the balance can't cover the reserve. Rush attempts, pass attempts and completions already carry measured game-script effects in
 `model_calibration.json` (favorites run more, trailing teams throw more; each dampened by how well it held out of sample), and script-aligned legs get a larger
 bonus for volume markets than for yardage in the pick'em builder.
 
@@ -580,7 +584,7 @@ record and parlay panels sit above; the left rail still jumps to a game or playe
 
 *Defense vs Position tab (modelled on myspariedge.com's tool).* The site's table is behind a login, so it was rebuilt from a pasted copy of it: per defense, per game, pass attempts, completions, yards and TDs, rush attempts/yards/TDs, targets, receptions, receiving yards and TDs, for Overall/QB/RB/WR/TE, over Season to date, Last 4 or last season, ranked most-allowed first ("3rd most", "10th least"), filterable to this week's games, with a game-by-game view (`context_data.dvp_table`; Detroit's season row matches the site's exactly). **It does not forecast:** on 1,534 defense-games (2022-25) a defense's season-to-date volume allowed predicted its next game slightly worse than the league average (pass attempts off by 6.45 vs 6.25), its last four games worse again (6.81), and a 50/50 blend with the league average was level (6.21), so the page says it is a description, and the projections keep using it only through the shrunken opponent multipliers.
 
-*Game-by-game breakdown (Game Lines tab).* One expandable block per game of the week, in the layout of the myspariedge.com game view: each defense's allowed stats per game (pass attempts, completions, passing yards/TDs, rush attempts/yards/TDs, targets, receptions, receiving yards/TDs) with ranks, a one-line headline (whichever of passing or rushing yards allowed sits furthest from the league middle), the team stats we already had (plays, yards, yards per play, first downs, 3rd-down rate, EPA per play, giveaways, pass rate, neutral pass rate, PROE, time of possession, and the defense's side of each; `team_stats.team_breakdown`), and our recency-weighted expected plays/yards-per-play for the matchup. Every number is shown **as played and adjusted for schedule** (toggle: both / as played / adjusted), for season to date, the last 4 games or last season, and by position for the defense tables. The adjustment: each game's number minus what that opponent normally does (or allows) in its OTHER games that season, averaged, added to the league mean, so a defense that has faced pass-heavy offenses reads better than its raw yardage (Detroit's 313.5 passing yards allowed adjusts to 306; Jacksonville's 283.0 to 297); a team whose opponent has no other games yet keeps its raw number. **What it is worth, tested** on 1,522 team-games (2022-25): a defense's own average allowed predicts its next game *worse* than the league average (pass attempts missed by 6.46 vs 6.30), the opposing offense's own average alone is slightly better (6.24), and the two combined with half weight each beat the league average by 4-5% on every volume stat (pass attempts 6.02, rush attempts 5.94, targets 5.79, passing yards 55.5 vs 57.5, rushing yards 39.1 vs 41.1). The breakdown's 'expected volume in this game' table is exactly that blend; the rest is context. The posted lines already hold most of it.
+*Game-by-game breakdown (Game Lines tab).* One expandable block per game of the week, in the layout of the myspariedge.com game view: each defense's allowed stats per game (pass attempts, completions, passing yards/TDs, rush attempts/yards/TDs, targets, receptions, receiving yards/TDs) with ranks, a one-line headline (whichever of passing or rushing yards allowed sits furthest from the league middle), the team stats we already had (plays, yards, yards per play, first downs, 3rd-down rate, EPA per play, giveaways, pass rate, neutral pass rate, PROE, time of possession, and the defense's side of each; `team_stats.team_breakdown`), and our recency-weighted expected plays/yards-per-play for the matchup. Every number is shown **as played and adjusted for schedule** (toggle: both / as played / adjusted), for season to date, the last 4 games or last season, and by position for the defense tables. The adjustment: each game's number minus what that opponent normally does (or allows) in its OTHER games that season, averaged, added to the league mean, so a defense that has faced pass-heavy offenses reads better than its raw yardage (Detroit's 313.5 passing yards allowed adjusts to 306; Jacksonville's 283.0 to 297); a team whose opponent has no other games yet keeps its raw number. In a position view (QB/RB/WR/TE) the block reads like the site's: "Falcons defense has allowed 6.1 receptions per game to RBs (2nd most)", then rush/receiving volume plus **DraftKings, FanDuel and PPR points allowed** (our scoring matches the site's to the decimal for nearly every defense); ties take the last place of their group as the site does (five teams at 1.0 are all "8th most", five at 0.0 all "1st least"), ranks use the displayed one-decimal values, and the headline is the stat furthest from the league middle among a few per position (volume and receiving TDs excluded as noisy). **What it is worth, tested** on 1,522 team-games (2022-25): a defense's own average allowed predicts its next game *worse* than the league average (pass attempts missed by 6.46 vs 6.30), the opposing offense's own average alone is slightly better (6.24), and the two combined with half weight each beat the league average by 4-5% on every volume stat (pass attempts 6.02, rush attempts 5.94, targets 5.79, passing yards 55.5 vs 57.5, rushing yards 39.1 vs 41.1). The breakdown's 'expected volume in this game' table is exactly that blend; the rest is context. The posted lines already hold most of it.
 
 *The Monday review.* Added: a **top 10 prop picks** write-up (record, flat-$1 profit at the logged prices, best call, biggest miss, season to date), **streaks** (players whose
 market the model's lean has been right 3+ weeks running, next to how many such streaks luck alone produces: a streak is a talking point, not a signal; the record on a player has

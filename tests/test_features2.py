@@ -319,25 +319,46 @@ class TestPickemTracking(unittest.TestCase):
 
 # ---- credits -----------------------------------------------------------------------------------------
 class TestBudget(unittest.TestCase):
-    def test_budget_spreads_what_is_left_over_the_weeks_left(self):
-        b = ep.props_budget(500, 13, 13, today=datetime.date(2026, 11, 1))
+    SAT = datetime.date(2026, 11, 7)
+
+    def test_the_big_run_gets_the_weekly_allowance_less_monday_nights_markets(self):
+        b = ep.props_budget(500, 13, 14, today=datetime.date(2026, 11, 1))
         self.assertGreater(b, 60)
-        self.assertLess(b, 500)
-        late = ep.props_budget(500, 13, 13, today=datetime.date(2026, 11, 26))      # one game week left: nearly everything is spendable
+        self.assertLess(b, 100)
+        full = len(ep.PRIORITY_MARKETS)
+        no_monday = ep.props_budget(500, 13, 13, today=datetime.date(2026, 11, 1))          # nothing after this run to hold back for
+        self.assertEqual(no_monday - b, full)
+        late = ep.props_budget(500, 13, 14, today=datetime.date(2026, 11, 26))              # one week left: nearly everything is spendable
         self.assertGreater(late, b)
 
-    def test_a_small_run_gets_a_small_share(self):
-        sunday = ep.props_budget(300, 13, 14, today=datetime.date(2026, 11, 8))
-        thursday = ep.props_budget(300, 1, 14, today=datetime.date(2026, 11, 8))
-        self.assertGreater(sunday, thursday)
+    def test_a_night_game_run_gets_every_priority_market(self):
+        full = len(ep.PRIORITY_MARKETS)
+        self.assertEqual(ep.props_budget(400, 1, 15, today=self.SAT), full)                 # Thursday: one game x every market
+        self.assertEqual(ep.props_budget(400, 2, 15, today=self.SAT), 2 * full)
+        self.assertGreater(ep.props_budget(400, 13, 14, today=self.SAT), ep.props_budget(400, 1, 15, today=self.SAT))
+
+    def test_the_three_runs_of_a_week_fit_inside_the_weekly_allowance(self):
+        """Thursday (1 game) + Saturday (13) + Monday (1) never plan more than a fair week's share of the month."""
+        today, remaining = datetime.date(2026, 11, 1), 500
+        full = len(ep.PRIORITY_MARKETS)
+        thu = ep.props_budget(remaining, 1, 15, today=today)
+        sat = ep.props_budget(remaining - thu, 13, 14, today=today)
+        mon = ep.props_budget(remaining - thu - sat, 1, 1, today=today)
+        weekly = remaining / ((datetime.date(2026, 12, 1) - today).days / 7) - ep.WEEKLY_OVERHEAD
+        self.assertEqual((thu, mon), (full, full))
+        self.assertLessEqual(thu + sat + mon, weekly + 2 * full)
 
     def test_budget_never_dips_into_the_reserve_or_goes_negative(self):
-        self.assertEqual(ep.props_budget(5, 13, 13, today=datetime.date(2026, 11, 8)), 0)
+        self.assertEqual(ep.props_budget(5, 13, 13, today=self.SAT), 0)
+        self.assertEqual(ep.props_budget(5, 1, 13, today=self.SAT), 0)
         self.assertLessEqual(ep.props_budget(100, 13, 13, today=datetime.date(2026, 11, 30)), 100 - ep.DEFAULT_RESERVE - ep.GAME_LINES_COST)
         self.assertIsNone(ep.props_budget(None, 13, 13))
 
     def test_december_rolls_into_january(self):
         self.assertIsNotNone(ep.props_budget(300, 5, 5, today=datetime.date(2026, 12, 20)))
+
+    def test_a_three_game_thursday_counts_as_a_big_run(self):
+        self.assertGreater(ep.props_budget(400, 3, 13, today=self.SAT), 0)
 
     def test_markets_follow_priority_and_the_budget(self):
         pri = ["m1", "m2", "m3", "m4", "m5", "m6", "m7", "m8"]

@@ -94,6 +94,41 @@ def _two_defense_history():
     return pd.DataFrame(rows)
 
 
+class TestFantasyPoints(unittest.TestCase):
+    def _pts(self, **kw):
+        row = {"passing_yards": 0, "passing_tds": 0, "passing_interceptions": 0, "rushing_yards": 0, "rushing_tds": 0, "receptions": 0, "receiving_yards": 0,
+               "receiving_tds": 0, "rushing_fumbles_lost": 0, "receiving_fumbles_lost": 0, "sack_fumbles_lost": 0, "fantasy_points_ppr": 0.0}
+        row.update(kw)
+        return cd.fantasy_points(pd.DataFrame([row])).iloc[0]
+
+    def test_a_running_back_line(self):
+        r = self._pts(rushing_yards=80, rushing_tds=1, receptions=4, receiving_yards=30, fantasy_points_ppr=21.0)
+        self.assertAlmostEqual(r["dk"], 8 + 6 + 4 + 3)             # 0.1/yd, 6/TD, 1/reception, 0.1/rec yd
+        self.assertAlmostEqual(r["fd"], 8 + 6 + 2 + 3)             # half a point per reception
+        self.assertEqual(r["ppr"], 21.0)                           # taken from nflverse
+
+    def test_draftkings_bonuses_and_fanduel_has_none(self):
+        r = self._pts(rushing_yards=100, receiving_yards=100, passing_yards=300)
+        self.assertAlmostEqual(r["dk"], 10 + 10 + 12 + 9)
+        self.assertAlmostEqual(r["fd"], 10 + 10 + 12)
+
+    def test_turnovers_cost_what_each_site_says(self):
+        r = self._pts(passing_interceptions=1, rushing_fumbles_lost=1)
+        self.assertAlmostEqual(r["dk"], -1 - 1)
+        self.assertAlmostEqual(r["fd"], -1 - 2)
+
+    def test_missing_columns_count_as_zero(self):
+        r = cd.fantasy_points(pd.DataFrame([{"rushing_yards": 50}])).iloc[0]
+        self.assertAlmostEqual(r["dk"], 5.0)
+
+    def test_the_table_carries_fantasy_points_by_position(self):
+        h = pd.DataFrame([_row("A", "B", 2026, 1, "RB", rushing_yards=100, rushing_tds=1, receptions=2, receiving_yards=10),
+                          _row("B", "A", 2026, 1, "QB", attempts=30)])
+        w = cd.dvp_table(h, 2026)["windows"]["season"]
+        self.assertAlmostEqual(w["RB"]["B"]["dk"], 10 + 6 + 2 + 1 + 3)        # includes the 100-yard bonus
+        self.assertEqual(w["QB"]["B"]["dk"], 0.0)
+
+
 class TestScheduleAdjustment(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -190,16 +225,30 @@ class TestDvpBlock(unittest.TestCase):
         rows = [{"team": "A", "x": 10}, {"team": "B", "x": 30}, {"team": "C", "x": 20}]
         self.assertEqual(self._run(f"dvRanks({json.dumps(rows)}, 'x')"), {"A": 3, "B": 1, "C": 2})
 
-    def test_ties_share_the_better_rank(self):
+    def test_ties_take_the_last_position_of_their_group_like_the_site(self):
         rows = [{"team": "A", "x": 5}, {"team": "B", "x": 5}, {"team": "C", "x": 1}]
-        self.assertEqual(self._run(f"dvRanks({json.dumps(rows)}, 'x')"), {"A": 1, "B": 1, "C": 3})
+        self.assertEqual(self._run(f"dvRanks({json.dumps(rows)}, 'x')"), {"A": 2, "B": 2, "C": 3})
+        # the site's own example: five teams at 1.0 behind three higher ones are all 8th most, and the 0.9 group is 11th
+        vals = [1.5, 1.4, 1.3, 1.0, 1.0, 1.0, 1.0, 1.0, 0.9, 0.9, 0.9]
+        rows = [{"team": f"T{i}", "x": x} for i, x in enumerate(vals)]
+        r = self._run(f"dvRanks({json.dumps(rows)}, 'x')")
+        self.assertEqual([r[f"T{i}"] for i in (3, 7, 8, 10)], [8, 8, 11, 11])
+
+    def test_ranks_use_the_displayed_one_decimal_values(self):
+        rows = [{"team": "A", "x": 1.04}, {"team": "B", "x": 0.96}, {"team": "C", "x": 1.0}, {"team": "D", "x": 2.0}]         # A, B, C all read 1.0
+        self.assertEqual(self._run(f"dvRanks({json.dumps(rows)}, 'x')"), {"A": 4, "B": 4, "C": 4, "D": 1})
+        self.assertEqual(self._run(f"dvRanks({json.dumps(rows)}, 'x', 3)"), {"A": 2, "B": 4, "C": 3, "D": 1})               # EPA-style numbers keep their decimals
+
+    def test_no_negative_zero(self):
+        self.assertEqual(self._run("[f1(-0.04), f1(0.04), f1(-1.26), f1(12.34)]"), ["0.0", "0.0", "-1.3", "12.3"])
 
     def test_labels_read_most_least_or_of_32(self):
         self.assertEqual(self._run("[1, 10, 11, 22, 23, 32].map(r => dvRankLabel(r, 32))"),
                          ["1st most", "10th most", "11th of 32", "22nd of 32", "10th least", "1st least"])
 
     def test_columns_by_position(self):
-        self.assertEqual(self._run("DV_COLS.WR"), ["tgt", "rec", "rec_yds", "rec_td"])
+        self.assertEqual(self._run("DV_COLS.WR"), ["tgt", "rec", "rec_yds", "rec_td", "dk", "fd", "ppr"])
+        self.assertEqual(self._run("DV_COLS.RB")[-3:], ["dk", "fd", "ppr"])
         self.assertEqual(len(self._run("DV_COLS.ALL")), 11)
         self.assertEqual(self._run("DV_COLS.QB")[0], "pass_att")
 
@@ -225,6 +274,44 @@ class TestDvpBlock(unittest.TestCase):
         self.assertAlmostEqual(self._run("dvExpected(40, 36, 32)"), 32 + 0.5 * 4 + 0.5 * 8)
         self.assertAlmostEqual(self._run("dvExpected(32, 32, 32)"), 32.0)
         self.assertAlmostEqual(self._run("dvExpected(40, 36, 32, 0)"), 32.0)
+
+    def test_tied_values_share_the_best_rank_from_each_end(self):
+        rows = [{"team": t, "x": v} for t, v in (("A", 2.0), ("B", 1.0), ("C", 0.0), ("D", 0.0), ("E", 0.0))]
+        self.assertEqual(self._run(f"dvRanks({json.dumps(rows)}, 'x')"), {"A": 1, "B": 2, "C": 5, "D": 5, "E": 5})
+        self.assertEqual(self._run(f"dvRanksAsc({json.dumps(rows)}, 'x')"), {"A": 5, "B": 4, "C": 1, "D": 1, "E": 1})
+
+    def test_a_zero_shared_by_many_reads_as_first_least(self):
+        n = 32
+        self.assertEqual(self._run(f"dvRankLabel(14, {n}, 1)"), "1st least")                    # tied at the bottom
+        self.assertEqual(self._run(f"dvRankLabel(14, {n})"), "14th of 32")                      # no tie information: plain rank
+        self.assertEqual(self._run(f"dvRankLabel(3, {n}, 30)"), "3rd most")
+
+    def _head(self, pos, team, row, ranks_desc, n=32):
+        asc = {k: {team: n - v[team] + 1} for k, v in ranks_desc.items()}
+        return self._run(f"dvHeadline({json.dumps(team)}, {json.dumps(row)}, {json.dumps(ranks_desc)}, {n}, false, {json.dumps(pos)}, {json.dumps(asc)})")
+
+    def test_position_headlines_match_the_sites_examples(self):
+        # Falcons vs RBs: receptions (2nd most) beats rush yards (21st), rushing TDs (8th most), receiving yards (6th most), DK (5th most)
+        r = {"rush_yds": {"ATL": 21}, "rush_td": {"ATL": 8}, "rec": {"ATL": 2}, "rec_yds": {"ATL": 6}, "dk": {"ATL": 5}}
+        row = {"rush_yds": 81.7, "rush_td": 1.0, "rec": 6.1, "rec_yds": 38.9, "dk": 26.9}
+        self.assertEqual(self._head("RB", "ATL", row, r), "Falcons defense has allowed 6.1 receptions per game to RBs (2nd most)")
+        # Jets: receptions 5th least beats everything else, including 2nd-most rush attempts (not a headline stat)
+        r = {"rush_yds": {"NYJ": 6}, "rush_td": {"NYJ": 20}, "rec": {"NYJ": 28}, "rec_yds": {"NYJ": 26}, "dk": {"NYJ": 15}}
+        row = {"rush_yds": 106.6, "rush_td": 0.7, "rec": 3.4, "rec_yds": 21.6, "dk": 22.7}
+        self.assertEqual(self._head("RB", "NYJ", row, r), "Jets defense has allowed 3.4 receptions per game to RBs (5th least)")
+        # Patriots: nothing is extreme; the 21st-of-32 DraftKings number is the furthest from the middle
+        r = {"rush_yds": {"NE": 19}, "rush_td": {"NE": 20}, "rec": {"NE": 16}, "rec_yds": {"NE": 14}, "dk": {"NE": 21}}
+        row = {"rush_yds": 83.4, "rush_td": 0.7, "rec": 4.4, "rec_yds": 35.4, "dk": 20.6}
+        self.assertEqual(self._head("RB", "NE", row, r), "Patriots defense has allowed 20.6 DraftKings points per game to RBs (21st of 32)")
+
+    def test_ties_between_headline_stats_go_to_the_earlier_one(self):
+        r = {"rush_yds": {"MIA": 11}, "rush_td": {"MIA": 26}, "rec": {"MIA": 4}, "rec_yds": {"MIA": 3}, "dk": {"MIA": 3}}      # rec yards and DK both 3rd most
+        row = {"rush_yds": 102.5, "rush_td": 0.5, "rec": 5.7, "rec_yds": 46.0, "dk": 29.3}
+        self.assertIn("46.0 receiving yards", self._head("RB", "MIA", row, r))
+
+    def test_wr_and_te_headlines_use_receiving_stats_only(self):
+        r = {"rec": {"X": 9}, "rec_yds": {"X": 2}, "dk": {"X": 12}}
+        self.assertIn("receiving yards per game to WRs (2nd most)", self._head("WR", "X", {"rec": 1, "rec_yds": 150.0, "dk": 3}, r))
 
     def test_every_team_has_a_nickname(self):
         names = self._run("TEAM_NAMES")

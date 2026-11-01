@@ -453,15 +453,18 @@ def build_context(props, games, history, season, sample=False) -> dict:
 
 # ---- staying inside the Odds API credit budget -----------------------------------------
 GAME_LINES_COST = 3          # the bulk spreads + totals + moneyline call, one region
-WEEKLY_OVERHEAD = 24         # credits a week that never go to props: three refresh game-lines pulls (9), four collector pulls (12), slack
+WEEKLY_OVERHEAD = 18         # credits a week that never go to props: three refresh game-lines pulls (9), two collector pulls (6), slack
+SMALL_RUN_GAMES = 2          # a Thursday- or Monday-night run: at most this many games
 DEFAULT_RESERVE = 10         # credits left untouched for the next game day's pull (Monday night, Thursday night)
 
 
 def props_budget(remaining, n_run, n_week, today=None, reserve=DEFAULT_RESERVE, fixed=GAME_LINES_COST):
     """
-    Credits this run may spend on props. The free plan's 500 credits reset around the 1st, so what is left is spread over the
-    weeks left in the month (an even weekly share, less the fixed game-lines pulls), and a run gets the share of its week's games it covers: a Thursday-night run
-    is a fraction of the week, the Sunday run is nearly all of what remains. Never below zero, never into the reserve.
+    Credits this run may spend on props. The free plan's 500 credits reset around the 1st, so what is left is spread evenly over the
+    weeks left in the month, less the week's fixed game-lines pulls (WEEKLY_OVERHEAD). The week has three props runs: a Thursday-night
+    game, the Sunday slate (pulled Saturday morning) and Monday night. The small ones (at most SMALL_RUN_GAMES games) are cheap and
+    get every priority market; the big run takes the weekly allowance minus what is held back for the small run still to come, so
+    Monday night is never starved by Sunday. Never below zero, never into the reserve.
     """
     if remaining is None:
         return None
@@ -469,8 +472,12 @@ def props_budget(remaining, n_run, n_week, today=None, reserve=DEFAULT_RESERVE, 
     first_next = datetime.date(today.year + (today.month == 12), today.month % 12 + 1, 1)
     weeks_left = max((first_next - today).days / 7.0, 1.0)
     weekly = max(0.0, remaining / weeks_left - WEEKLY_OVERHEAD)
-    share = n_run / max(n_week, n_run, 1)
-    return int(max(0, min(remaining - reserve - fixed, weekly * share)))
+    cap = remaining - reserve - fixed
+    full = len(PRIORITY_MARKETS)
+    if n_run <= SMALL_RUN_GAMES:
+        return int(max(0, min(n_run * full, weekly, cap)))
+    held = min(max(n_week - n_run, 0), SMALL_RUN_GAMES) * full           # games after this run: normally Monday night
+    return int(max(0, min(cap - held, weekly - held)))
 
 
 def choose_markets_by_budget(priority, budget, n_events, min_markets=3):

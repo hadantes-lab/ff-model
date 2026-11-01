@@ -223,8 +223,9 @@ def team_breakdown(tg: pd.DataFrame, season: int, last_n: int = 4) -> dict:
                         bd = baseline(r.opp, r.season, r.game_id, ocol)       # what that opponent's offense normally does
                         if np.isfinite(bd) and np.isfinite(getattr(r, dcol)):
                             d_d.append(getattr(r, dcol) - bd)
-                    off_adj[name] = _r((lg[ocol] + np.mean(d_o)) * scale, 3) if d_o else off[name]
-                    dfn_adj[name] = _r((lg[dcol] + np.mean(d_d)) * scale, 3) if d_d else dfn[name]
+                    floor = -np.inf if name in ("epa_pp", "proe") else 0.0            # only the net measures can be negative
+                    off_adj[name] = _r(max(floor, (lg[ocol] + np.mean(d_o)) * scale), 3) if d_o else off[name]
+                    dfn_adj[name] = _r(max(floor, (lg[dcol] + np.mean(d_d)) * scale), 3) if d_d else dfn[name]
             res[team] = {"g": int(len(g)), "off": off, "def": dfn, "off_adj": off_adj, "def_adj": dfn_adj}
         return res
 

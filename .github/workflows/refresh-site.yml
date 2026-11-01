@@ -1,13 +1,17 @@
 name: Refresh site
 
-# Sunday, Monday and Thursday mornings (NFL game days). Cron runs in UTC.
+# Monday, Thursday and Saturday mornings. Cron runs in UTC.
+#   Saturday  pulls the player props for every Sunday game (and Sunday night) and publishes the week's page;
+#   Monday    publishes Monday night's game alone (props, lines, defense vs position) plus the weekly report on the weekend;
+#   Thursday  publishes Thursday night's game alone, plus the report on the full week including Monday night.
+# Three runs a week instead of four is part of staying inside the Odds API's 500 free credits a month (see props_budget in export_props.py).
 # Scheduled to start at 11:17 UTC = 6:17 AM CDT / 5:17 AM CST, NOT at 8 AM sharp: GitHub queues scheduled runs
 # late under load, worst at the top of the hour (it was 4-8 hours late on three occasions), so the schedule asks early
 # and at an off-peak minute to have the page ready by 8. Run it by hand any time from the Actions tab.
 # A scheduled run that starts after a recent successful run (e.g. you ran it by hand) skips itself, see `gate`.
 on:
   schedule:
-    - cron: "17 11 * * 0,1,4"
+    - cron: "17 11 * * 1,4,6"
   workflow_dispatch:
 
 permissions:
@@ -111,7 +115,10 @@ jobs:
       - name: Rebuild props page
         if: steps.key.outputs.have_key == 'true'
         run: |
-          python export_props.py --days 1
+          # Saturday looks 2 days ahead so the whole Sunday slate (and Sunday night) is priced in one pull; every other run is a
+          # single night game, so 1 day. A manual run any other day looks one day ahead too (use --days by hand for more).
+          if [ "$(date -u +%u)" = "6" ]; then DAYS=2; else DAYS=1; fi
+          python export_props.py --days "$DAYS"
           python web/build_props_page.py
 
       # Copies finished HTML pages only -- never the raw JSON snapshots.

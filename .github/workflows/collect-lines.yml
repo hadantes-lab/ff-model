@@ -1,11 +1,11 @@
 name: Collect lines
 
-# The off days (Tue, Wed, Fri, Sat). The main refresh covers Sun/Mon/Thu; this adds cheap game-line
-# pulls in between so line movement and closing lines build up. One bulk call, ~2 Odds API credits,
+# Wednesday and Sunday. The main refresh covers Mon/Thu/Sat; this adds two cheap game-line pulls (3 credits each)
+# so line movement builds up: Wednesday for the week's opening numbers, Sunday morning for the closing lines of the Sunday games. One bulk call, ~2 Odds API credits,
 # no simulation, no site rebuild. 11:43 UTC = 6:43 AM CDT; an off-peak minute because GitHub queues scheduled runs late.
 on:
   schedule:
-    - cron: "43 11 * * 2,3,5,6"
+    - cron: "43 11 * * 0,3"
   workflow_dispatch:
 
 permissions:
@@ -47,7 +47,7 @@ jobs:
         run: python collect_lines.py
 
       # Past games' prop lines from ESPN (free; one request per finished game; see espn_lines.py). Unofficial
-      # endpoint, so it may fail without failing the run. Tue/Wed/Fri/Sat picks up the previous days' games.
+      # endpoint, so it may fail without failing the run. Wednesday picks up the weekend's and Monday night's games.
       - name: Collect ESPN lines for newly finished games
         if: steps.key.outputs.have_key == 'true'
         continue-on-error: true

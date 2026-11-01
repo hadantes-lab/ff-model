@@ -236,11 +236,31 @@ def defense_vs_position(history: pd.DataFrame, season: int, markets: dict, min_g
 
 
 # ---- defense vs position: the full volume table ------------------------------------------------
-DVP_STATS = ["pass_att", "cmp", "pass_yds", "pass_td", "rush_att", "rush_yds", "rush_td", "tgt", "rec", "rec_yds", "rec_td"]
+DVP_STATS = ["pass_att", "cmp", "pass_yds", "pass_td", "rush_att", "rush_yds", "rush_td", "tgt", "rec", "rec_yds", "rec_td", "dk", "fd", "ppr"]
 DVP_COLS = {"pass_att": "attempts", "cmp": "completions", "pass_yds": "passing_yards", "pass_td": "passing_tds", "rush_att": "carries",
             "rush_yds": "rushing_yards", "rush_td": "rushing_tds", "tgt": "targets", "rec": "receptions", "rec_yds": "receiving_yards",
             "rec_td": "receiving_tds"}
 DVP_GROUP = {"QB": "QB", "RB": "RB", "FB": "RB", "WR": "WR", "TE": "TE"}
+
+
+def fantasy_points(h: pd.DataFrame) -> pd.DataFrame:
+    """
+    DraftKings (full PPR, +3 for 300 passing / 100 rushing / 100 receiving yards, fumble lost -1), FanDuel (half PPR, no bonuses, fumble
+    lost -2, interception -1) and PPR (nflverse's own fantasy_points_ppr: interception and fumble lost -2) points for every player-game.
+    Missing stat columns count as zero.
+    """
+    def col(name):
+        return h[name].fillna(0.0) if name in h else pd.Series(0.0, index=h.index)
+
+    pyd, ptd, ints = col("passing_yards"), col("passing_tds"), col("passing_interceptions")
+    ryd, rtd, rec, cyd, ctd = col("rushing_yards"), col("rushing_tds"), col("receptions"), col("receiving_yards"), col("receiving_tds")
+    lost = col("sack_fumbles_lost") + col("rushing_fumbles_lost") + col("receiving_fumbles_lost")
+    two = col("passing_2pt_conversions") + col("rushing_2pt_conversions") + col("receiving_2pt_conversions")
+    base = 0.04 * pyd + 4 * ptd + 0.1 * ryd + 6 * rtd + 0.1 * cyd + 6 * ctd + 2 * two
+    dk = base - ints + rec + 3 * ((pyd >= 300).astype(float) + (ryd >= 100).astype(float) + (cyd >= 100).astype(float)) - lost
+    fd = base - ints + 0.5 * rec - 2 * lost
+    ppr = col("fantasy_points_ppr") if "fantasy_points_ppr" in h else base - 2 * ints + rec - 2 * lost
+    return pd.DataFrame({"dk": dk, "fd": fd, "ppr": ppr}, index=h.index)
 
 
 def dvp_table(history: pd.DataFrame, season: int, last_n: int = 4) -> dict:
@@ -255,6 +275,7 @@ def dvp_table(history: pd.DataFrame, season: int, last_n: int = 4) -> dict:
     h["grp"] = h["position"].map(DVP_GROUP)
     for k, c in DVP_COLS.items():
         h[k] = h[c].fillna(0.0) if c in h else 0.0
+    h[["dk", "fd", "ppr"]] = fantasy_points(h)
     by = h.groupby(["opponent_team", "season", "week", "grp"])[DVP_STATS].sum().reset_index()
     tot = h.groupby(["opponent_team", "season", "week"])[DVP_STATS].sum().reset_index().assign(grp="ALL")
     by = pd.concat([by, tot], ignore_index=True)
@@ -294,7 +315,7 @@ def dvp_table(history: pd.DataFrame, season: int, last_n: int = 4) -> dict:
                     base = o.reindex([(t, s, x) for x in others])[DVP_STATS].fillna(0.0).mean()
                     for k in DVP_STATS:
                         diffs[k].append(float(row[k]) - float(base[k]))
-                r["adj"] = {k: round(lg[k] + float(np.mean(diffs[k])), 2) if diffs[k] else r[k] for k in DVP_STATS}
+                r["adj"] = {k: max(0.0, round(lg[k] + float(np.mean(diffs[k])), 2)) if diffs[k] else r[k] for k in DVP_STATS}   # a rate can't go below zero
                 r["adj_games"] = len(diffs["pass_att"])
                 del r["_keys"], r["_vals"]
             out[pos] = res
