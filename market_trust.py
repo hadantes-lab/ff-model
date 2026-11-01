@@ -192,7 +192,7 @@ def build_frame(seasons=(2024, 2025)) -> pd.DataFrame:
     import espn_lines as el
 
     h = bt.load(list(seasons))
-    bt.MARKETS = {m: s for m, s in bt.MARKETS.items() if s.kind != "td"}
+    bt.MARKETS = {m: s for m, s in bt.MARKETS.items() if s.kind != "td" and m not in pm.MODEL_ONLY}
     opp_lookup = {}
     for s, w in sorted({(int(a), int(b)) for a, b in h.loc[h["season"].isin(seasons) & (h["week"] >= 4), ["season", "week"]].to_numpy()}):
         prior = h[(h["season"] * 100 + h["week"]) < (s * 100 + w)]

@@ -524,6 +524,67 @@ balance the free events call reports: props for as many games as the credits cov
 soonest kickoffs first, with a note on the page for any skipped games; if a call fails mid-pull (out of credits) it stops, keeps what it has and still builds the page
 instead of crashing, and the off-day collector exits cleanly when it can't pull. This is why Sunday may show props for the first 10 of 13 games when the balance is low.
 
+**Round two: totals, teasers, volume markets, targets, Underdog entries, the by-game page, and the review.** What was built, and what testing it
+found, both the useful and the unflattering parts.
+
+*Over/under (`totals_model.py`).* The old total came from rolling the player simulation up into team points, and it ran about 10 points high against the
+posted totals (54.9 projected vs 44.4 posted on one slate) with nearly every game called an over. Searching for better inputs turned up the usual list (scoring
+rates, pace, EPA, wind, domes), so each was tested walk-forward on 3,771 regular-season games (2012-26, closing totals from nflverse, every season predicted from
+earlier ones only) against `actual total - closing total`. Result: **the closing total is efficient**. Its average miss is 10.4 points (SD 13.1) with no tilt by
+season, week or line level (actual = 1.02 x line - 0.1), and teams' decayed points for/against, plays per game, offensive/defensive EPA per play and pass rate add
+nothing out of sample (R-squared -0.003 to 0.000, win rate 49-51%). Two weather effects are real but small: **domes** finish about 1 point above the closing total
+(3 standard errors, higher in 12 of 15 seasons, though betting every dome over won only 52% walk-forward) and **outdoor games with wind of 12+ mph** finish 1.5-2
+points below (56.9% unders walk-forward, n = 281). The model is therefore *the posted total plus a weather adjustment* (centered, and shrunk 25% because a forecast
+is noisier than the measured wind it was fit on), with the real spread of the miss (SD 13) behind the probabilities; most games get a prediction equal to the
+line and a ~50% total, which is the honest answer. Walk-forward, its picks at |adjustment| >= 0.3 pt won 53.5% (n = 831) and at >= 1 pt 54.9% (n = 224) against
+52.4% needed at -110: promising, not proven. The simulation still prices player props; it just no longer sets a game total. `python totals_model.py --write` refits.
+
+*One slate at a time.* The Odds API posts everything for the next 7 days, so a Thursday run used to mix in next Thursday's game and the teaser/parlay lists mixed
+weeks. `export_props.filter_to_slate` keeps only the week of the earliest game not yet started, for props, game cards, moneyline parlays and teasers, and teaser
+pairs only ever combine two games of the same week.
+
+*Wong teasers, fixed.* Besides the week bug, a week with no game on exactly +-1.5/2.5/7.5/8.5 showed nothing. `parlays.teaser_curve` now rates a 6-point teaser leg at
+every half-point spread from -14 to +14 from 2014+ history, shrunk toward the flat ~67% a normal miss gives (a first version shrank toward the wrong, spread-dependent curve
+and rated big underdogs 80%+; an out-of-sample check, fitted 2014-21 and tested 2022-25, caught it: those legs covered 50-70%). Corrected, the legs the curve rates 74.3-76%
+covered 77.5% and the ones above 76% covered 66.7%, so treat the number as +-3 points. Key numbers hold: +1.5 covered 75%, +2.5 77%, +4 76%; the -7.5 favorite leg
+covered 57%. Legs are tagged Wong when they sit on the key numbers, and "clears break-even" only when the rate beats the 73.9% a 2-team teaser at -120 needs. Out of
+sample the legs clearing it were break-even (EV about 0.0% at -120), i.e. teasers are not a money machine; the underdog Wong legs are as good as it gets.
+
+*Volume markets and the credit budget.* The pull is now `receptions, rush attempts, receiving yards, pass attempts, rush yards, pass completions, pass yards,
+pass TDs` in that order of priority, and `export_props.props_budget` decides how many of them a run can afford: the credits left are spread over the weeks left in the
+month (the free plan resets around the 1st), less 24 a week of fixed game-lines pulls, and a run gets the share of the week's games it covers, so a Thursday-night
+run spends a few credits and the Sunday run most of the week's. With an even 500 credits that is about six to eight markets for a full Sunday slate; with fewer, fewer
+markets for every game (floor of three, then later games are dropped). Rush attempts, pass attempts and completions already carry measured game-script effects in
+`model_calibration.json` (favorites run more, trailing teams throw more; each dampened by how well it held out of sample), and script-aligned legs get a larger
+bonus for volume markets than for yardage in the pick'em builder.
+
+*Targets (`target_track.py`).* No book in the Odds API posts a targets line, so targets are a model-only market: a projection with a median "model line" and no price; type
+your app's line into the box under each game's targets table and it reads the chance off the distribution. Injuries and depth charts act through the same pieces as every
+prop (Out/Doubtful players are dropped; a backup stepping into a starter's role is scaled up). **A test that did not pan out:** redistributing a missing teammate's targets
+to everyone else made projections *worse* (6 seasons of injury reports, 12,559 player-games with a regular role: mean error 2.035 targets with no adjustment, 2.036 / 2.039 /
+2.050 / 2.081 when 10 / 20 / 50 / 100% of the vacated targets are passed on; players do pick up about 4-7% more when a regular is out, which is the whole effect), so no such
+redistribution is applied. The projection is logged (`tracking/target_proj.csv`) and the Monday report grades it against each player's recent average, the thing it has to
+beat to be worth reading. There is no market line to test "exploitable" against; that stays unproven.
+
+*Underdog pick'em entries.* Pick'em apps post one line and a Higher/Lower choice. When the default pull includes Underdog (the default is nine sportsbooks plus Underdog, ten
+bookmakers, which costs the same as one region; if the API rejects the list the run falls back to the plain US region) a prop carries Underdog's own line, and its pick'em
+probability is the market's probability for that side moved by how far the model says the line sits from the sportsbooks' (capped at 12 points). Entries: two 4-pick
+**high confidence** sets (the most likely to hit in full, flex-friendly) and two 5-pick **high upside** sets (best 20x standard-entry value), sorted by confidence, from picks where
+the model's lean matches the market's, with measured same-game correlation, a game-script bonus (bigger for volume markets) and the market-quality factor. Each shows the chance every
+pick hits, the chance of at most one miss, the per-pick break-even, and the EV of a standard and a flex entry. Payout tables (`parlays.PICKEM_PAYOUTS`) are assumptions: confirm yours.
+Same logging/grading as other parlays (`tracking/parlay_log.csv`, flex pays on partial hits).
+
+*The By-game page.* This Week is now one section per game (kickoff, spread, total, weather, count and best of its props, a defense-vs-position strip showing how soft each
+opponent is by position), opening to that game's props sorted by confidence (the chance the better side hits at the pick'em line; the other sorts remain). The top-10 board, track
+record and parlay panels sit above; the left rail still jumps to a game or player.
+
+*"Betting models" from other sites.* The site named, mysportsedge.com, turned out to cover only NBA and NHL (a no-vig consensus edge scanner), so nothing was copied from it; the
+defense-vs-position view is built from the nflverse data already here.
+
+*The Monday review.* Added: a **top 10 prop picks** write-up (record, flat-$1 profit at the logged prices, best call, biggest miss, season to date), **streaks** (players whose
+market the model's lean has been right 3+ weeks running, next to how many such streaks luck alone produces: a streak is a talking point, not a signal; the record on a player has
+not predicted his next result) and **target projection accuracy**. See `review_extras.py`.
+
 How the model works, and what it still can't see: `props_model.py`. It does not know about
 weather or in-game injuries, and it simulates players independently of each other (aside from
 the shared game-script factor `game_odds.py` uses for team totals). Treat large model-vs-market
@@ -533,6 +594,5 @@ gaps as "the model is missing something" until proven otherwise.
 
 - Live odds via The Odds API (feeds real lines into `find_edge`)
 - Injury/inactive scraping to auto-adjust volume
-- Weather for totals (wind/precip move scoring)
 - Proper correlation matrix (QB-WR stacks) for sharper spreads
 - Kelly bet sizing off the EV numbers

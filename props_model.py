@@ -105,6 +105,14 @@ MARKETS = {
     "player_rush_longest":       Spec("Long Rush",     ("long_rush",), "yards"),
 }
 
+# Markets the model projects that no sportsbook in the Odds API posts: they have a projection and a model line (the median),
+# but no price, so there is no edge or EV to compute. The page lets you type your own book's line against the distribution.
+MODEL_ONLY = {
+    "player_targets":            Spec("Targets",       ("targets",), "count"),
+}
+ALL_MARKETS = {**MARKETS, **MODEL_ONLY}
+
+
 # Minimum recent average for a player to count as a "regular" for a stat. Used when estimating
 # league-wide effects (bias, game environment): a backup QB whose 2 attempts a game come in
 # garbage time, or a WR4 with an occasional catch, has erratic outcomes that swamp the signal
@@ -114,7 +122,7 @@ ROLE_FLOOR = {
     "player_pass_completions": 10.0, "player_pass_interceptions": 0.3,
     "player_rush_yds": 20.0, "player_rush_attempts": 5.0, "player_receptions": 2.0,
     "player_reception_yds": 20.0, "player_rush_reception_yds": 25.0, "player_anytime_td": 0.0,
-    "player_reception_longest": 12.0, "player_rush_longest": 7.0,
+    "player_reception_longest": 12.0, "player_rush_longest": 7.0, "player_targets": 3.0,
 }
 
 # cheapest useful set first: what most people mean by "player props"
@@ -130,6 +138,14 @@ CORE_MARKETS = [
 EXTENDED_MARKETS = [
     "player_pass_attempts", "player_pass_completions", "player_rush_attempts", "player_rush_reception_yds",
     "player_reception_longest", "player_rush_longest",
+]
+
+# What to pull, most valuable first. The Odds API charges one credit per market per game, so a short balance buys the first
+# N of these for every game rather than everything for a few. Volume markets (attempts, receptions, completions) lead because
+# they are the ones game script moves and the ones pick'em apps post; pass TDs, the noisiest, come last.
+PRIORITY_MARKETS = [
+    "player_receptions", "player_rush_attempts", "player_reception_yds", "player_pass_attempts",
+    "player_rush_yds", "player_pass_completions", "player_pass_yds", "player_pass_tds",
 ]
 
 
@@ -176,7 +192,9 @@ def build_history(player_stats: pd.DataFrame, longest: pd.DataFrame = None) -> p
     for col in ("long_rec", "long_rush"):
         if col not in df:
             df[col] = 0.0
-    for col in {c for s in MARKETS.values() for c in s.cols}:
+    for col in {c for s in ALL_MARKETS.values() for c in s.cols}:
+        if col not in df:
+            df[col] = 0.0
         df[col] = df[col].fillna(0)
     return df.sort_values(["season", "week"]).reset_index(drop=True)
 

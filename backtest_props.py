@@ -31,7 +31,7 @@ import nflreadpy as nfl
 import game_context as gc
 import props_model as pm
 
-MARKETS = {m: s for m, s in pm.MARKETS.items() if s.kind != "td"}
+MARKETS = {m: s for m, s in pm.ALL_MARKETS.items() if s.kind != "td"}      # includes the model-only targets market
 
 
 def load(seasons):

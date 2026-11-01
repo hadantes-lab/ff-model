@@ -338,6 +338,19 @@
     border-top: 1px solid var(--border); font-size: 13px; align-items: baseline; }
   .pleg .nm { font-weight: 600; } .pleg .sub { font-size: 11.5px; color: var(--text-faint); }
   .pnote { font-size: 12px; color: var(--text-faint); margin-top: 6px; }
+  .gsec { margin: 10px 0; border: 1px solid var(--border); border-radius: 12px; background: var(--surface, transparent); overflow: hidden; }
+  .gsec-head { display: grid; grid-template-columns: minmax(150px, 1.1fr) minmax(150px, 1fr) minmax(200px, 2fr) 18px; gap: 4px 14px; align-items: center;
+    width: 100%; text-align: left; padding: 12px 14px; background: none; border: 0; color: inherit; font: inherit; cursor: pointer; }
+  .gsec-head:hover { background: rgba(127,127,127,.07); }
+  .gsec-head .gm { color: var(--text-faint); font-size: 12.5px; display: flex; gap: 10px; flex-wrap: wrap; }
+  .gsec-head .gc { font-size: 12.5px; color: var(--text-faint); }
+  .gsec-head .caret { transition: transform .15s; } .gsec.open .gsec-head .caret { transform: rotate(90deg); }
+  .gsec-body { border-top: 1px solid var(--border); padding: 4px 8px 10px; }
+  .gsec-body .row { margin: 6px 0; }
+  .tgt-title { margin: 14px 8px 4px; font-size: 13.5px; font-weight: 700; }
+  .tgt input { width: 70px; }
+  @media (max-width: 720px) { .gsec-head { grid-template-columns: 1fr 18px; } .gsec-head .gm, .gsec-head .gc { grid-column: 1; } .gsec-head .caret { grid-column: 2; grid-row: 1; } }
+  .uleg-line { font-size: 12px; color: var(--text-faint); }
   .ptbl { width: 100%; border-collapse: collapse; font-size: 13px; }
   .ptbl th, .ptbl td { padding: 5px 8px; text-align: left; border-top: 1px solid var(--border); white-space: nowrap; }
   .ptbl th { color: var(--text-faint); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; border-top: none; }
@@ -383,7 +396,7 @@
     <label class="check"><input type="checkbox" id="only-ev"> Model +EV only</label>
     <label class="check"><input type="checkbox" id="hide-thin"> Hide thin samples</label>
     <select class="field spacer" id="sort" aria-label="Sort">
-      <option value="ev">Sort: best EV</option><option value="edge">Sort: biggest edge</option><option value="gap">Sort: biggest raw model gap</option>
+      <option value="conf">Sort: most confident</option><option value="ev">Sort: best EV</option><option value="edge">Sort: biggest edge</option><option value="gap">Sort: biggest raw model gap</option>
       <option value="name">Sort: player</option><option value="time">Sort: kickoff</option>
     </select>
   </div>
@@ -481,7 +494,10 @@ function renderHeader() {
 }
 
 /* ---------- filters + list ---------- */
-const S = { markets: new Set(), pos: "", game: "", player: null, q: "", sort: "ev", onlyEv: false, hideThin: false, limit: 80, open: null };
+const S = { markets: new Set(), pos: "", game: "", player: null, q: "", sort: "conf", onlyEv: false, hideThin: false, limit: 80, open: null, openGames: new Set() };
+const TG = (DATA.targets || []).map((p, i) => Object.assign(p, { tid: i }));
+/* confidence = the chance the better side hits at the pick'em line (Underdog's when the pull had it, else the sportsbook line) */
+const confOf = p => p.pickem ? p.pickem.prob : Math.max(p.over, p.under);
 
 function buildControls() {
   const labels = [...new Map(P.map(p => [p.market, p.label]))];
@@ -493,7 +509,7 @@ function visible() {
   let rows = P.filter(p =>
     (!S.markets.size || S.markets.has(p.market)) && (!S.pos || p.pos === S.pos) && (!S.game || p.game === S.game) && (!S.player || p.player === S.player) &&
     (!q || p.player.toLowerCase().includes(q) || p.team.toLowerCase().includes(q) || p.game.toLowerCase().includes(q)) && (!S.onlyEv || (p.pick_ev != null && p.pick_ev > 0)) && (!S.hideThin || !p.thin));
-  const key = { ev: p => -(p.pick_ev ?? -9), edge: p => -Math.abs(p.edge ?? 0), gap: p => -Math.abs((p.line_gap ?? 0) / (p.line || 1)), name: p => p.player, time: p => p.commence + p.player }[S.sort];
+  const key = { conf: p => -confOf(p), ev: p => -(p.pick_ev ?? -9), edge: p => -Math.abs(p.edge ?? 0), gap: p => -Math.abs((p.line_gap ?? 0) / (p.line || 1)), name: p => p.player, time: p => p.commence + p.player }[S.sort];
   return rows.sort((a, b) => { const x = key(a), y = key(b); return x < y ? -1 : x > y ? 1 : 0; });
 }
 
@@ -506,7 +522,7 @@ function rowHTML(p) {
     <div class="row-head" role="button" tabindex="0" aria-expanded="${S.open === p.id}">
       <div class="who"><div class="name">${esc(p.player)}</div>
         <div class="sub"><span>${p.team} ${p.home ? "vs" : "@"} ${p.opp}</span><span class="tag">${p.pos}</span>${p.top_rank ? `<span class="tag gold" title="One of the week's 10 best prop picks by expected value">Top ${p.top_rank}</span>` : ""}${p.confidence && p.confidence.n ? `<span class="tag ${p.confidence.grade >= 6.5 ? "ok" : p.confidence.grade <= 3.5 ? "warn" : ""}" title="${confTitle(p.confidence)}">Model ${p.confidence.grade.toFixed(1)}/10</span>` : ""}
-          ${p.injury ? `<span class="tag warn">${esc(p.injury)}</span>` : ""}${p.promoted ? `<span class="tag" title="A teammate ahead of him in usage is Out/Doubtful/IR; his volume is scaled x${p.promoted} toward the team's rate">backup starting</span>` : ""}${p.thin ? `<span class="tag warn">${p.n_games} games</span>` : ""}${p.env && Math.abs(p.env.mult - 1) >= 0.04 ? `<span class="tag" title="Game total ${p.env.total}, ${p.team} implied ${p.env.implied}: moves the projection ${signed((p.env.mult - 1) * 100, 1)}%">${p.env.total} total ${signed((p.env.mult - 1) * 100, 0)}%</span>` : ""}${p.dfs && p.dfs.some(d => d.gap !== 0) ? `<span class="tag">pick'em line differs</span>` : ""}${big ? `<span class="tag warn" title="The raw model is ${Math.abs(p.gap).toFixed(0)} points from the market, far more than a real edge usually is">model far from market</span>` : ""}</div></div>
+          ${p.injury ? `<span class="tag warn">${esc(p.injury)}</span>` : ""}${p.promoted ? `<span class="tag" title="A teammate ahead of him in usage is Out/Doubtful/IR; his volume is scaled x${p.promoted} toward the team's rate">backup starting</span>` : ""}${p.thin ? `<span class="tag warn">${p.n_games} games</span>` : ""}${p.env && Math.abs(p.env.mult - 1) >= 0.04 ? `<span class="tag" title="Game total ${p.env.total}, ${p.team} implied ${p.env.implied}: moves the projection ${signed((p.env.mult - 1) * 100, 1)}%">${p.env.total} total ${signed((p.env.mult - 1) * 100, 0)}%</span>` : ""}${p.pickem ? `<span class="tag ${p.pickem.grade === "high" ? "ok" : p.pickem.grade === "low" ? "warn" : ""}" title="${p.pickem.book ? esc(p.pickem.book) + " line" : "Sportsbook line (no pick'em line in this pull)"}: chance the ${p.pickem.side} hits ${pct(p.pickem.prob, 1)}${p.pickem.line_edge >= 0.01 ? "; the pick'em line is softer than the sportsbooks' by " + pct(p.pickem.line_edge, 1) : ""}${p.pickem.agree ? "" : "; the raw model leans the other way"}">${p.pickem.book ? "UD " : ""}${p.pickem.side === "over" ? "O" : "U"} ${p.pickem.line} &middot; ${pct(p.pickem.prob)}</span>` : ""}${p.dfs && p.dfs.some(d => d.gap !== 0) && !p.pickem?.book ? `<span class="tag">pick'em line differs</span>` : ""}${big ? `<span class="tag warn" title="The raw model is ${Math.abs(p.gap).toFixed(0)} points from the market, far more than a real edge usually is">model far from market</span>` : ""}</div></div>
       <div class="mk"><div class="lbl">${esc(p.label)}</div><div class="line">${fmtLine(p)}</div></div>
       <div class="model"><div class="mean">${p.kind === "td" ? pct(p.over, 1) : "μ " + p.mean}</div>
         <div class="pair">${p.kind === "td" ? "P(TD) adj" : "P(over) adj " + pct(p.over)} · raw ${pct(p.model_over)}${p.market_over != null ? ` · mkt ${pct(p.market_over)}${p.fair_over == null ? "*" : ""}` : ""}</div></div>
@@ -519,10 +535,72 @@ function rowHTML(p) {
   </div>`;
 }
 
+function gameMeta(game) { return (DATA.games || []).find(g => g.game === game) || null; }
+
+function gameHeadHTML(game, rows, open, commence) {
+  const g = gameMeta(game), [away, home] = game.split(" @ ");
+  const w = ((DATA.context || {}).weather || {})[game];
+  const wx = !w ? "" : w.indoors ? "Dome" : `${w.temp_f ?? "?"}&deg; &middot; ${w.wind_mph ?? "?"} mph wind`;
+  const spread = g ? (g.home_spread <= 0 ? `${home} ${g.home_spread}` : `${away} ${-g.home_spread}`) : "";
+  const withPk = rows.filter(p => p.pickem);
+  const best = withPk.slice().sort((a, b) => b.pickem.prob - a.pickem.prob)[0];
+  const nHigh = withPk.filter(p => p.pickem.prob >= 0.6).length;
+  return `<button class="gsec-head" data-gsec="${esc(game)}" aria-expanded="${open}">
+    <div><strong>${esc(away)} @ ${esc(home)}</strong><div class="gm"><span>${new Date(commence).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })}</span></div></div>
+    <div class="gm">${spread ? `<span>${esc(spread)}</span>` : ""}${g ? `<span>O/U ${g.total}</span>` : ""}${wx ? `<span>${wx}</span>` : ""}</div>
+    <div class="gc">${rows.length} props${nHigh ? ` &middot; <b>${nHigh} high confidence</b>` : ""}${best ? `<br>Most confident: ${esc(best.player)} ${esc(best.label)} ${best.pickem.side} ${best.pickem.line} (${pct(best.pickem.prob)})` : ""}</div>
+    <div class="caret" aria-hidden="true">&rsaquo;</div></button>`;
+}
+
+/* Defense-vs-position at a glance for one game: how soft the defense each offense faces is, by position and stat (rank 1 = allows the fewest) */
+const MATCH_KEYS = [["QB", "player_pass_yds", "Pass yds"], ["QB", "player_pass_attempts", "Pass att"], ["RB", "player_rush_attempts", "Rush att"],
+  ["RB", "player_rush_yds", "Rush yds"], ["WR", "player_receptions", "WR rec"], ["WR", "player_reception_yds", "WR yds"], ["TE", "player_reception_yds", "TE yds"]];
+function matchupStripHTML(game) {
+  const dvp = (DATA.context || {}).dvp || {};
+  const [away, home] = game.split(" @ ");
+  const side = (off, def) => {
+    const d = dvp[def];
+    if (!d) return "";
+    const tags = MATCH_KEYS.map(([pos, m, lbl]) => {
+      const c = d[pos] && d[pos][m];
+      if (!c) return "";
+      const cls = c.rank >= 23 ? "ok" : c.rank <= 10 ? "warn" : "";
+      return `<span class="tag ${cls}" title="${esc(def)} allow ${c.pg} per game to ${pos}s (league average ${c.lg}); rank ${c.rank} of 32, 1 = allows the fewest">${lbl} #${c.rank}</span>`;
+    }).join(" ");
+    return tags ? `<div style="margin:3px 0;"><b>${esc(off)}</b> offense vs ${esc(def)} defense: ${tags}</div>` : "";
+  };
+  const html = side(away, home) + side(home, away);
+  return html ? `<div class="note" style="margin:6px 8px;">${html}<span style="color:var(--text-faint)">Green = a soft defense (ranks 23-32), amber = a tough one (1-10). Defense vs position moves the projections already (opponent multipliers); this is the view of it.</span></div>` : "";
+}
+
+function targetsHTML(game) {
+  const q = S.q.trim().toLowerCase();
+  const rows = TG.filter(t => t.game === game && (!S.pos || t.pos === S.pos) && (!S.player || t.player === S.player) && (!q || t.player.toLowerCase().includes(q) || t.team.toLowerCase().includes(q)))
+    .sort((a, b) => b.mean - a.mean);
+  if (!rows.length || (S.markets.size && !S.markets.has("player_targets"))) return "";
+  return `<div class="tgt-title">Targets <span class="note" style="font-weight:400;">No book posts this line. The model line is the median of its own projection; type the line your app shows to read the chance off the distribution.</span></div>
+    <div class="scroll-x"><table class="ptbl tgt"><thead><tr><th>Player</th><th>Projection</th><th>Recent avg</th><th>Your line</th><th>Over</th><th>Under</th></tr></thead><tbody>
+    ${rows.map(t => `<tr><td><b>${esc(t.player)}</b> <span style="color:var(--text-faint)">${esc(t.pos)} ${esc(t.team)}${t.promoted ? " &middot; stepping up" : ""}</span></td>
+      <td class="num">${t.mean} &plusmn; ${t.sd}</td><td class="num">${t.target_rate}</td>
+      <td><input class="field tline" type="number" step="0.5" value="${t.line}" data-tid="${t.tid}" aria-label="Line for ${esc(t.player)} targets"></td>
+      <td class="num" id="tgo-${t.tid}">${pct(probsAt(t, t.line).over)}</td><td class="num" id="tgu-${t.tid}">${pct(probsAt(t, t.line).under)}</td></tr>`).join("")}
+    </tbody></table></div>`;
+}
+
 function renderList() {
-  const rows = visible(), shown = rows.slice(0, S.limit);
-  $("rows").innerHTML = rows.length
-    ? shown.map(rowHTML).join("") + (rows.length > shown.length ? `<button class="more" id="more">Show ${Math.min(80, rows.length - shown.length)} more (${rows.length - shown.length} hidden)</button>` : "")
+  const rows = visible();
+  const byGame = new Map();
+  rows.forEach(p => { if (!byGame.has(p.game)) byGame.set(p.game, { rows: [], commence: p.commence }); byGame.get(p.game).rows.push(p); });
+  // a game with only target projections (no prop lines pulled for it) still gets a section
+  TG.forEach(t => { if (!byGame.has(t.game) && (!S.markets.size || S.markets.has("player_targets")) && (!S.game || S.game === t.game) && !S.q.trim()) byGame.set(t.game, { rows: [], commence: t.commence }); });
+  const searching = !!S.q.trim();
+  const games = [...byGame.entries()].sort((a, b) => a[1].commence.localeCompare(b[1].commence) || a[0].localeCompare(b[0]));
+  $("rows").innerHTML = games.length
+    ? games.map(([game, v]) => {
+      const open = searching || S.game === game || S.openGames.has(game) || (S.open != null && P[S.open] && P[S.open].game === game);
+      return `<div class="gsec ${open ? "open" : ""}">${gameHeadHTML(game, v.rows, open, v.commence)}
+        ${open ? `<div class="gsec-body">${matchupStripHTML(game)}${v.rows.map(rowHTML).join("")}${targetsHTML(game)}</div>` : ""}</div>`;
+    }).join("")
     : `<div class="empty">No props match these filters.</div>`;
   if (S.open != null && $("detail-" + S.open)) renderDetail(P[S.open]);
 }
@@ -911,11 +989,15 @@ function gameCardHTML(g) {
   const predSpreadLine = g.predicted_spread <= 0 ? `${g.home} ${g.predicted_spread}` : `${g.away} ${-g.predicted_spread}`;
   const spreadPickInfo = { pick: g.spread_pick, price: g.spread_pick_price, ev: g.spread_pick_ev };
   const totalPickInfo = { pick: g.total_pick, price: g.total_pick_price, ev: g.total_pick_ev };
-  const trust = Math.min(g.spread_trust, g.total_trust);
-  const trustNote = trust < 0.1
-    ? `Early-season sample (n_eff ${g.n_eff}) -- only up to ${pct(trust)} of the model's own view is trusted here; the rest defers to the market.`
-    : `n_eff ${g.n_eff} across ${g.n_players} simulated players -- spread trust ${pct(g.spread_trust)}, total trust ${pct(g.total_trust)}.`;
-  const predNote = `Model's own line (before seeing the market): <strong>${esc(predSpreadLine)}</strong> (${signed(g.spread_gap, 1)} vs posted) &middot; total <strong>${g.predicted_total}</strong> (${signed(g.total_gap, 1)} vs posted).`;
+  const trust = g.spread_trust;
+  const totalWhy = g.total_basis === "wind" ? "windy forecast: outdoor games with 12+ mph wind have gone under the closing total 57% of the time"
+    : g.total_basis === "dome" ? "indoor game: domes have finished about a point over the closing total"
+    : "no weather edge: closing totals have been efficient (no pace, scoring or EPA input beat the posted total in 3,700 games)";
+  const spreadTrustNote = trust < 0.1
+    ? `Spread: early-season sample (n_eff ${g.n_eff}) -- only up to ${pct(trust)} of the model's own view is trusted; the rest defers to the market.`
+    : `Spread: n_eff ${g.n_eff} across ${g.n_players} simulated players, trust ${pct(g.spread_trust)}.`;
+  const trustNote = `${spreadTrustNote} Total: ${totalWhy}.`;
+  const predNote = `Model's own spread line: <strong>${esc(predSpreadLine)}</strong> (${signed(g.spread_gap, 1)} vs posted) &middot; total <strong>${g.predicted_total}</strong> (${signed(g.total_gap, 1)} vs posted: the posted total adjusted for weather).`;
   return `<div class="row game-card">
     <div class="game-head">
       <div class="teams">${esc(g.away)} @ ${esc(g.home)}</div>
@@ -1022,6 +1104,7 @@ function railSelect(game, player) {
   } else {
     S.game = game; S.player = null; S.open = null;
   }
+  if (game) S.openGames.add(game);
   S.limit = 80;
   renderRail(); renderList();
   if (S.open != null) { const row = document.querySelector(`.row[data-id="${S.open}"]`); if (row) row.scrollIntoView({ block: "start", behavior: "smooth" }); }
@@ -1084,17 +1167,44 @@ function parlayCardHTML(p, title) {
     ${p.legs.map(parlayLegHTML).join("")}${sg}</div>`;
 }
 
+function pickemLegHTML(l) {
+  const script = l.script_note ? `<span class="tag ${l.script > 0 ? "ok" : "warn"}" title="${esc(l.script_note)}">script ${l.script > 0 ? "fits" : "against"}</span>` : "";
+  const soft = l.line_edge >= 0.01 ? `<span class="tag ok" title="This line is softer than the sportsbooks' by ${pct(l.line_edge, 1)}">soft line</span>` : "";
+  return `<div class="pleg"><div class="nm">${esc(l.player)}<div class="sub">${esc(l.team)} &middot; ${esc(l.game)}</div></div>
+    <div>${esc(l.label)} <b>${l.side === "over" ? "Higher" : "Lower"} ${l.line}</b></div><div class="num">${pct(l.prob)}</div><div class="uleg-line">${esc(l.book)}</div>
+    <div class="sub" style="color:var(--text-faint)">${script} ${soft}</div></div>`;
+}
+
+function pickemCardHTML(e, i) {
+  const st = e.standard, fx = e.flex;
+  const ev = x => x == null ? "&mdash;" : `<b class="pev ${evCls(x)}">${x > 0 ? "+" : ""}${(x * 100).toFixed(0)}%</b>`;
+  const dist = e.hit_distribution || [];
+  const near = dist.length > 1 ? dist[dist.length - 1] + dist[dist.length - 2] : null;
+  const sg = e.same_game && e.same_game.length ? `<div class="pnote">Two picks share a game (${e.same_game.map(esc).join(", ")}); their correlation is already counted in the chances above.</div>` : "";
+  return `<div class="pcard ${e.ev > 0 ? "pos" : ""}"><div class="phead"><span class="pprice">${e.n_legs}-pick</span><strong>${esc(e.label)} #${i + 1}</strong>
+      <span class="pstat">all ${e.n_legs} hit <b>${pct(e.joint_prob, 1)}</b>${st ? ` &middot; ${st.multiplier}x needs <b>${pct(st.breakeven_prob, 1)}</b>` : ""}${near != null ? ` &middot; at most one miss <b>${pct(near, 1)}</b>` : ""}</span>
+      <span class="pstat">avg pick <b>${pct(e.avg_leg_prob, 1)}</b> &middot; standard ${ev(st && st.ev)} &middot; flex ${ev(fx && fx.ev)} per $1${e.volume_legs ? ` &middot; ${e.volume_legs} volume pick${e.volume_legs > 1 ? "s" : ""}` : ""}</span></div>
+    ${e.legs.map(pickemLegHTML).join("")}${sg}</div>`;
+}
+
 function renderParlayPanel() {
   const el = $("parlay-panel");
-  const pp = PB && PB.props;
-  if (!pp) { el.hidden = true; return; }
+  const pp = PB && PB.props, pk = PB && PB.pickem;
+  if (!pp && !pk) { el.hidden = true; return; }
   el.hidden = false;
-  const best = pp.parlays.length ? Math.max(...pp.parlays.map(p => p.ev)) : null;
-  el.innerHTML = `<div class="board"><h2>Prop parlays: 4&ndash;5 legs, plus-money</h2>
-    <div class="note">Built from the markets the model has been doing best in this season, favoring the legs it is most confident in, and checked for how props in the same game move together (a quarterback's yards and his receivers' yards rise together; a quarterback's passing and his running back's rushing move against each other). Legs are mostly from different games.
-    <strong>Read the edge column first:</strong> every leg's price carries the sportsbook's margin and a parlay multiplies it, and our tests found the model has no measurable edge over the market on props, so most parlays here have a <em>negative</em> expected value. This is ranked by the least-negative (or, where there is one, the positive) edge, not a promise of value.</div>
+  const be = pk && pk.breakeven_leg ? Object.entries(pk.breakeven_leg).map(([k, v]) => `${k}-pick ${(v * 100).toFixed(1)}%`).join(", ") : "";
+  const udCount = P.filter(p => p.pickem && p.pickem.book).length;
+  const pickemHTML = pk ? `<div class="board"><h2>Underdog pick'em entries: 4&ndash;5 picks, ranked by confidence</h2>
+    <div class="note">Each pick is a line and a side (Higher/Lower). <b>${udCount ? `${udCount} props here use Underdog's own line` : "No Underdog line was in this pull, so picks are priced at the sportsbook consensus line"}</b>; a pick's chance is the market's own probability for that side, moved by how far the model says the line sits from the sportsbooks' (capped at a few points), and the chance every pick hits uses measured same-game correlations. <b>High confidence</b> entries are the 4-pick sets most likely to hit in full (and the ones a flex entry suits); <b>high upside</b> entries are 5-pick sets for the 20x payout. Volume markets (attempts, completions, receptions) get extra weight when the game script fits: rushing when a team is favored, passing when it trails. A pick needs about ${be} to break even on a standard entry.
+    <strong>Read the EV first:</strong> the model has not beaten the market on props (see the track record), so expect these to be near or below break-even unless a pick'em line really is soft; "soft line" marks where one is. Payout tables are assumptions (${Object.entries(pk.payouts.standard).map(([k, v]) => `${k}-pick ${v}x`).join(", ")}; flex 4-pick 6x / 1.5x, 5-pick 10x / 2x / 0.4x): confirm yours in the app, they change with promotions.</div>
+    ${pk.entries.length ? pk.entries.map(pickemCardHTML).join("") : `<div class="note" style="margin-top:8px;"><strong>None this run.</strong> Fewer than four qualifying picks (the slate is light, or the props pull was limited by credits).</div>`}
+    <div class="note">${pk.candidate_legs} picks qualified (${(pk.searched || 0).toLocaleString()} entries searched).</div></div>` : "";
+  const best = pp && pp.parlays.length ? Math.max(...pp.parlays.map(p => p.ev)) : null;
+  const sbHTML = pp ? `<details class="board" style="margin-top:12px;"><summary style="cursor:pointer; font-weight:700;">Sportsbook prop parlays: 4&ndash;5 legs, plus-money</summary>
+    <div class="note" style="margin-top:8px;">The same idea at sportsbook prices. <strong>Read the edge column first:</strong> every leg's price carries the sportsbook's margin and a parlay multiplies it, so most of these have a <em>negative</em> expected value. Ranked by the least-negative edge.</div>
     ${pp.parlays.length ? pp.parlays.map((p, i) => parlayCardHTML(p, `${p.n_legs}-leg parlay #${i + 1}`)).join("") : `<div class="note" style="margin-top:8px;"><strong>None this run.</strong> ${esc((PB.notes || [])[0] || "Not enough qualifying legs.")}</div>`}
-    <div class="note">${pp.candidate_legs} legs qualified (${pp.searched.toLocaleString()} parlays searched). Market quality used to prioritize legs (shrunk hit rate of high-confidence picks this season): ${Object.entries(PB.quality || {}).sort((a, b) => b[1] - a[1]).map(([m, q]) => `${esc(m.replace("player_", "").replace(/_/g, " "))} ${Math.round(q * 100)}%`).join(", ") || "none yet"}.</div></div>`;
+    <div class="note">${pp.candidate_legs} legs qualified (${pp.searched.toLocaleString()} parlays searched).</div></details>` : "";
+  el.innerHTML = pickemHTML + sbHTML;
 }
 
 function mlParlayHTML() {
@@ -1111,7 +1221,7 @@ function teaserHTML() {
   const be = t.breakeven_leg || {};
   const beTxt = Object.entries(be).map(([k, v]) => `${k}: <b>${(v * 100).toFixed(1)}%</b>`).join(" &middot; ");
   const hist = Object.entries(PB.wong_history || {}).map(([sp, h]) => `<tr><td>${esc(h.name)}</td><td class="num">${h.n_recent}</td><td class="num">${h.rate_recent == null ? "&mdash;" : (h.rate_recent * 100).toFixed(1) + "%"}</td><td class="num">${h.rate_all == null ? "&mdash;" : (h.rate_all * 100).toFixed(1) + "%"} (${h.n_all})</td><td class="num"><b>${(h.rate * 100).toFixed(1)}%</b></td></tr>`).join("");
-  const legRow = l => `<tr><td><b>${esc(l.team)}</b> <span style="color:var(--text-faint)">vs ${esc(l.opp)}</span></td><td class="num">${l.spread > 0 ? "+" : ""}${l.spread} &rarr; ${l.teased > 0 ? "+" : ""}${l.teased}</td><td>${esc(l.bucket)}</td><td class="num">${(l.prob * 100).toFixed(0)}%</td><td>${l.playable ? `<span class="tag ok">clears break-even</span>` : `<span class="tag warn">below break-even</span>`}</td></tr>`;
+  const legRow = l => `<tr><td><b>${esc(l.team)}</b> <span style="color:var(--text-faint)">vs ${esc(l.opp)}</span></td><td class="num">${l.spread > 0 ? "+" : ""}${l.spread} &rarr; ${l.teased > 0 ? "+" : ""}${l.teased}</td><td>${esc(l.bucket)} ${l.wong ? `<span class="tag gold" title="Crosses both 3 and 7">Wong</span>` : ""}</td><td class="num">${(l.prob * 100).toFixed(0)}%</td><td>${l.playable ? `<span class="tag ok">clears break-even</span>` : `<span class="tag warn">below break-even</span>`}</td></tr>`;
   const pairRow = p => `<tr><td>${esc(p.legs[0].team)} + ${esc(p.legs[1].team)}</td><td class="num">${(p.prob * 100).toFixed(0)}%</td>${Object.keys(p.ev).map(k => `<td class="num pev ${evCls(p.ev[k])}">${p.ev[k] > 0 ? "+" : ""}${(p.ev[k] * 100).toFixed(1)}%</td>`).join("")}</tr>`;
   const rr = t.round_robin;
   const evKeys = Object.keys((t.pairs[0] || {ev: {}}).ev);
@@ -1119,8 +1229,9 @@ function teaserHTML() {
     <div class="note">A 6-point teaser that moves a line across both 3 and 7, the two most common NFL margins: favorites of -7.5 or -8.5 down to -1.5 or -2.5, and underdogs of +1.5 or +2.5 up to +7.5 or +8.5. A 2-team teaser needs each leg to cover ${beTxt}. Teaser prices are assumptions (-120 and -110; sportsbook prices vary, and the Odds API doesn't supply them), so check yours. The spread must match exactly at your book.</div>
     <div class="scroll-x"><table class="ptbl" style="margin-top:8px;"><thead><tr><th>Cover rate by leg type</th><th>Games since 2021</th><th>Covered since 2021</th><th>Since 2014</th><th>Used (shrunk)</th></tr></thead><tbody>${hist}</tbody></table></div>
     <div class="note">The edge has not held evenly: underdog legs (+1.5, +2.5) have kept covering about 76%, while the favorite legs have slipped below the break-even in recent years, so only legs that clear it are marked and used for the round robin.</div>
-    ${(t.legs || []).length ? `<h3 style="margin:14px 0 4px; font-size:14px;">This week's Wong legs</h3><div class="scroll-x"><table class="ptbl"><thead><tr><th>Team</th><th>Line &rarr; teased</th><th>Type</th><th>Cover %</th><th></th></tr></thead><tbody>${t.legs.map(legRow).join("")}</tbody></table></div>`
-      : `<div class="note" style="margin-top:8px;"><strong>No Wong legs this week:</strong> no game's consensus spread sits exactly on -7.5, -8.5, +1.5 or +2.5.</div>`}
+    ${(t.legs || []).length ? `<h3 style="margin:14px 0 4px; font-size:14px;">Best teaser legs, week ${PB.slate_week ?? DATA.week} (one per game)</h3><div class="scroll-x"><table class="ptbl"><thead><tr><th>Team</th><th>Line &rarr; teased</th><th>Type</th><th>Cover %</th><th></th></tr></thead><tbody>${t.legs.map(legRow).join("")}</tbody></table></div>
+      <div class="note">Only games of this week's slate are listed, and a pair only ever combines two of them. ${t.legs.some(l => l.wong) ? "Legs tagged Wong sit on the key numbers." : "No game sits on a Wong number this week (-7.5, -8.5, +1.5, +2.5), so these are the next-best legs by historical cover rate."}</div>`
+      : `<div class="note" style="margin-top:8px;"><strong>No teaser legs yet:</strong> this week's spreads haven't been posted for any game still to be played.</div>`}
     ${t.pairs.length ? `<h3 style="margin:14px 0 4px; font-size:14px;">Best pairs (2-team teasers)</h3><div class="scroll-x"><table class="ptbl"><thead><tr><th>Pair</th><th>Both cover</th>${evKeys.map(k => `<th>EV ${esc(k.replace("2-team at ", "at "))}</th>`).join("")}</tr></thead><tbody>${t.pairs.map(pairRow).join("")}</tbody></table></div>` : ""}
     ${rr ? `<h3 style="margin:14px 0 4px; font-size:14px;">Round robin: ${rr.legs.map(l => esc(l.team)).join(", ")}</h3>
       <div class="note">All ${rr.n_pairs} two-team pairs among these ${rr.legs.length} legs, one unit each: expected return ${evKeys.map(k => `<b>${rr.total_ev[k] >= 0 ? "+" : ""}${rr.total_ev[k].toFixed(2)} units</b> ${esc(k.replace("2-team ", ""))}`).join(", ")} (average ${evKeys.map(k => `${(rr.avg_ev[k] * 100).toFixed(1)}%`).join(" / ")} per pair). A round robin spreads the risk of one leg losing; it does not change the expected value per pair.</div>`
@@ -1284,9 +1395,22 @@ $("sort").addEventListener("change", e => { S.sort = e.target.value; renderList(
 $("only-ev").addEventListener("change", e => { S.onlyEv = e.target.checked; S.limit = 80; renderList(); });
 $("hide-thin").addEventListener("change", e => { S.hideThin = e.target.checked; S.limit = 80; renderList(); });
 $("rows").addEventListener("click", e => {
-  if (e.target.id === "more") { S.limit += 80; renderList(); return; }
+  const gh = e.target.closest(".gsec-head");
+  if (gh) {
+    const g = gh.dataset.gsec;
+    if (S.openGames.has(g) || (S.game === g)) { S.openGames.delete(g); if (S.game === g) S.game = ""; if (S.open != null && P[S.open] && P[S.open].game === g) S.open = null; }
+    else S.openGames.add(g);
+    renderRail(); renderList(); return;
+  }
   const head = e.target.closest(".row-head"); if (!head) return;
   const id = +head.parentElement.dataset.id; S.open = S.open === id ? null : id; renderList();
+});
+$("rows").addEventListener("input", e => {
+  const inp = e.target.closest(".tline"); if (!inp) return;
+  const t = TG[+inp.dataset.tid], line = parseFloat(inp.value);
+  if (!t || Number.isNaN(line)) return;
+  const pr = probsAt(t, line);
+  $("tgo-" + t.tid).textContent = pct(pr.over); $("tgu-" + t.tid).textContent = pct(pr.under);
 });
 $("rows").addEventListener("keydown", e => {
   if ((e.key === "Enter" || e.key === " ") && e.target.classList.contains("row-head")) { e.preventDefault(); e.target.click(); }

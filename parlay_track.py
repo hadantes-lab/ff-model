@@ -24,10 +24,10 @@ import pandas as pd
 import parlays as pl
 
 PARLAY_LOG = pathlib.Path(__file__).parent / "tracking" / "parlay_log.csv"
-COLUMNS = ["season", "week", "id", "kind", "n_legs", "price", "decimal", "joint_prob", "ev", "legs", "first_logged", "logged_at"]
+COLUMNS = ["season", "week", "id", "kind", "n_legs", "price", "decimal", "joint_prob", "ev", "legs", "first_logged", "logged_at", "entry"]
 LEG_KEYS = ("id", "kind", "player_id", "player", "team", "opp", "game", "market", "label", "side", "line", "price", "prob", "spread", "teased", "week")
 TEASER_DECIMAL = pl.TEASER_PRICES["2-team at -120"]
-KINDS = {"props": "Prop parlays", "ml": "Moneyline parlays", "teaser": "Wong teasers (pairs)"}
+KINDS = {"pickem": "Underdog pick'em entries", "props": "Prop parlays", "ml": "Moneyline parlays", "teaser": "Wong teasers (pairs)"}
 
 
 def _leg(l: dict) -> dict:
@@ -38,11 +38,14 @@ def rows_from_block(block: dict, season: int, week: int, now: str) -> list:
     """Every recommended parlay (props, moneyline, and each Wong teaser pair) as a log row."""
     rows = []
 
-    def add(kind, legs, price, decimal, joint, ev, wk=None):
+    def add(kind, legs, price, decimal, joint, ev, wk=None, entry=None):
         rows.append({"season": season, "week": int(wk or week), "id": pl._parlay_id(legs), "kind": kind, "n_legs": len(legs),
                      "price": price, "decimal": round(decimal, 4), "joint_prob": round(float(joint), 5), "ev": round(float(ev), 5),
-                     "legs": json.dumps([_leg(l) for l in legs]), "first_logged": now, "logged_at": now})
+                     "legs": json.dumps([_leg(l) for l in legs]), "first_logged": now, "logged_at": now, "entry": entry})
 
+    for p in (block.get("pickem") or {}).get("entries", []):
+        top = (p.get("standard") or {}).get("multiplier") or 0
+        add("pickem", p["legs"], 0, top, p["joint_prob"], p["ev"], entry=p.get("best_type"))
     for p in (block.get("props") or {}).get("parlays", []):
         add("props", p["legs"], p["price"], p["decimal"], p["joint_prob"], p["ev"])
     for p in (block.get("ml") or {}).get("parlays", []):
@@ -65,7 +68,11 @@ def load(path=None) -> pd.DataFrame:
     path = pathlib.Path(path or PARLAY_LOG)
     if not path.exists() or path.stat().st_size == 0:
         return pd.DataFrame(columns=COLUMNS)
-    return pd.read_csv(path)
+    df = pd.read_csv(path)
+    for c in COLUMNS:
+        if c not in df:
+            df[c] = None
+    return df
 
 
 def log_parlays(rows: list, path=None) -> int:
@@ -88,7 +95,7 @@ def log_parlays(rows: list, path=None) -> int:
 def grade_leg(leg: dict, season: int, week: int, props_log: pd.DataFrame, sched: pd.DataFrame) -> str:
     """'win' | 'loss' | 'push' | 'void' | 'pending' for one leg."""
     kind = leg.get("kind")
-    if kind == "prop":
+    if kind in ("prop", "pickem"):
         r = props_log[(props_log["season"] == season) & (props_log["player_id"] == leg["player_id"]) & (props_log["market"] == leg["market"])
                       & (props_log["week"] == week)]
         if r.empty:
@@ -123,6 +130,19 @@ def grade_parlay(row, props_log: pd.DataFrame, sched: pd.DataFrame) -> dict:
     res = [grade_leg(l, int(row.season), int(row.week), props_log, sched) for l in legs]
     out = {"legs": legs, "leg_results": res, "legs_won": res.count("win"), "legs_lost": res.count("loss"),
            "legs_pending": res.count("pending"), "legs_dropped": res.count("push") + res.count("void")}
+    if row.kind == "pickem":
+        # a pushed or dropped pick shrinks the entry to the picks left; a flex entry pays on partial hits, a standard one doesn't
+        if "pending" in res:
+            out.update(status="pending", profit=None)
+            return out
+        n, hits = res.count("win") + res.count("loss"), res.count("win")
+        if n < 2:
+            out.update(status="push", profit=0.0)
+            return out
+        flex = getattr(row, "entry", None) == "flex" and n in pl.PICKEM_PAYOUTS["flex"]
+        mult = pl.PICKEM_PAYOUTS["flex"][n].get(hits, 0.0) if flex else (pl.PICKEM_PAYOUTS["standard"].get(n, 0.0) if hits == n else 0.0)
+        out.update(status="cashed" if mult > 1 else "push" if mult == 1 else "lost", profit=mult - 1)
+        return out
     if "loss" in res:
         out.update(status="lost", profit=-1.0)
     elif "pending" in res:
@@ -161,9 +181,9 @@ def section(parlay_log: pd.DataFrame, props_log: pd.DataFrame, sched: pd.DataFra
                 k["legs_graded"] += 1
                 k["legs_won"] += res == "win"
                 k["expected_legs"] += float(leg.get("prob") or 0.0)
-        items.append({"kind": r.kind, "id": r.id, "price": int(r.price), "status": g["status"], "joint_prob": float(r.joint_prob), "ev": float(r.ev),
+        items.append({"kind": r.kind, "id": r.id, "price": int(r.price), "n_legs": int(r.n_legs), "entry": None if pd.isna(r.entry) else r.entry, "status": g["status"], "joint_prob": float(r.joint_prob), "ev": float(r.ev),
                       "legs_won": g["legs_won"], "legs_lost": g["legs_lost"], "legs_pending": g["legs_pending"],
-                      "legs": [{"label": (l.get("player") or l.get("team")) + (f" {l.get('label')} {l.get('side')} {l.get('line')}" if l.get("kind") == "prop"
+                      "legs": [{"label": (l.get("player") or l.get("team")) + (f" {l.get('label')} {l.get('side')} {l.get('line')}" if l.get("kind") in ("prop", "pickem")
                                 else (" ML" if l.get("kind") == "ml" else f" teased to {l.get('teased', 0):+g}")), "result": res}
                                for l, res in zip(g["legs"], g["leg_results"])]})
     for k in groups.values():

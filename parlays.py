@@ -79,6 +79,8 @@ TEASER_PRICES = {"2-team at -120": 100 / 120 + 1, "2-team at -110": 100 / 110 + 
 TEASER_POINTS = 6.0
 WONG_BUCKETS = {-7.5: "fav -7.5 to -1.5", -8.5: "fav -8.5 to -2.5", 1.5: "dog +1.5 to +7.5", 2.5: "dog +2.5 to +8.5"}
 WONG_RECENT_FROM = 2021
+SNAP_TOLERANCE = 0.13          # a consensus spread this close to a half point counts as that number
+TEASER_POOL = 8                # best legs (one per game) whose pairs are compared
 WONG_SHRINK = 40
 
 
@@ -394,6 +396,147 @@ def build_prop_parlays(legs: list, corr: CorrModel, n_recommend: int = 4, sizes=
     return {"parlays": chosen, "candidate_legs": len(legs), "searched": len(cands)}
 
 
+# ---- pick'em entries (Underdog) --------------------------------------------------------------------
+# Underdog Fantasy pick'em: choose Higher/Lower on 2-5+ player lines; a standard entry pays a fixed multiple only if every pick
+# hits, a flex entry also pays something for one miss. There are no prices to shop: every leg is just a line and a side, so
+# a leg's value is its chance of hitting, and the only "edge" is how much better that is than the multiple needs. These
+# multiples are ASSUMPTIONS from the app's usual tables (they change with promotions and by pick); confirm yours in the app.
+PICKEM_PAYOUTS = {
+    "standard": {2: 3.0, 3: 6.0, 4: 10.0, 5: 20.0},
+    "flex": {3: {3: 3.0, 2: 1.0}, 4: {4: 6.0, 3: 1.5}, 5: {5: 10.0, 4: 2.0, 3: 0.4}},
+}
+VOLUME_MARKETS = {"player_rush_attempts", "player_pass_attempts", "player_pass_completions", "player_receptions", "player_targets"}
+PICKEM_POOL = 14
+PICKEM_MIN_PROB = 0.52
+SCRIPT_BONUS, SCRIPT_BONUS_VOLUME = 0.01, 0.025      # volume markets are the ones game script moves most
+
+
+def pickem_breakeven(n: int) -> float:
+    """Per-leg chance an n-pick standard entry needs to break even (independent legs)."""
+    return (1 / PICKEM_PAYOUTS["standard"][n]) ** (1 / n)
+
+
+def hit_distribution(ps, R, n=MC_SAMPLES, seed=0) -> list:
+    """[P(0 hits), P(1), ..., P(all)] for correlated legs under a Gaussian copula (Monte Carlo, fixed seed)."""
+    ps = np.asarray(ps, float)
+    k = len(ps)
+    R = np.asarray(R, float)
+    w, v = np.linalg.eigh(R)
+    R = v @ np.diag(np.clip(w, 1e-6, None)) @ v.T
+    d = np.sqrt(np.diag(R))
+    L = np.linalg.cholesky(R / np.outer(d, d))
+    z = np.random.default_rng(seed).standard_normal((n, k)) @ L.T
+    th = np.array([ND.inv_cdf(min(max(p, 1e-6), 1 - 1e-6)) for p in ps])
+    hits = (z < th).sum(axis=1)
+    return [float(np.mean(hits == j)) for j in range(k + 1)]
+
+
+def pickem_evs(dist: list) -> dict:
+    """EV per $1 of a standard and a flex entry from a hit distribution (index = number of hits)."""
+    n = len(dist) - 1
+    out = {"standard": None, "flex": None}
+    if n in PICKEM_PAYOUTS["standard"]:
+        m = PICKEM_PAYOUTS["standard"][n]
+        out["standard"] = {"multiplier": m, "ev": dist[n] * m - 1, "breakeven_prob": 1 / m}
+    if n in PICKEM_PAYOUTS["flex"]:
+        tbl = PICKEM_PAYOUTS["flex"][n]
+        out["flex"] = {"payouts": {str(h): m for h, m in tbl.items()}, "ev": sum(dist[h] * m for h, m in tbl.items()) - 1}
+    return out
+
+
+def pickem_legs(props: list, games: list, quality: dict = None, require_agree: bool = True) -> list:
+    """
+    One leg per qualifying prop: its pick'em line (Underdog's when the pull had it), on the side with the better chance, where
+    the model's own lean agrees with that side. Skips thin samples, injured players and anytime TDs. Score rewards a high
+    chance, a market the model has been doing well in, a game script that fits (more for the volume markets), and a pick'em
+    line that is softer than the sportsbooks'.
+    """
+    quality = quality or {}
+    gm = {g["game"]: g for g in games}
+    legs = []
+    for p in props:
+        pk = p.get("pickem")
+        if not pk or p.get("model_only") or p.get("thin") or p.get("injury") or "player_id" not in p:
+            continue
+        if (require_agree and not pk["agree"]) or pk["prob"] < PICKEM_MIN_PROB:
+            continue
+        g = gm.get(p["game"], {})
+        team_margin = None
+        if g.get("home_spread") is not None:
+            team_margin = -g["home_spread"] if p["team"] == g.get("home") else g["home_spread"]
+        align, why = script_alignment(p["market"], pk["side"], team_margin, g.get("total")) if team_margin is not None else (0, "")
+        q = quality.get(p["market"], 0.5)
+        bonus = SCRIPT_BONUS_VOLUME if p["market"] in VOLUME_MARKETS else SCRIPT_BONUS
+        legs.append({"id": f"{p['player_id']}|{p['market']}|{pk['side']}", "kind": "pickem", "player_id": p["player_id"], "player": p["player"],
+                     "team": p["team"], "opp": p["opp"], "game": p["game"], "pos": p["pos"], "market": p["market"], "label": p["label"],
+                     "side": pk["side"], "line": pk["line"], "book": pk["book"] or "sportsbook line", "prob": pk["prob"],
+                     "sportsbook_prob": pk["sportsbook_prob"], "line_edge": pk["line_edge"], "quality": q, "script": align,
+                     "script_note": why, "volume": p["market"] in VOLUME_MARKETS,
+                     "score": (pk["prob"] - 0.5) * quality_factor(q) + bonus * align + 0.5 * max(pk["line_edge"], 0)})
+    legs.sort(key=lambda l: -l["score"])
+    return legs
+
+
+def _pickem_summary(legs, label, corr) -> dict:
+    n = len(legs)
+    R = np.eye(n)
+    for a in range(n):
+        for b in range(a + 1, n):
+            R[a, b] = R[b, a] = corr.rho(legs[a], legs[b])
+    ps = [l["prob"] for l in legs]
+    dist = hit_distribution(ps, R)
+    evs = pickem_evs(dist)
+    options = {k: v for k, v in evs.items() if v}
+    best = max(options, key=lambda k: options[k]["ev"])
+    same_game = [g for g in {l["game"] for l in legs} if sum(1 for l in legs if l["game"] == g) > 1]
+    return {"id": _parlay_id(legs), "kind": "pickem", "label": label, "n_legs": n, "joint_prob": dist[n], "naive_prob": float(np.prod(ps)),
+            "hit_distribution": [round(x, 4) for x in dist], "avg_leg_prob": float(np.mean(ps)), "standard": evs["standard"], "flex": evs["flex"],
+            "best_type": best, "ev": options[best]["ev"], "script_aligned": sum(1 for l in legs if l.get("script", 0) > 0),
+            "volume_legs": sum(1 for l in legs if l.get("volume")), "same_game": same_game, "legs": legs}
+
+
+def build_pickem(legs: list, corr: CorrModel, n_confidence: int = 2, n_upside: int = 2, pool: int = PICKEM_POOL) -> dict:
+    """
+    Underdog entries: `n_confidence` 4-pick entries chosen for the highest chance every pick hits (flex-friendly), and
+    `n_upside` 5-pick entries chosen for the best standard-entry value (the 20x payout), none sharing more than two picks.
+    Returned best-chance first.
+    """
+    top, per_game = [], {}
+    for l in legs:
+        if per_game.get(l["game"], 0) >= 3:
+            continue
+        per_game[l["game"]] = per_game.get(l["game"], 0) + 1
+        top.append(l)
+        if len(top) == pool:
+            break
+    cands = {4: [], 5: []}
+    for k in (4, 5):
+        for combo in itertools.combinations(top, k):
+            if _combo_ok(combo, corr):
+                cands[k].append((_approx_joint(combo, corr), combo))
+    chosen, used = [], []
+
+    def take(k, n, label, key):
+        got = 0
+        for j, combo in sorted(cands[k], key=key):
+            ids = {l["id"] for l in combo}
+            if any(len(ids & u) > MAX_SHARED_LEGS for u in used):
+                continue
+            chosen.append(_pickem_summary(list(combo), label, corr))
+            used.append(ids)
+            got += 1
+            if got == n:
+                break
+
+    take(4, n_confidence, "High confidence", lambda c: -c[0])
+    take(5, n_upside, "High upside", lambda c: -(c[0] * PICKEM_PAYOUTS["standard"][5]))
+    chosen.sort(key=lambda e: (-e["avg_leg_prob"], -e["joint_prob"]))
+    return {"entries": chosen, "candidate_legs": len(legs), "searched": len(cands[4]) + len(cands[5]),
+            "payouts": {"standard": {str(k): v for k, v in PICKEM_PAYOUTS["standard"].items()},
+                        "flex": {str(k): {str(h): m for h, m in t.items()} for k, t in PICKEM_PAYOUTS["flex"].items()}},
+            "breakeven_leg": {str(k): round(pickem_breakeven(k), 4) for k in (3, 4, 5)}}
+
+
 # ---- moneyline parlays ---------------------------------------------------------------------------
 def moneyline_legs(games: list) -> list:
     """Favorites with a live moneyline: probability = the market's vig-free consensus, price = the best across books."""
@@ -472,22 +615,69 @@ def wong_history(sched: pd.DataFrame, recent_from: int = WONG_RECENT_FROM, first
     return out
 
 
-def wong_legs(games: list, hist: dict) -> list:
-    """Every upcoming game's side whose consensus spread sits exactly on a Wong bucket, with its teased line and cover rate."""
+def teaser_curve(sched: pd.DataFrame, first: int = 2014, k: int = WONG_SHRINK, sd: float = 13.5) -> dict:
+    """
+    {spread: {n, rate}} for every half-point spread from -14 to +14 (a team's own spread; positive = underdog): how often a
+    team at that number covered the 6-point-teased line since `first`. A teased leg covers when the game finishes no more
+    than 6 points worse than the spread, which a normal miss (sd 13.5) gives ~67% of the time whatever the spread is; the
+    rate is shrunk toward that with `k` games of weight, so a spread few games have sat on leans on the flat 67% while the
+    key-number spreads (+1.5, +2.5, -7.5, -8.5 ...) lean on their own history. (An earlier version shrank toward the wrong,
+    spread-dependent curve and rated big underdogs at 80%+ when they covered 50-70% out of sample.)
+    """
+    d = sched[(sched["game_type"] == "REG") & (sched["season"] >= first) & sched["home_score"].notna() & sched["spread_line"].notna()]
+    recs = []
+    for r in d.itertuples(index=False):
+        m = r.home_score - r.away_score
+        recs.append((-r.spread_line, m))
+        recs.append((r.spread_line, -m))
+    t = pd.DataFrame(recs, columns=["spread", "margin"])
+    t["cover"] = t["margin"] + t["spread"] + TEASER_POINTS > 0
+    g = t.groupby("spread")["cover"].agg(["sum", "count"])
+    out = {}
+    for sp in np.arange(-14.0, 14.5, 0.5):
+        if sp == 0:
+            continue
+        prior = ND.cdf(TEASER_POINTS / sd)               # the game ends within 6 of the spread this often, at any spread
+        c, n = (float(g.loc[sp, "sum"]), int(g.loc[sp, "count"])) if sp in g.index else (0.0, 0)
+        out[float(sp)] = {"n": n, "rate": (c + k * prior) / (n + k)}
+    return out
+
+
+def snap_spread(x: float):
+    """A consensus spread (a median across books, so it can be 2.25) snapped to the nearest half point, or None if it sits between two (a 2.25 is neither a 2 nor a 2.5)."""
+    s = round(float(x) * 2) / 2
+    return s if abs(float(x) - s) <= SNAP_TOLERANCE else None
+
+
+def wong_legs(games: list, hist: dict, curve: dict = None) -> list:
+    """
+    Every upcoming game's side with its 6-point-teased line and cover rate, best first. A side on a Wong number (-7.5, -8.5,
+    +1.5, +2.5) uses the Wong bucket's recent, shrunk rate and is tagged `wong`; with a `curve` (see teaser_curve) every other
+    side within 14 points is a candidate too, rated off the whole-league curve, so a week with no Wong number still shows the
+    best available legs. Without a curve only the Wong numbers are returned.
+    """
     legs = []
     for g in games:
         hs = g.get("home_spread")
         if hs is None:
             continue
         for team, opp, spread, side in ((g["home"], g["away"], hs, "home"), (g["away"], g["home"], -hs, "away")):
-            sp = float(spread)
-            if sp not in WONG_BUCKETS or sp not in hist:
+            sp = snap_spread(spread)
+            if sp is None:
                 continue
-            h = hist[sp]
+            is_wong = sp in WONG_BUCKETS and sp in hist
+            if is_wong:
+                h = hist[sp]
+                prob, bucket, n_recent, rate_recent, rate_all, n_all = h["rate"], h["name"], h["n_recent"], h["rate_recent"], h["rate_all"], h["n_all"]
+            elif curve and sp in curve:
+                c = curve[sp]
+                prob, bucket, n_recent, rate_recent, rate_all, n_all = c["rate"], f"{'dog' if sp > 0 else 'fav'} {sp:+g}", None, None, c["rate"], c["n"]
+            else:
+                continue
             legs.append({"id": f"{g['game']}|wong|{team}", "game": g["game"], "team": team, "opp": opp, "side": side, "spread": sp,
-                         "teased": sp + TEASER_POINTS, "bucket": h["name"], "prob": h["rate"], "n_recent": h["n_recent"],
-                         "rate_recent": h["rate_recent"], "rate_all": h["rate_all"], "n_all": h["n_all"], "kickoff": g.get("commence"),
-                         "kind": "wong", "week": g.get("week")})
+                         "teased": sp + TEASER_POINTS, "bucket": bucket, "prob": prob, "n_recent": n_recent,
+                         "rate_recent": rate_recent, "rate_all": rate_all, "n_all": n_all, "kickoff": g.get("commence"),
+                         "kind": "wong", "week": g.get("week"), "wong": is_wong})
     legs.sort(key=lambda l: -l["prob"])
     be = math.sqrt(1 / TEASER_PRICES["2-team at -120"])
     for l in legs:
@@ -506,22 +696,31 @@ def build_teasers(legs: list, max_round_robin: int = 5, n_pairs: int = 3) -> dic
            "breakeven_leg": {k: math.sqrt(1 / d) for k, d in TEASER_PRICES.items()}}
     distinct = []
     seen = set()
-    for l in legs:
+    for l in sorted(legs, key=lambda l: -l["prob"]):
         if l["game"] in seen:
             continue                                                # one side per game
         seen.add(l["game"])
         distinct.append(l)
-    pairs = [teaser_pair(a, b) for a, b in itertools.combinations(distinct, 2)]
+    top = distinct[:TEASER_POOL]
+    # a teaser's legs must come from the same slate: books don't take a Sunday leg with one from next week
+    pairs = [teaser_pair(a, b) for a, b in itertools.combinations(top, 2) if a.get("week") == b.get("week")]
     pairs.sort(key=lambda p: -p["ev"]["2-team at -120"])
     out["pairs"] = pairs[:n_pairs]
     out["playable_legs"] = sum(1 for l in distinct if l.get("playable"))
-    rr = [l for l in distinct if l.get("playable")][:max_round_robin]       # only legs that clear the break-even
+    out["legs"] = distinct[:TEASER_POOL]
+    rr = [l for l in top if l.get("playable")][:max_round_robin]       # only legs that clear the break-even
     if len(rr) >= 3:
-        rp = [teaser_pair(a, b) for a, b in itertools.combinations(rr, 2)]
+        rp = [teaser_pair(a, b) for a, b in itertools.combinations(rr, 2) if a.get("week") == b.get("week")]
         out["round_robin"] = {"legs": rr, "pairs": rp, "n_pairs": len(rp),
                               "total_ev": {k: sum(p["ev"][k] for p in rp) for k in TEASER_PRICES},
                               "avg_ev": {k: float(np.mean([p["ev"][k] for p in rp])) for k in TEASER_PRICES}}
     return out
+
+
+def slate_week(games: list):
+    """The week being played: the earliest week among games not yet started (the Odds API also posts next week's lines)."""
+    weeks = [g["week"] for g in games if g.get("week") is not None]
+    return min(weeks) if weeks else None
 
 
 # ---- everything ------------------------------------------------------------------------------------
@@ -531,11 +730,19 @@ def build_all(props: list, games: list, summary: pd.DataFrame = None, corr: Corr
     corr = corr or CorrModel.load()
     quality = market_quality(summary, season)
     upcoming = [g for g in games if g.get("in_window", True)]
-    out = {"quality": {m: round(v, 3) for m, v in quality.items()}, "notes": []}
+    slate = slate_week(upcoming)
+    upcoming = [g for g in upcoming if slate is None or g.get("week") in (None, slate)]
+    out = {"slate_week": slate, "quality": {m: round(v, 3) for m, v in quality.items()}, "notes": []}
     legs = prop_legs(props, upcoming, quality)
     for l in legs:
         l["week"] = week
     out["props"] = build_prop_parlays(legs, corr) if legs else {"parlays": [], "candidate_legs": 0, "searched": 0}
+    plegs = pickem_legs(props, upcoming, quality)
+    if len(plegs) < 8:                                           # too few where model and market agree: take every qualifying leg
+        plegs = pickem_legs(props, upcoming, quality, require_agree=False)
+    for l in plegs:
+        l["week"] = week
+    out["pickem"] = build_pickem(plegs, corr) if len(plegs) >= 4 else {"entries": [], "candidate_legs": len(plegs), "searched": 0}
     if not out["props"]["parlays"]:
         n_games = len({l["game"] for l in legs})
         out["notes"].append(
@@ -543,9 +750,10 @@ def build_all(props: list, games: list, summary: pd.DataFrame = None, corr: Corr
             f"player, at most {MAX_PER_GAME} per game, no negatively correlated same-game pairs, a payout of at least +200). "
             f"On a light slate (Monday or Thursday night) that is expected.")
 
-    out["ml"] = build_ml_parlays(moneyline_legs(games))
+    out["ml"] = build_ml_parlays(moneyline_legs(upcoming))
     hist = wong_history(sched) if sched is not None and len(sched) else {}
-    out["teasers"] = build_teasers(wong_legs(games, hist), ) if hist else {"legs": [], "pairs": [], "round_robin": None, "assumptions": {}}
+    curve = teaser_curve(sched) if hist else None
+    out["teasers"] = build_teasers(wong_legs(upcoming, hist, curve)) if hist else {"legs": [], "pairs": [], "round_robin": None, "assumptions": {}}
     out["wong_history"] = {str(k): v for k, v in hist.items() if k != "_pooled_recent"}
     out["wong_pooled_recent"] = hist.get("_pooled_recent")
     return out

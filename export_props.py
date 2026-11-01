@@ -37,10 +37,12 @@ import straight_up
 import odds_api
 import props_tracker
 import team_ratings
+import target_track
 import team_stats
+import totals_model
 from matchups import CoverageModel, load_coverage_targets
 from props_model import (
-    MARKETS, CORE_MARKETS, EXTENDED_MARKETS, LAMBDA_MAX, load_longest, MIN_GAMES, blend_toward_market, environment_effect, fair_line, load_calibration,
+    MARKETS, ALL_MARKETS, MODEL_ONLY, PRIORITY_MARKETS, CORE_MARKETS, EXTENDED_MARKETS, LAMBDA_MAX, load_longest, MIN_GAMES, blend_toward_market, environment_effect, fair_line, load_calibration,
     market_weight, stat_series, build_history, distribution_summary, draw, fit_player,
     line_probs, normalize_name, opponent_multipliers, position_priors, rng_for,
 )
@@ -170,7 +172,7 @@ def ev_per_dollar(win_prob, lose_prob, american):
 def build_prop(event, home, away, player_row, market, cons, fit, mult, inj, matchup=None, promo=1.0,
                lambda_override=None, confidence=None):
     env = fit.get("env")
-    spec = MARKETS[market]
+    spec = ALL_MARKETS[market]
     line = cons["point"]
     rng = rng_for(player_row["player_id"], market)
     draws = draw(spec.kind, fit["mean"], fit["var"], rng)
@@ -205,8 +207,15 @@ def build_prop(event, home, away, player_row, market, cons, fit, mult, inj, matc
     dfs = []
     for d in cons.get("dfs", []):
         dp = line_probs(draws, d["line"])
+        # the pick'em line's chance, anchored to the market: the adjusted probability at the sportsbook line, moved by how
+        # much the model says the shift in line changes it (the raw model alone sits far from every market)
+        shift = dp["over"] - raw["over"]
+        shift = max(-PICKEM_MAX_SHIFT, min(PICKEM_MAX_SHIFT, shift))     # a differing line is worth a few points, not a coin flip's worth
+        o_adj = min(0.97, max(0.03, p["over"] + shift)) if d["line"] != line else p["over"]
         dfs.append({"book": d["book"], "line": d["line"], "gap": round(d["line"] - line, 2),
-                    "over": round(dp["over"], 4), "under": round(dp["under"], 4), "push": round(dp["push"], 4)})
+                    "over": round(dp["over"], 4), "under": round(dp["under"], 4), "push": round(dp["push"], 4),
+                    "over_adj": round(o_adj, 4), "under_adj": round(max(0.0, 1 - o_adj - dp["push"]), 4)})
+    pickem = pickem_entry(p, raw, line, dfs, spec.kind)
 
     team = player_row["team"]
     opp = away if team == home else home
@@ -233,7 +242,7 @@ def build_prop(event, home, away, player_row, market, cons, fit, mult, inj, matc
         "ev_over": None if ev_o is None else round(ev_o, 4),
         "ev_under": None if ev_u is None else round(ev_u, 4),
         "pick": pick, "pick_ev": None if pick_ev is None else round(pick_ev, 4),
-        "matchup": matchup,
+        "matchup": matchup, "pickem": pickem,
         "env": None if not env or "total" not in env else {
             "mult": round(env["mult"], 4), "total": env["total"], "margin": env["margin"],
             "avg_total": round(env["avg_total"], 1), "avg_margin": round(env["avg_margin"], 1),
@@ -241,6 +250,38 @@ def build_prop(event, home, away, player_row, market, cons, fit, mult, inj, matc
             "implied_opp": round((env["total"] - env["margin"]) / 2, 1)},
         "books": cons["books"], "dfs": dfs, "log": fit["log"], "dist": distribution_summary(spec.kind, draws),
     }
+
+
+# Ten bookmakers cost the same as one region, so the default pull is nine sportsbooks plus Underdog: the sportsbooks
+# set the market, Underdog's own line is what the pick'em entries are priced against. If the API rejects the list the
+# run falls back to the plain "us" region (no Underdog line; entries then use the sportsbook consensus line).
+DEFAULT_BOOKS = ["draftkings", "fanduel", "betmgm", "williamhill_us", "betrivers", "fanatics", "bovada", "betonlineag",
+                 "prizepicks", "underdog"]
+PICKEM_MAX_SHIFT = 0.12
+PICKEM_BOOKS = ("underdog",)       # the pick'em app the page is tuned for; other DFS lines are listed but not used for entries
+
+
+def pickem_entry(p, raw, line, dfs, kind):
+    """
+    The pick'em view of a prop: the line to play (Underdog's when the pull included it, else the sportsbook consensus line),
+    the side with the better chance at that line, and how much that chance rests on the pick'em line differing from the
+    sportsbooks'. `agree` = the raw model leans the same side as the market, which is what the entry builder requires.
+    -> None for anytime TDs (no line to be over or under).
+    """
+    if kind == "td":
+        return None
+    ud = next((d for d in dfs if any(k in d["book"].lower() for k in PICKEM_BOOKS)), None)
+    if ud:
+        o, u, ln, src = ud["over_adj"], ud["under_adj"], ud["line"], ud["book"]
+    else:
+        o, u, ln, src = p["over"], p["under"], line, None
+    side = "over" if o >= u else "under"
+    prob = o if side == "over" else u
+    sb_prob = p["over"] if side == "over" else p["under"]          # the same side at the sportsbook line
+    model_side = "over" if raw["over"] > 0.5 else "under"
+    return {"line": ln, "book": src, "side": side, "prob": round(prob, 4), "sportsbook_prob": round(sb_prob, 4),
+            "line_edge": round(prob - sb_prob, 4), "agree": model_side == side,
+            "grade": "high" if prob >= 0.60 else "medium" if prob >= 0.55 else "low"}
 
 
 def build_game(event, home, away, home_fits, away_fits, line, prices, live_weights=None):
@@ -307,6 +348,17 @@ def build_game(event, home, away, home_fits, away_fits, line, prices, live_weigh
         "total_pick": total_pick, "total_pick_price": total_price,
         "total_pick_ev": None if total_ev is None else round(total_ev, 4),
     }
+
+
+def refresh_total_pick(g):
+    """Recompute a game's total pick and its EV from its current over/under probabilities and best prices."""
+    sides = []
+    for side, p_side, other, price in (("over", g["over"], g["under"], g.get("best_over")), ("under", g["under"], g["over"], g.get("best_under"))):
+        if price:
+            sides.append((ev_per_dollar(p_side, other, price["price"]), side, price))
+    ev, pick, price = max(sides) if sides else (None, None, None)
+    g["total_pick"], g["total_pick_price"] = pick, price
+    g["total_pick_ev"] = None if ev is None else round(ev, 4)
 
 
 # ---- game log for the hit-rate chart -----------------------------------------
@@ -396,10 +448,42 @@ def build_context(props, games, history, season, sample=False) -> dict:
 
 # ---- staying inside the Odds API credit budget -----------------------------------------
 GAME_LINES_COST = 3          # the bulk spreads + totals + moneyline call, one region
+WEEKLY_OVERHEAD = 24         # credits a week that never go to props: three refresh game-lines pulls (9), four collector pulls (12), slack
 DEFAULT_RESERVE = 10         # credits left untouched for the next game day's pull (Monday night, Thursday night)
 
 
-def plan_props_pull(events, n_markets, remaining, reserve=DEFAULT_RESERVE, fixed_costs=GAME_LINES_COST, regions=1):
+def props_budget(remaining, n_run, n_week, today=None, reserve=DEFAULT_RESERVE, fixed=GAME_LINES_COST):
+    """
+    Credits this run may spend on props. The free plan's 500 credits reset around the 1st, so what is left is spread over the
+    weeks left in the month (an even weekly share, less the fixed game-lines pulls), and a run gets the share of its week's games it covers: a Thursday-night run
+    is a fraction of the week, the Sunday run is nearly all of what remains. Never below zero, never into the reserve.
+    """
+    if remaining is None:
+        return None
+    today = today or datetime.date.today()
+    first_next = datetime.date(today.year + (today.month == 12), today.month % 12 + 1, 1)
+    weeks_left = max((first_next - today).days / 7.0, 1.0)
+    weekly = max(0.0, remaining / weeks_left - WEEKLY_OVERHEAD)
+    share = n_run / max(n_week, n_run, 1)
+    return int(max(0, min(remaining - reserve - fixed, weekly * share)))
+
+
+def choose_markets_by_budget(priority, budget, n_events, min_markets=3):
+    """
+    The first N markets of `priority` that `budget` credits cover for all `n_events` games (one credit per market per game).
+    Fewer than `min_markets` per game isn't worth it, so below that the market count stays at the floor and
+    plan_props_pull drops the latest games instead. -> (markets, note).
+    """
+    if budget is None:
+        return list(priority), "credit balance unknown: every priority market"
+    if n_events <= 0:
+        return list(priority[:min_markets]), "no games to price"
+    k = max(min_markets, min(len(priority), budget // n_events))
+    k = min(k, len(priority))
+    return list(priority[:k]), f"{k} of {len(priority)} priority markets for {n_events} games ({budget} credits budgeted for props this run)"
+
+
+def plan_props_pull(events, n_markets, remaining, reserve=DEFAULT_RESERVE, fixed_costs=GAME_LINES_COST, regions=1, budget=None):
     """
     How many games' props the credits can afford. Props cost n_markets x regions credits per game (only markets that
     return data are charged, so this is an upper bound). Soonest kickoff first, so a short balance drops the latest
@@ -411,11 +495,31 @@ def plan_props_pull(events, n_markets, remaining, reserve=DEFAULT_RESERVE, fixed
         return ordered, [], "credit balance unknown: pulling every game"
     per_game = max(1, n_markets * regions)
     n = max(0, (remaining - fixed_costs - reserve) // per_game)
+    if budget is not None:
+        n = min(n, budget // per_game)
     pull, skip = ordered[:n], ordered[n:]
     if not skip:
         return pull, [], f"{remaining} credits left: enough for all {len(pull)} games (about {len(pull) * per_game} credits)"
-    return pull, skip, (f"{remaining} credits left, keeping {reserve} in reserve for the next game day: props pulled for the first "
+    why = f"{budget} credits budgeted for this run" if budget is not None and budget // per_game < (remaining - fixed_costs - reserve) // per_game         else f"keeping {reserve} in reserve for the next game day"
+    return pull, skip, (f"{remaining} credits left, {why}: props pulled for the first "
                         f"{len(pull)} of {len(ordered)} games, {len(skip)} later games skipped")
+
+
+def filter_to_slate(events, sched):
+    """
+    Keep only the games of the week being played. The Odds API lists everything posted in the next 7 days, which on a
+    Thursday reaches into next week's Thursday game and on a Sunday morning is still all one week, so the slate is the
+    schedule week of the earliest game not yet started. -> (events of that week, the week or None if it can't be told).
+    """
+    if sched is None or not events:
+        return events, None
+    wk = [props_tracker.week_for_game(sched, odds_api.TEAM_ABBR[e["home_team"]], odds_api.TEAM_ABBR[e["away_team"]],
+                                      e["commence_time"], default=None) for e in events]
+    known = [w for w in wk if w is not None]
+    if not known:
+        return events, None
+    slate = min(known)
+    return [e for e, w in zip(events, wk) if w in (None, slate)], slate
 
 
 # ---- how much to trust the model, market by market --------------------------------
@@ -537,14 +641,84 @@ def rank_game_picks(games):
     return entries
 
 
+# ---- targets: a market the books don't post, projected anyway ---------------------------------
+TARGET_MARKET = "player_targets"
+TARGET_MIN_RATE = 2.5           # recent targets per game for a player to be projected
+TARGETS_PER_GAME = 10
+
+
+def recent_target_rates(history, teams, season, max_age_weeks=8):
+    """{player_id: (row, decayed recent targets/game)} for WR/TE/RB on `teams` who played within the last `max_age_weeks` weeks."""
+    h = history[history["team"].isin(teams) & history["position"].isin(["WR", "TE", "RB"])]
+    out = {}
+    for pid, g in h.groupby("player_id"):
+        last = g.iloc[-1]
+        if last["season"] != season and not (last["season"] == season - 1):
+            continue
+        recent = g.tail(5)["targets"].to_numpy(float)
+        rate = float(np.average(recent, weights=0.6 ** np.arange(len(recent))[::-1]))
+        out[pid] = (last, rate)
+    return out
+
+
+def build_target_props(events, history, inj, mults, priors, calibration, gl, season, conf_strength=0.0, conf_records=None):
+    """
+    A projection for every regular receiver in each game: targets are the stat that drives receptions and receiving yards, and
+    no sportsbook in the Odds API posts a line on them. So the "line" here is the model's own median and there is no price or
+    edge; the page lets you type the line your app shows and reads the chance off the distribution. Injuries and depth charts
+    enter the way they do for every prop: Out/Doubtful players are dropped and a promoted backup is scaled to the role.
+    -> list of props (marked model_only).
+    """
+    spec = MODEL_ONLY[TARGET_MARKET]
+    out = []
+    for ev in events:
+        home, away = odds_api.TEAM_ABBR[ev["home_team"]], odds_api.TEAM_ABBR[ev["away_team"]]
+        rates = recent_target_rates(history, {home, away}, season)
+        ranked = sorted(rates.items(), key=lambda kv: -kv[1][1])
+        n = 0
+        for pid, (row, rate) in ranked:
+            if rate < TARGET_MIN_RATE or n >= TARGETS_PER_GAME * 2:
+                continue
+            status = inj.get(pid)
+            if status in ("Out", "Doubtful"):
+                continue
+            opp = away if row["team"] == home else home
+            mult = mults.get(TARGET_MARKET, {}).get((opp, row["position"]), 1.0)
+            eff = environment_effect(calibration, TARGET_MARKET)
+            g_line = gl.get(ev["id"], {})
+            env_fn = None
+            if eff and g_line.get("total") is not None and g_line.get("home_spread") is not None:
+                team_margin = -g_line["home_spread"] if row["team"] == home else g_line["home_spread"]
+                env_fn = lambda g, w, e=eff, t=g_line["total"], m=team_margin: gc.env_multiplier(g, w, t, m, e)
+            promo = dc.promotion_multiplier(history, row["team"], row["position"], pid, inj)
+            fit = fit_player(history, pid, spec, mult * promo, priors.get(TARGET_MARKET),
+                             (calibration or {}).get("calibration", {}).get(TARGET_MARKET), env_fn)
+            if fit is None:
+                continue
+            draws = draw(spec.kind, fit["mean"], fit["var"], rng_for(pid, TARGET_MARKET))
+            line = fair_line(spec.kind, draws)
+            cons = {"point": float(line), "fair_over": None, "best_over": None, "best_under": None, "n_books": 0, "books": [], "dfs": []}
+            prop = build_prop(ev, home, away, row, TARGET_MARKET, cons, fit, mult, status,
+                              None, promo, None, None)
+            prop["model_only"], prop["pickem"] = True, None
+            prop["target_rate"] = round(rate, 1)
+            out.append(prop)
+            n += 1
+        # keep each game's list to its busiest receivers, ordered by projection
+        game_label = f"{away} @ {home}"
+        mine = sorted([q for q in out if q["game"] == game_label], key=lambda q: -q["mean"])[:TARGETS_PER_GAME]
+        out = [q for q in out if q["game"] != game_label] + mine
+    return out
+
+
 # ---- main ---------------------------------------------------------------
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--sample", action="store_true", help="demo lines derived from the model (no API)")
     ap.add_argument("--markets", help="comma-separated Odds API market keys")
     ap.add_argument("--all-markets", action="store_true", help="every offensive market")
-    ap.add_argument("--books", help="comma-separated bookmaker keys, e.g. draftkings,fanduel,underdog "
-                                    "(up to 10 cost the same as one region; overrides the default 'us' region)")
+    ap.add_argument("--books", help="comma-separated bookmaker keys (up to 10 cost the same as one region). Default: nine "
+                                    "sportsbooks plus Underdog; pass 'us' for the plain US region instead")
     ap.add_argument("--no-matchups", action="store_true",
                     help="skip the man/zone coverage matchup (saves ~1 min of play-by-play loading)")
     ap.add_argument("--max-events", type=int, help="only the first N games (saves credits)")
@@ -552,15 +726,18 @@ def main():
     ap.add_argument("--reserve", type=int, default=DEFAULT_RESERVE,
                     help="Odds API credits to leave unspent for the next game day (props for later games are skipped to keep them)")
     ap.add_argument("--extended", choices=["auto", "on", "off"], default="auto",
-                    help="also pull pass attempts/completions, rush attempts, rush+rec yards, longest reception "
-                         "and rush. auto = only when plenty of credits remain (never on the free plan)")
+                    help="auto = as many of the priority markets (receptions, rush attempts, receiving yards, pass attempts, "
+                         "rush yards, completions, pass yards, pass TDs) as this run's credit budget covers for every game; "
+                         "on = those plus rush+rec yards and the longest-play markets; off = the five core markets only")
     args = ap.parse_args()
 
     season = nfl.get_current_season()
     week = nfl.get_current_week()
     markets = (args.markets.split(",") if args.markets
                else list(MARKETS) if args.all_markets else CORE_MARKETS)
-    books = [b.strip() for b in args.books.split(",")] if args.books else None
+    books = ([b.strip() for b in args.books.split(",")] if args.books else list(DEFAULT_BOOKS))
+    if books == ["us"]:
+        books = None
     bad = [m for m in markets if m not in MARKETS]
     if bad:
         sys.exit(f"Unknown market(s): {bad}. Choose from: {list(MARKETS)}")
@@ -568,13 +745,33 @@ def main():
     key, events, headers = None, None, None
     if not args.sample:        # the events list is free and its headers carry the credits left, which decides the markets
         key = odds_api.load_key()
-        events, headers = odds_api.fetch_events(key, args.days)
+        all_events, headers = odds_api.fetch_events(key, max(args.days, 8))     # free; the whole week sizes the credit budget
+        cutoff = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=args.days)
+        events = [e for e in all_events if datetime.datetime.fromisoformat(e["commence_time"].replace("Z", "+00:00")) < cutoff]
         if args.max_events:
             events = events[: args.max_events]
+    sched_now, slate = None, None
+    if not args.sample:
+        try:
+            sched_now = nfl.load_schedules([season]).to_pandas()
+        except Exception as e:
+            log(f"Schedule unavailable ({e}); games will be tagged with the current week.")
+        all_events, _ = filter_to_slate(all_events, sched_now)
+        events, slate = filter_to_slate(events, sched_now)
+        if slate is not None:
+            log(f"Slate: week {slate} ({len(events)} games not yet started; later weeks' games are left out of props, parlays and teasers)")
+    run_budget = None
     if not (args.markets or args.all_markets):
         remaining = None if headers is None or headers.get("x-requests-remaining") is None else int(headers.get("x-requests-remaining"))
-        markets, note = choose_markets(markets, args.extended if not args.sample or args.extended == "on" else "off",
-                                       remaining, 0 if events is None else len(events))
+        if args.extended == "off":
+            markets, note = list(CORE_MARKETS), "core markets only (--extended off)"
+        else:
+            if not args.sample:
+                run_budget = props_budget(remaining, len(events), len(all_events))
+            markets, note = choose_markets_by_budget(PRIORITY_MARKETS, run_budget, 0 if events is None else len(events))
+            if args.extended == "on":
+                markets += [m for m in EXTENDED_MARKETS if m not in markets]
+                note += "; extras forced on"
         log(f"Markets: {len(markets)} ({note})")
 
     log(f"Loading nflverse history (season {season}, week {week})...")
@@ -608,6 +805,8 @@ def main():
     # prop markets were actually requested from the Odds API
     for m in ("player_pass_yds", "player_rush_yds", "player_anytime_td"):
         mults.setdefault(m, opponent_multipliers(history, MARKETS[m]))
+    mults[TARGET_MARKET] = opponent_multipliers(history, MODEL_ONLY[TARGET_MARKET])
+    priors[TARGET_MARKET] = position_priors(history, MODEL_ONLY[TARGET_MARKET])
     priors.setdefault("player_anytime_td", position_priors(history, MARKETS["player_anytime_td"]))
 
     credits = None
@@ -623,7 +822,7 @@ def main():
         credits = odds_api.credits_line(headers)
         regions = -(-len(books) // 10) if books else 1
         bal = None if headers is None or headers.get("x-requests-remaining") is None else int(headers.get("x-requests-remaining"))
-        events, skipped_events, credit_note = plan_props_pull(events, len(markets), bal, args.reserve, regions=regions)
+        events, skipped_events, credit_note = plan_props_pull(events, len(markets), bal, args.reserve, regions=regions, budget=run_budget)
         log("Credit plan: " + credit_note)
         log(f"{len(events)} games in the next {args.days} days. Worst-case cost this run: "
             f"{len(events) * len(markets) * regions} credits ({len(events)} games x {len(markets)} markets x "
@@ -659,7 +858,14 @@ def main():
             odds = sample_event_odds(ev, history, idx, rng_for("sample", ev["id"]), priors, markets)
         else:
             try:
-                odds, cached = odds_api.fetch_event_props(key, ev["id"], markets, bookmakers=books)
+                try:
+                    odds, cached = odds_api.fetch_event_props(key, ev["id"], markets, bookmakers=books)
+                except odds_api.OddsApiError as e:
+                    if books is None or not any(f"HTTP {c}" in str(e) for c in (400, 422)):
+                        raise
+                    log(f"  the API rejected the bookmaker list ({e}); falling back to the plain US region (no Underdog line)")
+                    books = None
+                    odds, cached = odds_api.fetch_event_props(key, ev["id"], markets)
             except odds_api.OddsApiError as e:       # most likely out of credits: keep what we have and finish the page
                 credit_note = f"Props pull stopped at {away} @ {home} ({e}); later games have no props this run."
                 log("  " + credit_note)
@@ -704,6 +910,13 @@ def main():
     if unmatched:
         log("  unmatched: " + ", ".join(sorted(unmatched)[:12]) + (" ..." if len(unmatched) > 12 else ""))
 
+    target_props = []
+    try:
+        target_props = build_target_props(list(events) + list(skipped_events), history, inj, mults, priors, calibration, gl, int(season))
+        log(f"Targets: {len(target_props)} receiver projections (model line only, no market).")
+    except Exception as e:
+        log(f"Target projections unavailable ({e}); the page omits them.")
+
     profiles, lg_ypp, lg_plays, power, rgames = {}, 5.4, 62.0, None, None
     try:   # informational matchup stats + power rankings; a data hiccup here must never block the odds page
         tg = team_stats.team_game_stats(team_stats.load_pbp(range(int(season) - 2, int(season) + 1)))
@@ -716,12 +929,6 @@ def main():
     except Exception as e:
         log(f"Team stat profiles / power rankings unavailable ({e}); game cards will omit them.")
 
-    sched_now = None
-    if not args.sample:
-        try:
-            sched_now = nfl.load_schedules([season]).to_pandas()
-        except Exception as e:
-            log(f"Schedule unavailable ({e}); games will be tagged with the current week.")
     window_end = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=args.days)
 
     games = []
@@ -740,8 +947,8 @@ def main():
         # the bulk game-lines call covers every posted game (next week's too), so the week comes
         # from the schedule, and only games inside the --days window are shown on the page
         game["week"] = props_tracker.week_for_game(sched_now, home, away, ev["commence_time"], default=int(week))
-        game["in_window"] = bool(args.sample or datetime.datetime.fromisoformat(
-            ev["commence_time"].replace("Z", "+00:00")) < window_end)
+        in_days = bool(args.sample or datetime.datetime.fromisoformat(ev["commence_time"].replace("Z", "+00:00")) < window_end)
+        game["in_window"] = bool(in_days and (slate is None or game["week"] == slate))   # this week's slate only
         game["rank"] = None
         if power is not None and home in power["ranks"] and away in power["ranks"]:
             game["rank"] = team_ratings.project_game(
@@ -770,6 +977,11 @@ def main():
     except Exception as e:
         log(f"Game logs unavailable for the hit-rate chart ({e}); the chart will say no game log is available.")
     context = build_context(props, games, history, int(season), args.sample)
+    n_tot = totals_model.apply(games, context.get("weather"))
+    for g in games:                      # re-pick each total's side on the new probabilities
+        refresh_total_pick(g)
+    log(f"Totals: {n_tot} games on the market-anchored totals model (weather-adjusted: "
+        f"{sum(abs(g.get('total_adj') or 0) >= 0.4 for g in games)}).")
     su_pool = None
     try:
         sched_week = nfl.load_schedules([int(season)]).to_pandas()
@@ -819,7 +1031,7 @@ def main():
     snapshot = {
         "generated": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
         "season": int(season), "week": int(week), "sample": bool(args.sample),
-        "credits": credits, "markets": markets, "n_games": len(events), "props": props, "games": games,
+        "credits": credits, "markets": markets, "n_games": len(events), "props": props, "targets": target_props, "games": games,
         "game_picks": game_picks, "rating_backtest": rating_backtest, "context": context,
         "trust_note": TRUST_NOTE if static_trust else None,
         "credit_note": credit_note if (skipped_events or (credit_note or "").startswith("Props pull stopped")) else None,
@@ -839,6 +1051,8 @@ def main():
         if snapshot.get("parlays"):
             n = parlay_track.log_parlays(parlay_track.rows_from_block(snapshot["parlays"], int(season), int(week), snapshot["generated"]))
             log(f"Tracker: logged/updated {n} recommended parlays (tracking/parlay_log.csv)")
+        n = target_track.log_projections(target_track.rows_from_snapshot(snapshot.get("targets"), int(season), int(week), snapshot["generated"]))
+        log(f"Tracker: logged/updated {n} target projections (tracking/target_proj.csv)")
         n = line_history.append_rows(line_history.rows_from_snapshot(snapshot, snapshot["generated"]))
         log(f"Backlog: appended {n} rows to tracking/line_history.csv")
         if power is not None and rgames is not None:

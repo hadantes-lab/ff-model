@@ -46,6 +46,8 @@ import numpy as np
 import pandas as pd
 
 import parlay_track
+import review_extras
+import target_track
 import straight_up
 
 MIN_FOR_SHARPER = 30               # games needed before the report says whether the model or the market was sharper
@@ -245,6 +247,12 @@ def build_report(log: pd.DataFrame, sched: pd.DataFrame, season: int, week: int,
     due = log[(log["season"] == season) & (log["week"] == week) & log["result"].isna() & log["market"].isin(list(GAME_GROUPS) + ["game_su"])]
     rep["games_pending"] = int(due["game"].nunique())
     rep["parlays"] = parlay_track.section(parlay_log, log, sched, season, week) if parlay_log is not None else None
+    rep["top10"] = review_extras.top10_section(log, season, week)
+    rep["streaks"] = review_extras.streaks(log, season, week)
+    try:
+        rep["targets"] = target_track.section(season, week)
+    except Exception:                                         # the report must not fail on a missing or malformed targets log
+        rep["targets"] = None
     rep["season_to_date"] = season_to_date(history, rep) if history is not None else {}
     for sec in sections + props:
         sec["writeup"] = blurb(sec)
@@ -382,6 +390,13 @@ def headline(rep: dict) -> str:
 
 
 # ---- rendering ---------------------------------------------------------------------------
+def _parlay_desc(it: dict) -> str:
+    """'4-pick flex' for a pick'em entry, '+513' for a priced parlay."""
+    if it["kind"] == "pickem":
+        return f"Underdog {it.get('n_legs', len(it['legs']))}-pick {it.get('entry') or 'standard'}"
+    return f"{it['kind']} {it['price']:+d}"
+
+
 def render_markdown(rep: dict) -> str:
     L = [f"# Week {rep['week']}, {rep['season']}: how the picks did", "", rep["headline"], ""]
     ml = rep["sections"][0]
@@ -402,8 +417,21 @@ def render_markdown(rep: dict) -> str:
     if pz:
         L += ["## Parlays", "", pz["writeup"], ""]
         for it in pz["items"]:
-            L.append(f"- {it['kind']} {it['price']:+d}: {it['status'].upper()} ({it['legs_won']} of {len(it['legs'])} legs hit)")
+            L.append(f"- {_parlay_desc(it)}: {it['status'].upper()} ({it['legs_won']} of {len(it['legs'])} legs hit)")
         L.append("")
+    t10 = rep.get("top10")
+    if t10:
+        L += ["## Top 10 prop picks", "", t10["writeup"], ""]
+        L += [f"- #{i['rank']} {i['player']} {i['market']} {i['side']} {i['line']:g} ({_pct(i['prob'])}), finished {i['actual']:g}: {'hit' if i['result'] == 'win' else 'MISSED'}" for i in t10["items"]] + [""]
+    st = rep.get("streaks")
+    if st:
+        L += ["## Streaks", "", st["writeup"], ""]
+        for s_ in st["current"]:
+            L.append(f"- {s_['player']} {s_['label']}: {s_['length']} straight (" + ", ".join(f"wk {g['week']} {g['side']} {g['line']:g}" for g in s_["games"]) + ")")
+        L.append("")
+    tg = rep.get("targets")
+    if tg:
+        L += ["## Target projections", "", tg["writeup"], ""]
     L += ["## Player props", ""]
     for p in rep["props"]:
         L += [f"### {p['title']}", "", p["writeup"], ""]
@@ -451,8 +479,19 @@ table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;p
     if pz:
         sym = {"win": '<span class="ok">hit</span>', "loss": '<span class="bad">missed</span>', "pending": "pending", "push": "push", "void": "void"}
         out.append(f'<h2>Parlays</h2><div class="card"><p>{e(pz["writeup"])}</p><ul>' + "".join(
-            f'<li>{e(it["kind"])} {it["price"]:+d}: <b>{e(it["status"])}</b> ({it["legs_won"]} of {len(it["legs"])} legs): ' + "; ".join(
+            f'<li>{e(_parlay_desc(it))}: <b>{e(it["status"])}</b> ({it["legs_won"]} of {len(it["legs"])} legs): ' + "; ".join(
                 f'{e(l["label"])} {sym[l["result"]]}' for l in it["legs"]) + "</li>" for it in pz["items"]) + "</ul></div>")
+    t10 = rep.get("top10")
+    if t10:
+        out.append(f'<h2>Top 10 prop picks</h2><div class="card"><p>{e(t10["writeup"])}</p><table><tr><th>#</th><th>Pick</th><th>Chance</th><th>Finished</th><th></th></tr>' + "".join(
+            f'<tr><td>{i["rank"]}</td><td>{e(i["player"])} {e(i["market"])} {e(i["side"])} {i["line"]:g}</td><td>{_pct(i["prob"])}</td><td>{i["actual"]:g}</td><td>{res(i["result"])}</td></tr>' for i in t10["items"]) + "</table></div>")
+    st = rep.get("streaks")
+    if st:
+        out.append(f'<h2>Streaks</h2><div class="card"><p>{e(st["writeup"])}</p>' + ("<ul>" + "".join(
+            f'<li><b>{e(s_["player"])}</b> {e(s_["label"])}: {s_["length"]} in a row <span class="dim">(' + ", ".join(f'wk {g["week"]} {e(g["side"])} {g["line"]:g}' for g in s_["games"]) + ")</span></li>" for s_ in st["current"]) + "</ul>" if st["current"] else "") + "</div>")
+    tg = rep.get("targets")
+    if tg:
+        out.append(f'<h2>Target projections</h2><div class="card"><p>{e(tg["writeup"])}</p></div>')
     out.append("<h2>Player props</h2>")
     for p in rep["props"]:
         out.append(f'<div class="card"><h3>{e(p["title"])}</h3><p>{e(p["writeup"])}</p>' + ("<ul>" + "".join(
@@ -506,6 +545,10 @@ def main():
     args = ap.parse_args()
     season = args.season or int(nfl.get_current_season())
     log = props_tracker._load()
+    try:
+        target_track.grade(nfl.load_player_stats([season]).to_pandas())
+    except Exception as ex:
+        print(f"Target projections not graded ({ex})", file=sys.stderr)
     sched = nfl.load_schedules([season]).to_pandas()
     sched = sched[sched["game_type"] == "REG"]
     week = args.week or default_week(log, sched, season)
