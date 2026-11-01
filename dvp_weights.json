@@ -1,0 +1,110 @@
+{
+ "seasons": [
+  2019,
+  2025
+ ],
+ "shrink_games": 6,
+ "weights": {
+  "fp_dk": 0.0,
+  "fp_ppr": 0.0,
+  "player_pass_attempts": 0.279,
+  "player_pass_completions": 0.381,
+  "player_pass_tds": 0.0,
+  "player_pass_yds": 0.336,
+  "player_reception_yds": 0.0,
+  "player_receptions": 0.0,
+  "player_rush_attempts": 0.246,
+  "player_rush_yds": 0.283,
+  "player_targets": 0.0
+ },
+ "evidence": {
+  "fp_dk": {
+   "weight": 0.0,
+   "coef": 0.197,
+   "t": 3.38,
+   "oos_mse_change": -0.00064,
+   "n": 17992,
+   "on": false
+  },
+  "fp_ppr": {
+   "weight": 0.0,
+   "coef": 0.182,
+   "t": 3.2,
+   "oos_mse_change": -0.00049,
+   "n": 17871,
+   "on": false
+  },
+  "player_pass_attempts": {
+   "weight": 0.279,
+   "coef": 0.349,
+   "t": 2.88,
+   "oos_mse_change": -0.00235,
+   "n": 3201,
+   "on": true
+  },
+  "player_pass_completions": {
+   "weight": 0.381,
+   "coef": 0.476,
+   "t": 4.52,
+   "oos_mse_change": -0.00604,
+   "n": 3156,
+   "on": true
+  },
+  "player_pass_tds": {
+   "weight": 0.0,
+   "coef": 0.008,
+   "t": 0.08,
+   "oos_mse_change": 0.00075,
+   "n": 2717,
+   "on": false
+  },
+  "player_pass_yds": {
+   "weight": 0.336,
+   "coef": 0.42,
+   "t": 4.1,
+   "oos_mse_change": -0.0047,
+   "n": 3186,
+   "on": true
+  },
+  "player_reception_yds": {
+   "weight": 0.0,
+   "coef": 0.021,
+   "t": 0.31,
+   "oos_mse_change": 0.00023,
+   "n": 13797,
+   "on": false
+  },
+  "player_receptions": {
+   "weight": 0.0,
+   "coef": 0.01,
+   "t": 0.16,
+   "oos_mse_change": 0.00025,
+   "n": 13859,
+   "on": false
+  },
+  "player_rush_attempts": {
+   "weight": 0.246,
+   "coef": 0.307,
+   "t": 3.73,
+   "oos_mse_change": -0.00137,
+   "n": 5721,
+   "on": true
+  },
+  "player_rush_yds": {
+   "weight": 0.283,
+   "coef": 0.353,
+   "t": 4.56,
+   "oos_mse_change": -0.00523,
+   "n": 6167,
+   "on": true
+  },
+  "player_targets": {
+   "weight": 0.0,
+   "coef": 0.049,
+   "t": 0.77,
+   "oos_mse_change": 0.00011,
+   "n": 13513,
+   "on": false
+  }
+ }
+}

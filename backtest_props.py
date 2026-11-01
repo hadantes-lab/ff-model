@@ -85,8 +85,8 @@ def collect(h, seasons, opp_lookup):
                     continue
                 opp = opp_lookup[(s_, wk_)][m].get((g.at[k, "opponent_team"], g.at[k, "position"]), 1.0)
                 recs.append((pid, m, s_, wk_, spec.kind, float(vals[m][k]), mu, var, n_eff, opp,
-                             ln_total[k] - avg_lt, margin[k] - avg_mg))
-    cols = ["pid", "market", "season", "week", "kind", "actual", "mu", "var", "n_eff", "opp", "dlt", "dm"]
+                             ln_total[k] - avg_lt, margin[k] - avg_mg, g.at[k, "opponent_team"], g.at[k, "position"]))
+    cols = ["pid", "market", "season", "week", "kind", "actual", "mu", "var", "n_eff", "opp", "dlt", "dm", "opp_team", "pos"]
     return pd.DataFrame(recs, columns=cols)
 
 

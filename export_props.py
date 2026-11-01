@@ -38,6 +38,8 @@ import odds_api
 import props_tracker
 import team_ratings
 import target_track
+import dvp_signal
+import dvp_track
 import team_stats
 import totals_model
 from matchups import CoverageModel, load_coverage_targets
@@ -818,6 +820,13 @@ def main():
     for m in ("player_pass_yds", "player_rush_yds", "player_anytime_td"):
         mults.setdefault(m, opponent_multipliers(history, MARKETS[m]))
     mults[TARGET_MARKET] = opponent_multipliers(history, MODEL_ONLY[TARGET_MARKET])
+    # defense vs position, beyond the season-long opponent multiplier above: the season-so-far, last-four-games and schedule-adjusted
+    # readings, applied only to the markets where dvp_study.py found it improves out-of-sample accuracy (dvp_weights.json)
+    try:
+        applied = dvp_signal.apply_to_multipliers(mults, history, {**MARKETS, **MODEL_ONLY}, stat_series, int(season))
+        log("Defense vs position adjustment on: " + (", ".join(f"{m} x{w:.2f}" for m, w in applied.items()) or "no market (no weights file)"))
+    except Exception as ex:
+        log(f"Defense vs position adjustment skipped ({ex})")
     priors[TARGET_MARKET] = position_priors(history, MODEL_ONLY[TARGET_MARKET])
     priors.setdefault("player_anytime_td", position_priors(history, MARKETS["player_anytime_td"]))
 
@@ -1070,6 +1079,11 @@ def main():
             log(f"Tracker: logged/updated {n} recommended parlays (tracking/parlay_log.csv)")
         n = target_track.log_projections(target_track.rows_from_snapshot(snapshot.get("targets"), int(season), int(week), snapshot["generated"]))
         log(f"Tracker: logged/updated {n} target projections (tracking/target_proj.csv)")
+        try:                                      # what every defense looked like before this week's games, for the weekly check
+            n = dvp_track.log_snapshot(dvp_track.snapshot_rows(history, int(season), int(week), snapshot["generated"]))
+            log(f"Tracker: logged/updated {n} defense-vs-position readings (tracking/dvp_log.csv)")
+        except Exception as ex:
+            log(f"Defense-vs-position log skipped ({ex})")
         n = line_history.append_rows(line_history.rows_from_snapshot(snapshot, snapshot["generated"]))
         log(f"Backlog: appended {n} rows to tracking/line_history.csv")
         if power is not None and rgames is not None:

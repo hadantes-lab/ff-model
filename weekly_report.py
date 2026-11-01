@@ -48,6 +48,7 @@ import pandas as pd
 import parlay_track
 import review_extras
 import target_track
+import dvp_track
 import straight_up
 
 MIN_FOR_SHARPER = 30               # games needed before the report says whether the model or the market was sharper
@@ -253,6 +254,10 @@ def build_report(log: pd.DataFrame, sched: pd.DataFrame, season: int, week: int,
         rep["targets"] = target_track.section(season, week)
     except Exception:                                         # the report must not fail on a missing or malformed targets log
         rep["targets"] = None
+    try:
+        rep["dvp"] = dvp_track.section(season, week)
+    except Exception:                                         # nor on a missing defense-vs-position log
+        rep["dvp"] = None
     rep["season_to_date"] = season_to_date(history, rep) if history is not None else {}
     for sec in sections + props:
         sec["writeup"] = blurb(sec)
@@ -432,6 +437,9 @@ def render_markdown(rep: dict) -> str:
     tg = rep.get("targets")
     if tg:
         L += ["## Target projections", "", tg["writeup"], ""]
+    dv = rep.get("dvp")
+    if dv:
+        L += ["## Defense vs position", "", dv["writeup"], ""]
     L += ["## Player props", ""]
     for p in rep["props"]:
         L += [f"### {p['title']}", "", p["writeup"], ""]
@@ -492,6 +500,9 @@ table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;p
     tg = rep.get("targets")
     if tg:
         out.append(f'<h2>Target projections</h2><div class="card"><p>{e(tg["writeup"])}</p></div>')
+    dv = rep.get("dvp")
+    if dv:
+        out.append(f'<h2>Defense vs position</h2><div class="card"><p>{e(dv["writeup"])}</p></div>')
     out.append("<h2>Player props</h2>")
     for p in rep["props"]:
         out.append(f'<div class="card"><h3>{e(p["title"])}</h3><p>{e(p["writeup"])}</p>' + ("<ul>" + "".join(
@@ -546,9 +557,13 @@ def main():
     season = args.season or int(nfl.get_current_season())
     log = props_tracker._load()
     try:
-        target_track.grade(nfl.load_player_stats([season]).to_pandas())
+        ps = nfl.load_player_stats([season - 1, season]).to_pandas()
+        target_track.grade(ps)
+        import props_model
+        n = dvp_track.grade(props_model.build_history(ps))
+        print(f"Graded {n} defense-vs-position readings", file=sys.stderr)
     except Exception as ex:
-        print(f"Target projections not graded ({ex})", file=sys.stderr)
+        print(f"Target projections / defense-vs-position log not graded ({ex})", file=sys.stderr)
     sched = nfl.load_schedules([season]).to_pandas()
     sched = sched[sched["game_type"] == "REG"]
     week = args.week or default_week(log, sched, season)
