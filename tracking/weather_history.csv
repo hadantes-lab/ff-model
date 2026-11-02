@@ -364,3 +364,4 @@ pulled_at,season,week,game,commence,stadium,roof,indoors,temp_f,wind_mph,gust_mp
 2026-11-01T17:14:45+00:00,2026,9,GB @ NE,2026-11-08T21:25:00Z,Gillette Stadium,outdoors,False,52,3,3,12,Overcast
 2026-11-01T17:14:45+00:00,2026,9,TB @ CHI,2026-11-09T01:20:00Z,Soldier Field,outdoors,False,50,11,26,21,Clear
 2026-11-01T17:14:45+00:00,2026,9,BUF @ MIN,2026-11-10T01:15:00Z,U.S. Bank Stadium,dome,True,,,,,
+2026-11-02T20:48:07+00:00,2026,8,CHI @ SEA,2026-11-03T01:20:00Z,Lumen Field,outdoors,False,45,2,3,3,Overcast
