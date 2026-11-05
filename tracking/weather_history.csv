@@ -393,3 +393,4 @@ pulled_at,season,week,game,commence,stadium,roof,indoors,temp_f,wind_mph,gust_mp
 2026-11-04T18:52:09+00:00,2026,10,SF @ DAL,2026-11-15T21:25:00Z,AT&T Stadium,nan,False,68,10,6,6,Clear
 2026-11-04T18:52:09+00:00,2026,10,PIT @ CIN,2026-11-16T01:20:00Z,Paycor Stadium,outdoors,False,37,4,3,9,Clear
 2026-11-04T18:52:09+00:00,2026,10,LAC @ BAL,2026-11-17T01:15:00Z,M&T Bank Stadium,outdoors,False,45,8,12,14,Overcast
+2026-11-05T18:46:14+00:00,2026,9,JAX @ BAL,2026-11-06T01:15:00Z,M&T Bank Stadium,outdoors,False,67,4,8,38,Rain
