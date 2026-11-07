@@ -394,3 +394,15 @@ pulled_at,season,week,game,commence,stadium,roof,indoors,temp_f,wind_mph,gust_mp
 2026-11-04T18:52:09+00:00,2026,10,PIT @ CIN,2026-11-16T01:20:00Z,Paycor Stadium,outdoors,False,37,4,3,9,Clear
 2026-11-04T18:52:09+00:00,2026,10,LAC @ BAL,2026-11-17T01:15:00Z,M&T Bank Stadium,outdoors,False,45,8,12,14,Overcast
 2026-11-05T18:46:14+00:00,2026,9,JAX @ BAL,2026-11-06T01:15:00Z,M&T Bank Stadium,outdoors,False,67,4,8,38,Rain
+2026-11-07T16:52:23+00:00,2026,9,CIN @ ATL,2026-11-08T14:30:00Z,Bernabeu,nan,False,60,5,12,5,Overcast
+2026-11-07T16:52:23+00:00,2026,9,DEN @ CAR,2026-11-08T18:00:00Z,Bank of America Stadium,outdoors,False,66,7,11,0,Clear
+2026-11-07T16:52:23+00:00,2026,9,CLE @ NO,2026-11-08T18:00:00Z,Caesars Superdome,dome,True,,,,,
+2026-11-07T16:52:23+00:00,2026,9,DAL @ IND,2026-11-08T18:00:00Z,Lucas Oil Stadium,nan,False,53,13,25,0,Clear
+2026-11-07T16:52:23+00:00,2026,9,DET @ MIA,2026-11-08T18:00:00Z,Hard Rock Stadium,outdoors,False,82,6,7,4,Mostly clear
+2026-11-07T16:52:23+00:00,2026,9,NYJ @ KC,2026-11-08T18:00:00Z,GEHA Field at Arrowhead Stadium,outdoors,False,59,7,12,0,Clear
+2026-11-07T16:52:23+00:00,2026,9,LA @ WAS,2026-11-08T18:00:00Z,Northwest Stadium,outdoors,False,60,10,18,0,Clear
+2026-11-07T16:52:23+00:00,2026,9,NYG @ PHI,2026-11-08T18:00:00Z,Lincoln Financial Field,outdoors,False,56,11,19,0,Clear
+2026-11-07T16:52:23+00:00,2026,9,HOU @ LAC,2026-11-08T21:05:00Z,SoFi Stadium,dome,True,,,,,
+2026-11-07T16:52:23+00:00,2026,9,LV @ SF,2026-11-08T21:05:00Z,Levi's Stadium,outdoors,False,67,8,12,0,Overcast
+2026-11-07T16:52:23+00:00,2026,9,ARI @ SEA,2026-11-08T21:25:00Z,Lumen Field,outdoors,False,53,11,20,9,Drizzle
+2026-11-07T16:52:23+00:00,2026,9,GB @ NE,2026-11-08T21:25:00Z,Gillette Stadium,outdoors,False,48,9,24,1,Clear

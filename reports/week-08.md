@@ -124,7 +124,7 @@ Wong teasers (pairs): 3 of 9 settled cashed; the stated chances expected 5.0. In
 
 ## Top 10 prop picks
 
-The week's top 10 prop picks went 4-1, about 2.2 wins by their stated chances. At the prices logged, $1 flat on each returned +3.94 (+79% per pick). Best call: Cam Ward Completions over 19.5, finished 26. Biggest miss: Ryan Flournoy Receptions over 3.5, finished 3. Season to date over 4 weeks: 10-7 (59%), against 8.1 expected wins and +5.58 units at logged prices. Ten picks a week is a small sample: judge the model on the season line, not one week.
+The week's top 10 prop picks went 4-1, about 2.2 wins by their stated chances. At the prices logged, $1 flat on each returned +3.94 (+79% per pick). Best call: Cam Ward Completions over 19.5, finished 26. Biggest miss: Ryan Flournoy Receptions over 3.5, finished 3. Season to date over 5 weeks: 11-7 (61%), against 8.6 expected wins and +6.93 units at logged prices. Ten picks a week is a small sample: judge the model on the season line, not one week.
 
 - #1 Ryan Flournoy Receptions over 3.5 (48%), finished 3: MISSED
 - #1 Zach Charbonnet Receptions over 1.5 (47%), finished 3: hit
@@ -156,6 +156,19 @@ Week 8: 89 target projections graded, off by 2.06 targets on average against 2.2
 ## Defense vs position
 
 Week 8: the schedule-adjusted ratings' softest quarter of defenses allowed +1% versus the league, the toughest quarter -5%. Season to date (1 weeks, 504 defense-position-stat games): the last-season rating tracked what defenses allowed best (correlation +0.12; the softest quarter allowed +8% against the league, the toughest -11%). A reading only helps a projection if it predicts the NEXT game, which is what this checks; the player-level test (dvp_study.py) replays every game since 2019.
+
+## Social picks
+
+No source has 10 graded picks yet, so none carries any weight. Records are graded by us from each source's own posts, flat 1 unit at the stated price (-110 if none).
+
+- @covers-computer: 0-0, +0.0 units, weight 0.00 (unproven)
+- @espn-fpi: 0-0, +0.0 units, weight 0.00 (unproven)
+- @nfelo: 0-0, +0.0 units, weight 0.00 (unproven)
+- @pickswise:aaron-taylor: 0-0, +0.0 units, weight 0.00 (unproven)
+- @pickswise:chris-farley: 0-0, +0.0 units, weight 0.00 (unproven)
+- @pickswise:kevin-rogers: 0-0, +0.0 units, weight 0.00 (unproven)
+- @pickswise:luke-lindholm: 0-0, +0.0 units, weight 0.00 (unproven)
+- @pickswise:ricky-dimon: 0-0, +0.0 units, weight 0.00 (unproven)
 
 ## Player props
 

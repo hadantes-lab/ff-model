@@ -1,9 +1,9 @@
 {
- "generated": "2026-11-07T06:54:50.950777+00:00",
+ "generated": "2026-11-07T16:51:10.548944+00:00",
  "sources": {
   "espn-fpi": {
    "ok": true,
-   "picks": 9,
+   "picks": 11,
    "note": null
   },
   "covers-computer": {
@@ -38,7 +38,7 @@
    "kickoff": "2026-11-08T14:30:00+00:00",
    "market": "spread",
    "side": "CIN",
-   "line": -3.0,
+   "line": -3.5,
    "odds": null
   },
   {
@@ -65,6 +65,19 @@
    "market": "spread",
    "side": "DET",
    "line": -6.5,
+   "odds": null
+  },
+  {
+   "source": "espn-fpi",
+   "platform": "web",
+   "game_id": "2026_09_CLE_NO",
+   "game": "CLE @ NO",
+   "season": 2026,
+   "week": 9,
+   "kickoff": "2026-11-08T18:00:00+00:00",
+   "market": "spread",
+   "side": "NO",
+   "line": -3.5,
    "odds": null
   },
   {
@@ -146,6 +159,19 @@
    "odds": null
   },
   {
+   "source": "espn-fpi",
+   "platform": "web",
+   "game_id": "2026_09_BUF_MIN",
+   "game": "BUF @ MIN",
+   "season": 2026,
+   "week": 9,
+   "kickoff": "2026-11-10T01:15:00+00:00",
+   "market": "spread",
+   "side": "BUF",
+   "line": -3.0,
+   "odds": null
+  },
+  {
    "source": "covers-computer",
    "platform": "web",
    "game_id": "2026_09_CIN_ATL",
@@ -168,7 +194,7 @@
    "kickoff": "2026-11-08T18:00:00+00:00",
    "market": "spread",
    "side": "IND",
-   "line": 4.5,
+   "line": 3.5,
    "odds": null
   },
   {
@@ -220,7 +246,7 @@
    "kickoff": "2026-11-08T18:00:00+00:00",
    "market": "spread",
    "side": "DET",
-   "line": -5.5,
+   "line": -6.5,
    "odds": null
   },
   {
@@ -246,7 +272,7 @@
    "kickoff": "2026-11-08T18:00:00+00:00",
    "market": "spread",
    "side": "PHI",
-   "line": 3.5,
+   "line": 2.5,
    "odds": null
   },
   {
@@ -389,7 +415,7 @@
    "kickoff": "2026-11-10T01:15:00+00:00",
    "market": "total",
    "side": "over",
-   "line": 43.5,
+   "line": 44.0,
    "odds": null
   },
   {
