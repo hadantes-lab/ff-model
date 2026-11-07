@@ -145,6 +145,8 @@
   .more { display: block; margin: 12px auto 0; padding: 9px 22px; border-radius: 8px; border: 1px solid var(--border);
     background: var(--surface-2); font-weight: 600; cursor: pointer; }
   .empty { padding: 50px 0; text-align: center; color: var(--text-faint); }
+  .brow.free-backed { box-shadow: inset 3px 0 0 var(--pos); }
+  .free-board { border-color: var(--pos); }
 
   /* ---- detail ---- */
   .detail { border-top: 1px solid var(--border); padding: 16px; display: grid; gap: 22px;
@@ -1404,16 +1406,37 @@ function suBoardHTML() {
     <div class="note"><strong>How these are made.</strong> Each win probability is the market's: the posted spread converted with a ${pool.sd}-point standard deviation of the final margin (the moneyline gives the same numbers; they correlate at 0.995). That is deliberate: tested on 1,424 games from 2021&ndash;26, the market's picks won 66.6% straight up and our own power ratings only 63.2%, and mixing any share of our ratings into the market's probability made it worse, so our model has no weight here. The tier records above are what each tier has really done, and they line up with their ranges. F-tier games are close to coin flips, so treat them that way. Finished games stay in the list so the week reads as a whole.</div></div>`;
 }
 
+/* ---------- the free-pick majority ---------- */
+/* how the free picks on this game and market lined up with our simulation's side */
+function freeTagHTML(e) {
+  const f = e.free;
+  if (!f || !f.of) return "";
+  if (f.backed) return ` <span class="tag ok free-tag" title="${esc(f.sources.join(", "))}">free picks agree: ${f.agree} of ${f.of}</span>`;
+  if (f.of >= (DATA.free_picks ? DATA.free_picks.min_free : 3) && f.against * 2 > f.of) return ` <span class="tag warn" title="The majority of free picks took the other side">free picks disagree: ${f.against} of ${f.of}</span>`;
+  return ` <span class="tag" title="No majority among ${f.of} free picks">free picks split ${f.agree}-${f.against}</span>`;
+}
+function freeBackedHTML() {
+  const fp = DATA.free_picks;
+  if (!fp) return "";
+  const src = Object.entries(fp.sources || {}).map(([n, s]) => `<span class="${s.ok ? "" : "down"}" style="margin-right:10px">${esc(n)}: ${s.ok ? s.picks + " picks" : "failed"}</span>`).join("");
+  const rows = (fp.backed || []).map(b => `<div class="brow"><div class="n">${b.rank == null ? "" : b.rank}</div><div>${esc(b.game)}</div>
+      <div><strong>${esc(b.pick)}</strong> <span class="tag">${b.type}</span> <span class="tag ok" title="${esc(b.sources.join(", "))}">${b.agree} of ${b.of} free picks agree</span></div>
+      <div class="num">${pct(b.prob)}</div></div>`).join("");
+  return `<div class="board free-board"><h2>Simulation picks the free-pick majority agrees with</h2>
+    <div class="note">Each of our spread and total picks is checked against the free picks on that game (ESPN's FPI, Covers' computer, Pickswise's handicappers; ${fp.min_free}+ picks and more than half on our side). Free sources are not independent of the market, and a majority that agrees is a reason to look twice, not a bet on its own. ${src ? `Sources this run: ${src}.` : ""}</div>
+    ${rows ? `<div class="brow head"><div>#</div><div>Game</div><div>Pick</div><div>Conf.</div></div>${rows}` : `<div class="note" style="margin-top:6px"><strong>No game pick is backed by a majority right now</strong> (or the sources had no picks yet).</div>`}</div>`;
+}
+
 /* ---------- game pick board + power rankings ---------- */
 function pickBoardHTML() {
   const picks = DATA.game_picks || [];
   if (!picks.length) return "";
-  return `<div class="board"><h2>Game picks ranked by confidence</h2>
+  return freeBackedHTML() + `<div class="board"><h2>Game picks ranked by confidence</h2>
     <div class="note">Confidence is the model's probability for the picked side after shrinking toward the market (so it stays close to 50%: that is deliberate, since the simulator has no proven edge over the line yet). "Rating agrees" means the power-ranking spread leans the same way.</div>
     <div class="brow head"><div>#</div><div>Game</div><div>Pick</div><div>Conf.</div><div>Best price</div><div style="text-align:right;">EV / $1</div></div>
-    ${picks.map(e => `<div class="brow ${e.rank <= 3 ? "glow" : ""}"><div class="n">${e.rank}</div>
+    ${picks.map(e => `<div class="brow ${e.rank <= 3 ? "glow" : ""} ${e.free && e.free.backed ? "free-backed" : ""}"><div class="n">${e.rank}</div>
       <div>${esc(e.game)}</div>
-      <div><strong>${esc(e.pick)}</strong> <span class="tag">${e.type}</span>${e.rank_agrees === true ? ` <span class="tag ok" title="The power-ranking spread leans the same way">rating agrees</span>` : e.rank_agrees === false ? ` <span class="tag warn" title="The power-ranking spread leans the other way">rating disagrees</span>` : ""}</div>
+      <div><strong>${esc(e.pick)}</strong> <span class="tag">${e.type}</span>${e.rank_agrees === true ? ` <span class="tag ok" title="The power-ranking spread leans the same way">rating agrees</span>` : e.rank_agrees === false ? ` <span class="tag warn" title="The power-ranking spread leans the other way">rating disagrees</span>` : ""}${freeTagHTML(e)}</div>
       <div class="num">${pct(e.prob)}</div>
       <div>${e.price ? `<span class="num">${price(e.price.price)}</span> <span style="color:var(--text-faint)">${esc(e.price.book)}</span>` : "&mdash;"}</div>
       <div class="num ${e.ev == null ? "" : e.ev > 0.005 ? "ev pos" : "ev neg"}" style="text-align:right;">${e.ev == null ? "&mdash;" : signed(e.ev * 100, 1) + "%"}</div></div>`).join("")}</div>`;

@@ -41,6 +41,7 @@ import target_track
 import dvp_signal
 import dvp_track
 import social_picks
+import free_picks
 import team_stats
 import totals_model
 from matchups import CoverageModel, load_coverage_targets
@@ -619,14 +620,14 @@ def game_pick_entries(g):
     home = side == "home"
     rk = g.get("rank") or {}
     rank_side = None if rk.get("rank_home_cover") is None else ("home" if rk["rank_home_cover"] > 0.5 else "away")
-    out.append({"type": "Spread", "game": g["game"], "week": g.get("week"),
+    out.append({"type": "Spread", "game": g["game"], "week": g.get("week"), "side": g["home"] if home else g["away"],
                 "pick": f"{g['home'] if home else g['away']} {(g['home_spread'] if home else -g['home_spread']):+g}",
                 "prob": g["home_cover"] if home else g["away_cover"],
                 "ev": g.get("spread_pick_ev") if g.get("spread_pick") else None,
                 "price": g.get("spread_pick_price") if g.get("spread_pick") else None,
                 "rank_agrees": None if rank_side is None else rank_side == side})
     side = g.get("total_pick") or ("over" if g["over"] >= g["under"] else "under")
-    out.append({"type": "Total", "game": g["game"], "week": g.get("week"),
+    out.append({"type": "Total", "game": g["game"], "week": g.get("week"), "side": side,
                 "pick": f"{side.title()} {g['total']:g}",
                 "prob": g["over"] if side == "over" else g["under"],
                 "ev": g.get("total_pick_ev") if g.get("total_pick") else None,
@@ -1054,12 +1055,17 @@ def main():
     if bt.exists():
         rating_backtest = json.loads(bt.read_text(encoding="utf-8"))
 
-    try:                                           # picks from X / imports, graded by us, the sources that have been winning first
-        social = social_picks.build_block(int(season))
-        log(f"Social picks: {len(social['sources'])} sources tracked, {len(social['games'])} games with picks to come.")
+    social, free = None, None
+    try:                                           # picks from X, imports and the free web sources, graded by us, the sources that have been winning first
+        latest = free_picks.load_latest()
+        eff = free_picks.upcoming(social_picks.load(), latest, int(season))
+        n_backed = free_picks.annotate(game_picks, eff)           # tags each simulation pick with how the sources on that game lined up
+        free = free_picks.block(game_picks, latest)
+        social = social_picks.build_block(int(season), upcoming=eff)
+        log(f"Free picks: {len(latest.get('picks', []))} from {len(latest.get('sources', {}))} sources; {n_backed} of our {len(game_picks)} game picks "
+            f"are backed by the majority. Social picks: {len(social['sources'])} sources tracked, {len(social['games'])} games with picks to come.")
     except Exception as ex:
-        social = None
-        log(f"Social picks unavailable ({ex}); the page omits them.")
+        log(f"Free/social picks unavailable ({ex}); the page omits them.")
     snapshot = {
         "generated": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
         "season": int(season), "week": int(week), "sample": bool(args.sample),
@@ -1067,6 +1073,7 @@ def main():
         "game_picks": game_picks, "rating_backtest": rating_backtest, "context": context,
         "trust_note": TRUST_NOTE if static_trust else None,
         "social": social,
+        "free_picks": free,
         "credit_note": credit_note if (skipped_events or (credit_note or "").startswith("Props pull stopped")) else None,
         "su_pool": su_pool,
         "team_breakdown": team_breakdown,

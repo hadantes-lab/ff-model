@@ -98,6 +98,14 @@ jobs:
           python props_tracker.py refine
           python props_tracker.py report --json
 
+      # Free picks from the web (ESPN's FPI, Covers' computer, Pickswise's handicappers): public pages, no key, no cost. Logged to the same
+      # pick log as X picks so each source is graded on its own record, and saved as tracking/free_picks_latest.json for the page's
+      # "free picks agree with our simulation" highlight. A source that is down or changed its page costs only its own picks; this
+      # step must never block the refresh.
+      - name: Free picks (fetch, log, grade)
+        continue-on-error: true
+        run: python free_picks.py fetch
+
       # Picks from X: pull posts newer than the last pull (at most max_posts_per_run, so a bounded spend), log the game picks they
       # contain and grade the ones whose games have finished. A no-op without X_BEARER_TOKEN and handles. Before the weekly report and
       # the props page so both see it; a failure here must never block the refresh.
@@ -152,7 +160,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add reports tracking/weekly_summary.csv tracking/learning_log.csv tracking/parlay_log.csv tracking/target_proj.csv tracking/dvp_log.csv tracking/social_picks.csv tracking/social_state.json trust_weights.json tracking/props_log.csv tracking/line_history.csv tracking/power_history.csv tracking/player_model_record.csv tracking/weather_history.csv web/track_record.json web/player_history.json
+          git add reports tracking/weekly_summary.csv tracking/learning_log.csv tracking/parlay_log.csv tracking/target_proj.csv tracking/dvp_log.csv tracking/social_picks.csv tracking/social_state.json tracking/free_picks_latest.json trust_weights.json tracking/props_log.csv tracking/line_history.csv tracking/power_history.csv tracking/player_model_record.csv tracking/weather_history.csv web/track_record.json web/player_history.json
           git diff --cached --quiet && echo "No tracker changes." || git commit -m "Update props tracking log [skip ci]"
           git checkout -- .   # discard regenerated build outputs (already published) so the rebase can run
           git pull --rebase -X theirs origin main   # a concurrent run edited the same files: this run's rows win (upsert semantics)

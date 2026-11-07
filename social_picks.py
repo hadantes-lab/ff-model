@@ -152,10 +152,10 @@ def load_games(seasons) -> pd.DataFrame:
     return games_from_schedule(nfl.load_schedules(list(seasons)).to_pandas())
 
 
-def find_game(games: pd.DataFrame, team: str, posted: pd.Timestamp, opponent: str = None):
-    """The first game `team` plays after `posted`, within MAX_LEAD_HOURS (and against `opponent` when given); None if there is none."""
+def find_game(games: pd.DataFrame, team: str, posted: pd.Timestamp, opponent: str = None, max_hours: float = MAX_LEAD_HOURS):
+    """The first game `team` plays after `posted`, within `max_hours` (and against `opponent` when given); None if there is none."""
     g = games[((games["home"] == team) | (games["away"] == team)) & (games["kickoff"] > posted)
-              & (games["kickoff"] - posted <= pd.Timedelta(hours=MAX_LEAD_HOURS))]
+              & (games["kickoff"] - posted <= pd.Timedelta(hours=max_hours))]
     if opponent:
         g = g[(g["home"] == opponent) | (g["away"] == opponent)]
     return None if g.empty else g.sort_values("kickoff").iloc[0]
@@ -403,22 +403,27 @@ def weights(df: pd.DataFrame, season: int) -> dict:
     return {r["source"]: r["weight"] for r in source_table(df, season)}
 
 
-def consensus(df: pd.DataFrame, season: int, now=None) -> list:
+def consensus(df: pd.DataFrame, season: int, now=None, upcoming: pd.DataFrame = None) -> list:
     """
     Picks on games still to be played, grouped by game and market, each side scored by the summed weight of the proven sources behind it.
     -> [{game, kickoff, items: [{market, side, line, score, backers: [...]}]}] with the most-backed game first.
     """
     now = to_utc(now) if now is not None else pd.Timestamp.now(tz="UTC")
     tab = {r["source"]: r for r in source_table(df, season)}
-    d = df[(df["season"] == season) & df["result"].isna()].copy()
-    d = d[pd.to_datetime(d["kickoff"], utc=True, format="ISO8601") > now]
+    if upcoming is not None:                           # the caller's own view of what is still to come (free_picks.upcoming: latest web picks)
+        d = upcoming
+    else:
+        d = df[(df["season"] == season) & df["result"].isna()].copy()
+        d = d[pd.to_datetime(d["kickoff"], utc=True, format="ISO8601") > now]
     out = []
     for gid, g in d.groupby("game_id"):
         items = []
         for (market, side), s in g.groupby(["market", "side"]):
+            blank = {"weight": 0.0, "status": "unproven", "wins": 0, "losses": 0}          # a source with nothing graded yet
             backers = [{"source": r.source, "line": None if pd.isna(r.line) else float(r.line),
-                        "odds": None if pd.isna(r.odds) else int(r.odds), "weight": tab[r.source]["weight"], "status": tab[r.source]["status"],
-                        "record": f"{tab[r.source]['wins']}-{tab[r.source]['losses']}"} for r in s.itertuples()]
+                        "odds": None if pd.isna(r.odds) else int(r.odds), "weight": tab.get(r.source, blank)["weight"],
+                        "status": tab.get(r.source, blank)["status"],
+                        "record": f"{tab.get(r.source, blank)['wins']}-{tab.get(r.source, blank)['losses']}"} for r in s.itertuples()]
             backers.sort(key=lambda b: -b["weight"])
             items.append({"market": market, "side": side, "line": next((b["line"] for b in backers if b["line"] is not None), None),
                           "score": round(sum(b["weight"] for b in backers), 3), "n": len(backers), "backers": backers})
@@ -490,13 +495,13 @@ def ensure_files(log_path=None, state_path=None, state: dict = None):
         save_state(state or load_state(state_path), state_path)
 
 
-def build_block(season: int, now=None, df: pd.DataFrame = None, config: dict = None, state: dict = None) -> dict:
-    """What the props page shows on its Social Picks tab."""
+def build_block(season: int, now=None, df: pd.DataFrame = None, config: dict = None, state: dict = None, upcoming: pd.DataFrame = None) -> dict:
+    """What the props page shows on its Social Picks tab. `upcoming` (free_picks.upcoming) puts web sources' latest picks on the board."""
     df = load() if df is None else df
     config = load_config() if config is None else config
     state = load_state() if state is None else state
     return {"season": season, "handles": len(config["x_handles"]), "max_posts": config["max_posts_per_run"], "min_picks": MIN_PICKS, "breakeven": round(BREAKEVEN, 4),
-            "prior_picks": PRIOR_PICKS, "sources": source_table(df, season), "games": consensus(df, season, now),
+            "prior_picks": PRIOR_PICKS, "sources": source_table(df, season), "games": consensus(df, season, now, upcoming),
             "test": skill_test(df, season), "x": {"token": bool(os.environ.get("X_BEARER_TOKEN")), "posts_read": state.get("posts_read", 0),
                                                   "est_cost_usd": round(state.get("est_cost_usd", 0.0), 2), "last_pull": state.get("last_pull"),
                                                   "note": state.get("last_note")}}
