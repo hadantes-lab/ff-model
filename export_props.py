@@ -42,6 +42,7 @@ import dvp_signal
 import dvp_track
 import social_picks
 import free_picks
+import youtube_picks
 import team_stats
 import totals_model
 from matchups import CoverageModel, load_coverage_targets
@@ -1062,6 +1063,7 @@ def main():
         n_backed = free_picks.annotate(game_picks, eff)           # tags each simulation pick with how the sources on that game lined up
         free = free_picks.block(game_picks, latest)
         social = social_picks.build_block(int(season), upcoming=eff)
+        social["youtube"] = youtube_picks.block(youtube_picks.load_channels())
         log(f"Free picks: {len(latest.get('picks', []))} from {len(latest.get('sources', {}))} sources; {n_backed} of our {len(game_picks)} game picks "
             f"are backed by the majority. Social picks: {len(social['sources'])} sources tracked, {len(social['games'])} games with picks to come.")
     except Exception as ex:

@@ -1,4 +1,10 @@
 {
  "x_handles": [],
- "max_posts_per_run": 200
+ "max_posts_per_run": 200,
+ "youtube_channels": [
+  "SharpFootballAnalysis",
+  "Wagertalk",
+  "RossTuckerNFL",
+  "MayoMediaNetwork"
+ ]
 }
