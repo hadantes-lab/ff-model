@@ -125,7 +125,7 @@ completions, interceptions and rush+rec yards; `--max-events N` limits games.
 Whether player props are included on a free plan is up to the Odds API, not this code.
 
 **Scheduled refresh.** `.github/workflows/refresh-site.yml` rebuilds the site every Saturday,
-Monday and Thursday morning (scheduled for 6:17 AM Central, because GitHub starts scheduled runs late, sometimes by hours, so asking at 8 sharp meant a late page; a scheduled run is skipped if a refresh already succeeded in the last 5 hours, so a late start never re-spends Odds API credits) and publishes it to GitHub Pages: the draft board
+Monday and Thursday morning (scheduled for 6:17 AM Central, because GitHub starts scheduled runs late, sometimes by hours, so asking at 8 sharp meant a late page; a scheduled run is skipped if a refresh already succeeded in the last 12 hours, so a late start never re-spends Odds API credits) and publishes it to GitHub Pages: the draft board
 at `/draft/` (always) and the props page at `/props/` (when the key below exists), using only
 games starting soon: **Saturday's run looks 2 days ahead, so its page is the whole Sunday slate (and Sunday night) with every game's props pulled in one go;
 Monday's is Monday night's game alone, and Thursday's is Thursday night's** (game lines, defense vs position and the game-by-game breakdown included). The game-lines call also

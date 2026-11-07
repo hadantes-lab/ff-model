@@ -8,7 +8,8 @@ name: Refresh site
 # Scheduled to start at 11:17 UTC = 6:17 AM CDT / 5:17 AM CST, NOT at 8 AM sharp: GitHub queues scheduled runs
 # late under load, worst at the top of the hour (it was 4-8 hours late on three occasions), so the schedule asks early
 # and at an off-peak minute to have the page ready by 8. Run it by hand any time from the Actions tab.
-# A scheduled run that starts after a recent successful run (e.g. you ran it by hand) skips itself, see `gate`.
+# A scheduled run that starts within 12 hours of a successful run (e.g. you ran it by hand, and the cron fires late) skips itself, see `gate`.
+# Scheduled runs are at least two days apart, so the window never swallows the next real one.
 on:
   schedule:
     - cron: "17 11 * * 1,4,6"
@@ -32,7 +33,7 @@ jobs:
     outputs:
       skip: ${{ steps.recent.outputs.skip }}
     steps:
-      - name: Skip a scheduled run if a refresh succeeded in the last 5 hours
+      - name: Skip a scheduled run if a refresh succeeded in the last 12 hours
         id: recent
         env:
           GH_TOKEN: ${{ github.token }}
@@ -44,7 +45,7 @@ jobs:
             if [ -n "$last" ]; then
               age=$(( $(date -u +%s) - $(date -u -d "$last" +%s) ))
               echo "Last successful refresh: $last (${age}s ago)"
-              if [ "$age" -lt 18000 ]; then skip=true; fi
+              if [ "$age" -lt 43200 ]; then skip=true; fi
             fi
           fi
           echo "skip=$skip" >> "$GITHUB_OUTPUT"
