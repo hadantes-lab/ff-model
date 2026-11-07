@@ -128,6 +128,57 @@ class TestESPN(unittest.TestCase):
         self.assertIsNone(fp.norm_code("XYZ", codes))
 
 
+class TestPredictionTracker(unittest.TestCase):
+    SPREADS = chr(10).join([
+        "lineopen,line,road,home,linemedian,linenfelo,linesag",
+        "-3,-3,Detroit,Miami,-5.0,-3.5,",                       # market DET -3; median has DET by 5; nfelo half a point; no Sagarin
+        "-6.5,-6.5,N.Y. Jets,Kansas City,-6.0,-8.0,-9.5",       # not on this fixture's schedule
+    ]) + chr(10)
+    TOTALS = chr(10).join([
+        "lineopen,line,road,home,totmed,totsag",
+        "47,47.5,Detroit,Miami,50.0,47.0",
+    ]) + chr(10)
+
+    def test_three_voices_from_sixty_models(self):
+        p = fp.parse_predictiontracker(self.SPREADS, self.TOTALS, GAMES, NOW)
+        got = {(x["source"], x["market"], x["side"], x["line"]) for x in p}
+        self.assertEqual(got, {("pt-median", "spread", "DET", -3.0), ("pt-median", "total", "over", 47.5)})
+
+    def test_the_market_line_sign_is_home_favored_positive(self):
+        spreads = chr(10).join(["line,road,home,linemedian", "3,Detroit,Miami,6.0"]) + chr(10)      # market MIA -3 at home; median says MIA by 6
+        p = fp.parse_predictiontracker(spreads, "", GAMES, NOW)
+        # a market of MIA -3 is far from the fixture's DET -3, so it is dropped as another game's number
+        self.assertEqual(p, [])
+
+    def test_a_missing_totals_file_still_gives_spreads(self):
+        p = fp.parse_predictiontracker(self.SPREADS, "", GAMES, NOW)
+        self.assertEqual({x["market"] for x in p}, {"spread"})
+
+    def test_names_map_to_teams(self):
+        for name, code in [("N.Y. Jets", "NYJ"), ("LA Rams", "LA"), ("LA Chargers", "LAC"), ("Tampa Bay", "TB"), ("Washington", "WAS"), ("Las Vegas", "LV")]:
+            self.assertEqual(fp.team_mentions(name)[0], code)
+
+
+class TestSBD(unittest.TestCase):
+    HUB = ('<a href="/news/nfl/tracking-biggest-nfl-odds-movement-week-9-spread-total-shifts/">x</a>'
+           '<a href="/news/nfl/week-9-nfl-picks-against-the-spread-ats-best-bets/">Week 9 NFL Picks</a>')
+    ARTICLE = ("<p>Week 9 picks. Lions vs Dolphins ATS Pick Pick: DET -3.5 A.I. Rationale: Detroit enjoys a win probability.</p>"
+               "<p>Patriots vs Packers ATS Pick Pick: NE -6.5 A.I. Rationale: ...</p><p>Bills vs Vikings ATS Pick Pick: BUF -3.5</p>")
+
+    def test_the_weeks_article_is_found_from_the_hub(self):
+        self.assertEqual(fp.sbd_week(GAMES, NOW), 9)
+        self.assertEqual(fp.sbd_article_url(self.HUB, 9), "https://www.sportsbettingdime.com/news/nfl/week-9-nfl-picks-against-the-spread-ats-best-bets/")
+        self.assertIsNone(fp.sbd_article_url(self.HUB, 10))
+
+    def test_picks_are_read_and_a_far_number_dropped(self):
+        p = fp.parse_sbd(self.ARTICLE, GAMES, NOW)
+        # DET -3.5 vs market -3 is fine; NE at GB: NE +6.5 would be the market (GB -6.5), so NE -6.5 is far from it; BUF is not on the fixture schedule
+        self.assertEqual([(x["source"], x["side"], x["line"]) for x in p], [("sbd-ai", "DET", -3.5)])
+
+    def test_no_games_left_means_no_week(self):
+        self.assertIsNone(fp.sbd_week(GAMES, pd.Timestamp("2027-01-01T00:00:00Z")))
+
+
 class TestRun(unittest.TestCase):
     def test_one_failing_source_does_not_take_the_others_down(self):
         def good(games, now, get):

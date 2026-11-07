@@ -9,6 +9,10 @@ SOURCES (each is a public page or API that answers a plain, honestly labelled re
   espn-fpi         ESPN's Football Power Index game projection (public JSON): predicted margin per game
   covers-computer  Covers' computer pick: predicted score per game, with its spread and total
   pickswise:<name> Pickswise's named handicappers: an explicit spread or total, at the number they picked at
+  pt-median        ThePredictionTracker's median of ~60 computer models (spread and total), from its published CSV downloads
+  nfelo, sagarin   two of those models on their own: nfelo (PredictionTracker's most accurate in 2024) and Sagarin
+  sbd-ai           Sports Betting Dime's A.I. model spread picks (the week's picks article, found from their NFL hub page)
+The ~60 PredictionTracker models are correlated with each other and with the market, so they enter as three voices, not sixty.
 Not used: Dimers (serves its page to browsers only), NFLPickWatch (loads its picks from a private API), Vegas Insider (premium-locked alternate lines).
 
 A projection becomes a pick only where it differs from the market line by MODEL_EDGE points or more; a human's pick is taken as stated. Every pick goes in
@@ -49,6 +53,11 @@ ESPN_SCOREBOARD = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/sc
 ESPN_PREDICTOR = "https://sports.core.api.espn.com/v2/sports/football/leagues/nfl/events/{id}/competitions/{id}/predictor"
 COVERS_URL = "https://www.covers.com/picks/nfl"
 PICKSWISE_URL = "https://www.pickswise.com/nfl/predictions/"
+PT_SPREADS = "http://www.thepredictiontracker.com/nflpredictions.csv"
+PT_TOTALS = "http://www.thepredictiontracker.com/nfltotals.csv"
+PT_SPREAD_MODELS = {"pt-median": "linemedian", "nfelo": "linenfelo", "sagarin": "linesag"}      # voice -> column (home-favored margin)
+PT_TOTAL_MODELS = {"pt-median": "totmed", "sagarin": "totsag"}
+SBD_HUB = "https://www.sportsbettingdime.com/nfl/"
 POLITE_DELAY = 0.3                # seconds between requests to the same site
 
 _NAME_RE = re.compile(rf"(?<![\w@])(?i:{sp._NAMES})(?![A-Za-z])")
@@ -232,7 +241,101 @@ def fetch_pickswise(games: pd.DataFrame, now: pd.Timestamp, get=fetch) -> list:
     return parse_pickswise(get(PICKSWISE_URL), games, now)
 
 
-SOURCES = {"espn-fpi": fetch_espn_fpi, "covers-computer": fetch_covers, "pickswise": fetch_pickswise}
+# ---- ThePredictionTracker: published CSVs of ~60 computer models ---------------------------------------------------------
+def _pt_teams(row, games, now):
+    """The game for a PredictionTracker row ('Jacksonville' at 'Baltimore'), or None."""
+    road, home = team_mentions(str(row["road"])), team_mentions(str(row["home"]))
+    if not road or not home:
+        return None
+    return sp.find_game(games, home[0], now, road[0], WEB_LEAD_HOURS)
+
+
+def parse_predictiontracker(spreads_csv: str, totals_csv: str, games: pd.DataFrame, now: pd.Timestamp) -> list:
+    """
+    Each row is a game with every model's predicted home margin (home favored = positive, as nflverse) and the market line in `line`.
+    Three voices come out of it: the median of all models, nfelo and Sagarin; a pick needs MODEL_EDGE points against the market line.
+    """
+    import io
+    out = []
+    sp_df = pd.read_csv(io.StringIO(spreads_csv))
+    for _, row in sp_df.iterrows():
+        g = _pt_teams(row, games, now)
+        if g is None or pd.isna(row.get("line")):
+            continue
+        market_home = -float(row["line"])                      # home_spread: negative = home favored
+        for name, col in PT_SPREAD_MODELS.items():
+            if col in row and not pd.isna(row[col]):
+                picks = model_picks(name, g, float(row[col]), market_home)
+                out += [p for p in picks if sane_spread(g, p["side"], p["line"])]
+    if totals_csv:
+        tot = pd.read_csv(io.StringIO(totals_csv))
+        for _, row in tot.iterrows():
+            g = _pt_teams(row, games, now)
+            if g is None or pd.isna(row.get("line")):
+                continue
+            for name, col in PT_TOTAL_MODELS.items():
+                if col in row and not pd.isna(row[col]):
+                    picks = model_picks(name, g, 0.0, float("nan"), float(row[col]), float(row["line"]))
+                    out += [p for p in picks if sane(g, "total", p["line"])]
+    return out
+
+
+def fetch_predictiontracker(games: pd.DataFrame, now: pd.Timestamp, get=fetch) -> list:
+    spreads = get(PT_SPREADS)
+    time.sleep(POLITE_DELAY)
+    try:
+        totals = get(PT_TOTALS)
+    except (urllib.error.URLError, ValueError):
+        totals = ""
+    return parse_predictiontracker(spreads, totals, games, now)
+
+
+# ---- Sports Betting Dime A.I. spread picks -------------------------------------------------------------------------------
+_SBD_PICK = re.compile(r"ATS Pick Pick: (?P<code>[A-Z]{2,4}) (?P<line>[+-]\d{1,2}(?:\.\d)?)")
+
+
+def sbd_week(games: pd.DataFrame, now: pd.Timestamp):
+    """The week whose games are next to kick off."""
+    up = games[games["kickoff"] > now]
+    return None if up.empty else int(up.sort_values("kickoff").iloc[0]["week"])
+
+
+def sbd_article_url(hub_html: str, week: int):
+    m = re.search(rf'href="([^"]*/week-{week}-nfl-picks-against-the-spread[^"]*)"', hub_html)
+    if not m:
+        return None
+    url = html.unescape(m.group(1))
+    return url if url.startswith("http") else "https://www.sportsbettingdime.com" + url
+
+
+def parse_sbd(raw: str, games: pd.DataFrame, now: pd.Timestamp) -> list:
+    codes = set(games["home"]) | set(games["away"])
+    out, seen = [], set()
+    for m in _SBD_PICK.finditer(html_text(raw)):
+        team = norm_code(m["code"], codes)
+        if not team:
+            continue
+        g = sp.find_game(games, team, now, None, WEB_LEAD_HOURS)
+        if g is None or g["game_id"] in seen or not sane_spread(g, team, float(m["line"])):
+            continue
+        seen.add(g["game_id"])
+        out.append(web_pick("sbd-ai", g, "spread", team, float(m["line"])))
+    return out
+
+
+def fetch_sbd(games: pd.DataFrame, now: pd.Timestamp, get=fetch) -> list:
+    week = sbd_week(games, now)
+    if week is None:
+        return []
+    url = sbd_article_url(get(SBD_HUB), week)
+    if not url:
+        return []
+    time.sleep(POLITE_DELAY)
+    return parse_sbd(get(url), games, now)
+
+
+SOURCES = {"espn-fpi": fetch_espn_fpi, "covers-computer": fetch_covers, "pickswise": fetch_pickswise,
+           "predictiontracker": fetch_predictiontracker, "sbd-ai": fetch_sbd}
 
 
 # ---- run it -------------------------------------------------------------------------------------------------------------

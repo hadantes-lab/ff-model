@@ -1596,7 +1596,8 @@ function renderSocial() {
   const sc = DATA.social, el = $("social-view");
   const pct = x => x == null ? "&mdash;" : (x * 100).toFixed(1) + "%";
   const yt = sc && sc.youtube && sc.youtube.videos && sc.youtube.videos.length;
-  if (!sc || (!sc.sources.length && !sc.games.length && !yt)) {
+  const pod = sc && sc.podcasts && sc.podcasts.episodes && sc.podcasts.episodes.length;
+  if (!sc || (!sc.sources.length && !sc.games.length && !yt && !pod)) {
     el.innerHTML = `<div class="board"><h2>Social picks</h2><div class="note" style="line-height:1.6">No picks are tracked yet. This tab collects game picks (spread, total, moneyline) from the X accounts you list, grades each one itself against the final score, and puts the accounts that have been winning this season first. To start it: list handles in <b>social_sources.json</b> (or the <b>X_HANDLES</b> variable) and add an <b>X_BEARER_TOKEN</b> secret (X's API is pay-per-use, about $0.005 a post read, and a run reads at most ${sc && sc.max_posts ? sc.max_posts : 200} posts), or import picks you collect with <b>python social_picks.py import picks.csv</b>. ${sc && sc.x && sc.x.note ? `Last pull: ${esc(sc.x.note)}.` : ""}</div></div>`;
     return;
   }
@@ -1624,7 +1625,14 @@ function renderSocial() {
     <div class="board"><h2>Sources this season</h2><div class="scroll-x"><table class="ptbl"><thead><tr><th style="text-align:left">Source</th><th>Spread/total</th><th>Win %</th><th>Units</th><th>ROI</th><th>Shrunk</th><th>Beats vig?</th><th>Weight</th><th style="text-align:left">Status</th><th>ML</th></tr></thead><tbody>${board}</tbody></table></div>
     <div class="note">Shrunk: win rate after the pull toward 50%. Beats vig?: the chance the source's true rate is above ${(sc.breakeven * 100).toFixed(1)}%. ML: moneyline picks (W-L), tracked separately because a moneyline win rate means nothing without the price.
     ${sc.x ? `X: ${sc.x.token ? "token set" : "no token"}, ${sc.handles} handle${sc.handles === 1 ? "" : "s"} listed, ${sc.x.posts_read} posts read so far (about $${sc.x.est_cost_usd.toFixed(2)})${sc.x.note ? ", last note: " + esc(sc.x.note) : ""}.` : ""}</div></div>
-    ${youtubeHTML(sc)}`;
+    ${youtubeHTML(sc)}${podcastHTML(sc)}`;
+}
+
+/* "12-8 on 20 picks found", or, before anything has been graded, "3 picks found, none graded yet" (a 0-0 would read like a record) */
+function socialRec(r, verb) {
+  if (!r) return `no picks ${verb} yet`;
+  const n = `${r.picks} pick${r.picks === 1 ? "" : "s"} ${verb}`;
+  return r.wins + r.losses + r.pushes ? `${r.wins}-${r.losses}${r.pushes ? "-" + r.pushes : ""} graded, ${n}` : `${n}, none graded yet`;
 }
 
 /* YouTube: the channels being followed, their record where picks were found, and their newest videos (the picks said aloud are not machine-readable) */
@@ -1634,7 +1642,7 @@ function youtubeHTML(sc) {
   const rec = Object.fromEntries((sc.sources || []).map(r => [r.source, r]));
   const chans = y.channels.map(c => {
     const r = rec["yt:" + c.handle.toLowerCase()];
-    return `<span style="margin-right:14px"><strong>${esc(c.title || "@" + c.handle)}</strong> <span class="note">${r ? `${r.wins}-${r.losses}${r.pushes ? "-" + r.pushes : ""} on ${r.picks} pick${r.picks === 1 ? "" : "s"} found` : "no picks found yet"}</span></span>`;
+    return `<span style="margin-right:14px"><strong>${esc(c.title || "@" + c.handle)}</strong> <span class="note">${socialRec(r, "found")}</span></span>`;
   }).join("");
   const vids = (y.videos || []).slice(0, 24).map(v => `<tr><td style="text-align:left;white-space:normal"><a href="${esc(v.url)}" target="_blank" rel="noopener">${esc(v.title)}</a></td>
       <td style="text-align:left">${esc(v.channel)}</td><td class="num">${esc((v.published || "").slice(0, 10))}</td>
@@ -1643,6 +1651,24 @@ function youtubeHTML(sc) {
     <div class="note" style="line-height:1.6">${chans}</div>
     <div class="note" style="line-height:1.6;margin-top:6px">${y.key ? "" : "<strong>No YOUTUBE_API_KEY is set, so nothing is being fetched.</strong> "}Only each new video's <b>title and description</b> is read for picks (same rules as X posts). Picks said aloud in a video cannot be read automatically (YouTube's captions are not available through its official API, and the endpoints that scrape them are off limits). To log one you heard, add a line to a notes file and run <b>python youtube_picks.py notes FILE</b>: it is graded like any other pick under the channel's name.${y.note ? ` Last note: ${esc(y.note)}.` : ""}</div>
     ${vids ? `<div class="scroll-x"><table class="ptbl"><thead><tr><th style="text-align:left">Latest video</th><th style="text-align:left">Channel</th><th>Posted</th><th style="text-align:left">Picks</th></tr></thead><tbody>${vids}</tbody></table></div>` : ""}</div>`;
+}
+
+/* Podcasts: shows followed, their record where picks were read, and their newest episodes (transcripts are read where the publisher supplies one) */
+function podcastHTML(sc) {
+  const p = sc.podcasts;
+  if (!p || !p.shows || !p.shows.length) return "";
+  const rec = Object.fromEntries((sc.sources || []).map(r => [r.source, r]));
+  const shows = p.shows.map(s => {
+    const r = rec["pod:" + s.id];
+    return `<span style="margin-right:14px"><strong>${esc(s.name)}</strong> <span class="note">${socialRec(r, "read")}</span></span>`;
+  }).join("");
+  const eps = (p.episodes || []).slice(0, 20).map(e => `<tr><td style="text-align:left;white-space:normal">${e.url ? `<a href="${esc(e.url)}" target="_blank" rel="noopener">${esc(e.title)}</a>` : esc(e.title)}</td>
+      <td style="text-align:left">${esc(e.show)}</td><td class="num">${esc((e.published || "").slice(0, 10))}</td>
+      <td style="text-align:left">${e.picks ? `<span class="tag ok">${e.picks} pick${e.picks === 1 ? "" : "s"} read</span>` : e.transcript ? `<span class="note">transcript read, no pick card</span>` : `<span class="note">show notes only</span>`}</td></tr>`).join("");
+  return `<div class="board"><h2>Podcasts</h2>
+    <div class="note" style="line-height:1.6">${shows}</div>
+    <div class="note" style="line-height:1.6;margin-top:6px">Read from each show's own RSS feed: the show notes, and the transcript where the publisher supplies one (nothing is transcribed or scraped). A transcript is conversation, so a sentence counts as a pick only when it carries a cue (&ldquo;I like&rdquo;, &ldquo;going with&rdquo;, &ldquo;I'm taking&rdquo;, &ldquo;best bet&rdquo;) and no negation, is not a question, and names an explicit spread, total or moneyline near the market's number. The pick is the <strong>show's</strong>, since transcripts rarely say which host said it. Shows that talk through games without stating a card (most do) give nothing, and one that is read wrongly would only show a coin-flip record.${p.note ? ` Last note: ${esc(p.note)}.` : ""}</div>
+    ${eps ? `<div class="scroll-x"><table class="ptbl"><thead><tr><th style="text-align:left">Latest episode</th><th style="text-align:left">Show</th><th>Posted</th><th style="text-align:left">Picks</th></tr></thead><tbody>${eps}</tbody></table></div>` : ""}</div>`;
 }
 
 function renderPower() {

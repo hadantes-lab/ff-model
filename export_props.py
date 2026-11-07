@@ -43,6 +43,7 @@ import dvp_track
 import social_picks
 import free_picks
 import youtube_picks
+import podcast_picks
 import team_stats
 import totals_model
 from matchups import CoverageModel, load_coverage_targets
@@ -1064,6 +1065,7 @@ def main():
         free = free_picks.block(game_picks, latest)
         social = social_picks.build_block(int(season), upcoming=eff)
         social["youtube"] = youtube_picks.block(youtube_picks.load_channels())
+        social["podcasts"] = podcast_picks.block(podcast_picks.load_podcasts())
         log(f"Free picks: {len(latest.get('picks', []))} from {len(latest.get('sources', {}))} sources; {n_backed} of our {len(game_picks)} game picks "
             f"are backed by the majority. Social picks: {len(social['sources'])} sources tracked, {len(social['games'])} games with picks to come.")
     except Exception as ex:

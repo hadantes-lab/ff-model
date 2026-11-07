@@ -6,5 +6,32 @@
   "Wagertalk",
   "RossTuckerNFL",
   "MayoMediaNetwork"
+ ],
+ "podcasts": [
+  {
+   "id": "actionnetwork",
+   "name": "The Action Network Podcast",
+   "feed": "https://www.omnycontent.com/d/playlist/e73c998e-6e60-432f-8610-ae210140c5b1/390f52fb-437c-4290-bdaa-b3ec011d3fc8/2d9ae039-d4b2-4a37-8a77-b3ec011d3fce/podcast.rss"
+  },
+  {
+   "id": "simplehandicap",
+   "name": "The Simple Handicap (Adam Chernoff)",
+   "feed": "https://rss.beehiiv.com/podcasts/019fd2ec-304e-7edb-81a3-3aadb83ce806.xml"
+  },
+  {
+   "id": "evenmoney",
+   "name": "Even Money: NFL Betting (Ross Tucker, Steve Fezzik)",
+   "feed": "https://feeds.megaphone.fm/DFT4986441816"
+  },
+  {
+   "id": "patmayo",
+   "name": "Pat Mayo Experience",
+   "feed": "https://feeds.simplecast.com/09AxY7vG"
+  },
+  {
+   "id": "sharpfootball",
+   "name": "Sharp Football Analysis (Warren Sharp)",
+   "feed": "https://feeds.simplecast.com/UiNmc8XS"
+  }
  ]
 }

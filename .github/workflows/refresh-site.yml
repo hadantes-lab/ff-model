@@ -108,6 +108,12 @@ jobs:
         continue-on-error: true
         run: python free_picks.py fetch
 
+      # Podcasts: each show's own RSS feed (show notes, and the transcript where the publisher supplies one). Public, no key, no cost;
+      # picks are logged as pod:<show>. Must never block the refresh.
+      - name: Podcast picks (RSS notes and transcripts)
+        continue-on-error: true
+        run: python podcast_picks.py fetch
+
       # YouTube: each listed channel's new uploads through the official Data API (about 3 quota units a channel of a 10,000 daily
       # allowance); picks in titles and descriptions are logged under yt:<channel>, new videos are listed on the Social Picks tab.
       # A no-op without YOUTUBE_API_KEY. Must never block the refresh.
@@ -169,7 +175,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add reports tracking/weekly_summary.csv tracking/learning_log.csv tracking/parlay_log.csv tracking/target_proj.csv tracking/dvp_log.csv tracking/social_picks.csv tracking/social_state.json tracking/free_picks_latest.json tracking/youtube_state.json tracking/youtube_latest.json trust_weights.json tracking/props_log.csv tracking/line_history.csv tracking/power_history.csv tracking/player_model_record.csv tracking/weather_history.csv web/track_record.json web/player_history.json
+          git add reports tracking/weekly_summary.csv tracking/learning_log.csv tracking/parlay_log.csv tracking/target_proj.csv tracking/dvp_log.csv tracking/social_picks.csv tracking/social_state.json tracking/free_picks_latest.json tracking/youtube_state.json tracking/youtube_latest.json tracking/podcast_state.json tracking/podcast_latest.json trust_weights.json tracking/props_log.csv tracking/line_history.csv tracking/power_history.csv tracking/player_model_record.csv tracking/weather_history.csv web/track_record.json web/player_history.json
           git diff --cached --quiet && echo "No tracker changes." || git commit -m "Update props tracking log [skip ci]"
           git checkout -- .   # discard regenerated build outputs (already published) so the rebase can run
           git pull --rebase -X theirs origin main   # a concurrent run edited the same files: this run's rows win (upsert semantics)
