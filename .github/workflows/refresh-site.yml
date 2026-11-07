@@ -59,6 +59,8 @@ jobs:
       url: ${{ steps.deploy.outputs.page_url }}
     env:
       ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+      X_BEARER_TOKEN: ${{ secrets.X_BEARER_TOKEN }}     # optional: without it no social posts are fetched and nothing is spent
+      X_HANDLES: ${{ vars.X_HANDLES }}                   # optional: comma-separated handles, in addition to social_sources.json
     steps:
       - uses: actions/checkout@v4
 
@@ -95,6 +97,13 @@ jobs:
           python props_tracker.py grade
           python props_tracker.py refine
           python props_tracker.py report --json
+
+      # Picks from X: pull posts newer than the last pull (at most max_posts_per_run, so a bounded spend), log the game picks they
+      # contain and grade the ones whose games have finished. A no-op without X_BEARER_TOKEN and handles. Before the weekly report and
+      # the props page so both see it; a failure here must never block the refresh.
+      - name: Social picks (pull, log, grade)
+        continue-on-error: true
+        run: python social_picks.py refresh
 
       # The weekly report: how every pick did (moneyline tiers, spreads, totals, props) with a write-up per
       # market, and the learning step that re-measures how much the model deserves to be trusted from everything
@@ -143,7 +152,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add reports tracking/weekly_summary.csv tracking/learning_log.csv tracking/parlay_log.csv tracking/target_proj.csv tracking/dvp_log.csv trust_weights.json tracking/props_log.csv tracking/line_history.csv tracking/power_history.csv tracking/player_model_record.csv tracking/weather_history.csv web/track_record.json web/player_history.json
+          git add reports tracking/weekly_summary.csv tracking/learning_log.csv tracking/parlay_log.csv tracking/target_proj.csv tracking/dvp_log.csv tracking/social_picks.csv tracking/social_state.json trust_weights.json tracking/props_log.csv tracking/line_history.csv tracking/power_history.csv tracking/player_model_record.csv tracking/weather_history.csv web/track_record.json web/player_history.json
           git diff --cached --quiet && echo "No tracker changes." || git commit -m "Update props tracking log [skip ci]"
           git checkout -- .   # discard regenerated build outputs (already published) so the rebase can run
           git pull --rebase -X theirs origin main   # a concurrent run edited the same files: this run's rows win (upsert semantics)

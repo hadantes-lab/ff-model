@@ -40,6 +40,7 @@ import team_ratings
 import target_track
 import dvp_signal
 import dvp_track
+import social_picks
 import team_stats
 import totals_model
 from matchups import CoverageModel, load_coverage_targets
@@ -1053,12 +1054,19 @@ def main():
     if bt.exists():
         rating_backtest = json.loads(bt.read_text(encoding="utf-8"))
 
+    try:                                           # picks from X / imports, graded by us, the sources that have been winning first
+        social = social_picks.build_block(int(season))
+        log(f"Social picks: {len(social['sources'])} sources tracked, {len(social['games'])} games with picks to come.")
+    except Exception as ex:
+        social = None
+        log(f"Social picks unavailable ({ex}); the page omits them.")
     snapshot = {
         "generated": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
         "season": int(season), "week": int(week), "sample": bool(args.sample),
         "credits": credits, "markets": markets, "n_games": len(events), "props": props, "targets": target_props, "games": games,
         "game_picks": game_picks, "rating_backtest": rating_backtest, "context": context,
         "trust_note": TRUST_NOTE if static_trust else None,
+        "social": social,
         "credit_note": credit_note if (skipped_events or (credit_note or "").startswith("Props pull stopped")) else None,
         "su_pool": su_pool,
         "team_breakdown": team_breakdown,

@@ -88,6 +88,8 @@
   .seg button { border: none; background: transparent; color: var(--text-dim); font-weight: 600; font-size: 13px;
     padding: 6px 13px; border-radius: 6px; cursor: pointer; }
   .seg button.active { background: var(--gold); color: var(--gold-ink); }
+  #view-tabs { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+  #view-tabs button { flex: none; white-space: nowrap; }
   .field { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 7px 11px; font-size: 13.5px; }
   .field::placeholder { color: var(--text-faint); }
   .check { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: var(--text-dim); cursor: pointer; }
@@ -382,6 +384,7 @@
     <button class="active" data-view="week">This Week</button>
     <button data-view="games">Game Lines</button>
     <button data-view="dvp">Defense vs Position</button>
+    <button data-view="social">Social Picks</button>
     <button data-view="power">Power Rankings</button>
     <button data-view="history">Player History</button>
   </div>
@@ -424,6 +427,7 @@
 </div>
 
 <div class="wrap" id="dvp-view" hidden style="padding-top:18px; padding-bottom:60px;"></div>
+<div class="wrap" id="social-view" hidden style="padding-top:18px; padding-bottom:60px;"></div>
 <div class="wrap" id="power-view" hidden style="padding-top:18px; padding-bottom:60px;"></div>
 
 <div class="wrap" id="history-view" hidden style="padding-top:18px; padding-bottom:60px;">
@@ -1547,6 +1551,57 @@ function renderDvp() {
     <div class="note"><strong>Does it predict?</strong> Tested on 1,534 defense-games (2022-25): a defense's season-to-date volume allowed forecast its <em>next</em> game no better than the league average (pass attempts: off by 6.45 vs 6.25 for the league average), and its last four games did worse (6.81); a 50/50 blend with the league average was level (6.21). Allowed volume depends as much on the offenses faced and the game script as on the defense, so read this as a description of what has happened. The matchup multipliers already in the projections use it, shrunk heavily.</div></div>`;
 }
 
+/* ---------- social picks ---------- */
+const MARKET_NAME = { spread: "Spread", total: "Total", moneyline: "Moneyline" };
+function socialSide(it, game) {
+  if (it.market === "total") return `${it.side === "over" ? "Over" : "Under"} ${it.line}`;
+  if (it.market === "moneyline") return `${esc(it.side)} ML`;
+  return `${esc(it.side)} ${it.line == null ? "" : signed(it.line, 1)}`;
+}
+/* does our own model lean the same way? (spread: the side our margin covers; total: over/under our total) */
+function socialModel(it, game) {
+  const g = (DATA.games || []).find(x => x.game === game);
+  if (!g) return "";
+  let lean = null;
+  if (it.market === "total" && g.proj_total != null && g.total != null) lean = g.proj_total > g.total ? "over" : "under";
+  if (it.market === "spread" && g.proj_margin != null && g.home_spread != null) lean = g.proj_margin + g.home_spread > 0 ? g.home : g.away;
+  if (it.market === "moneyline" && g.proj_margin != null) lean = g.proj_margin > 0 ? g.home : g.away;
+  if (lean == null) return "";
+  return lean === it.side ? `<span class="up">our model agrees</span>` : `<span class="down">our model leans the other way</span>`;
+}
+function renderSocial() {
+  const sc = DATA.social, el = $("social-view");
+  const pct = x => x == null ? "&mdash;" : (x * 100).toFixed(1) + "%";
+  if (!sc || (!sc.sources.length && !sc.games.length)) {
+    el.innerHTML = `<div class="board"><h2>Social picks</h2><div class="note" style="line-height:1.6">No picks are tracked yet. This tab collects game picks (spread, total, moneyline) from the X accounts you list, grades each one itself against the final score, and puts the accounts that have been winning this season first. To start it: list handles in <b>social_sources.json</b> (or the <b>X_HANDLES</b> variable) and add an <b>X_BEARER_TOKEN</b> secret (X's API is pay-per-use, about $0.005 a post read, and a run reads at most ${sc && sc.max_posts ? sc.max_posts : 200} posts), or import picks you collect with <b>python social_picks.py import picks.csv</b>. ${sc && sc.x && sc.x.note ? `Last pull: ${esc(sc.x.note)}.` : ""}</div></div>`;
+    return;
+  }
+  const t = sc.test || {};
+  const testLine = t.hot_n && t.rest_n
+    ? `Does a good record predict anything? Picks from sources that looked good at the time of the post (${sc.min_picks}+ graded picks and above break-even) won ${pct(t.hot_win)} over ${t.hot_n} picks; everyone else's won ${pct(t.rest_win)} over ${t.rest_n}.${t.z == null ? " Too few picks to call the gap real." : Math.abs(t.z) >= 2 ? " That gap is bigger than luck explains." : " That gap is within what luck produces."}`
+    : "Does a good record predict anything? Not enough graded picks yet to say.";
+  const cards = sc.games.map(g => {
+    const rows = g.items.map(it => `<tr><td>${MARKET_NAME[it.market] || esc(it.market)}</td><td><strong>${socialSide(it, g.game)}</strong> ${socialModel(it, g.game)}</td>
+      <td class="num">${it.score > 0 ? it.score.toFixed(2) : "&mdash;"}</td>
+      <td style="text-align:left;white-space:normal">${it.backers.map(b => b.status === "tracked"
+        ? `<span style="margin-right:10px">@${esc(b.source)} <span class="num">${b.record}</span>${b.weight > 0 ? "" : " (not beating the vig)"}</span>`
+        : `<span style="margin-right:10px;color:var(--text-faint)">@${esc(b.source)} unproven</span>`).join("")}</td></tr>`).join("");
+    return `<div class="board"><h2>${esc(g.game.replace(" @ ", " at "))} <span class="note" style="margin-left:6px">${etTime(g.kickoff)}</span></h2>
+      <div class="scroll-x"><table class="ptbl"><thead><tr><th style="text-align:left">Pick</th><th style="text-align:left">Side</th><th>Weight</th><th style="text-align:left">Backed by</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+  }).join("");
+  const board = sc.sources.map(r => `<tr><td class="num">@${esc(r.source)}</td><td class="num">${r.wins}-${r.losses}${r.pushes ? "-" + r.pushes : ""}</td>
+    <td class="num">${pct(r.win_pct)}</td><td class="num">${signed(r.units, 1)}</td><td class="num">${r.roi == null ? "&mdash;" : signed(r.roi * 100, 1) + "%"}</td>
+    <td class="num">${pct(r.shrunk)}</td><td class="num">${(r.p_beats * 100).toFixed(0)}%</td><td class="num">${r.weight.toFixed(2)}</td>
+    <td>${r.status === "tracked" ? "tracked" : `unproven (${r.n}/${sc.min_picks})`}</td><td class="num">${r.ml_record}</td></tr>`).join("");
+  el.innerHTML = `<div class="board"><h2>Social picks, the winning sources first</h2>
+    <div class="note" style="line-height:1.6">Picks are read from posts, graded here against the final score at the number in the post (flat 1 unit, -110 unless a price is given), and counted only if posted before kickoff and as a source's first call on that game. A source's record is what we graded, not what its profile says. A win rate is pulled toward 50% by ${sc.prior_picks} pseudo-picks (a hot start is mostly luck) and must beat the ${(sc.breakeven * 100).toFixed(1)}% that -110 requires to earn any weight; under ${sc.min_picks} graded picks a source is unproven and counts for nothing. These re-order what you read; they do not change any projection.</div>
+    <div class="note" style="margin-top:6px">${testLine}</div></div>
+    ${cards || `<div class="empty">No picks on games still to be played.</div>`}
+    <div class="board"><h2>Sources this season</h2><div class="scroll-x"><table class="ptbl"><thead><tr><th style="text-align:left">Source</th><th>Spread/total</th><th>Win %</th><th>Units</th><th>ROI</th><th>Shrunk</th><th>Beats vig?</th><th>Weight</th><th style="text-align:left">Status</th><th>ML</th></tr></thead><tbody>${board}</tbody></table></div>
+    <div class="note">Shrunk: win rate after the pull toward 50%. Beats vig?: the chance the source's true rate is above ${(sc.breakeven * 100).toFixed(1)}%. ML: moneyline picks (W-L), tracked separately because a moneyline win rate means nothing without the price.
+    ${sc.x ? `X: ${sc.x.token ? "token set" : "no token"}, ${sc.handles} handle${sc.handles === 1 ? "" : "s"} listed, ${sc.x.posts_read} posts read so far (about $${sc.x.est_cost_usd.toFixed(2)})${sc.x.note ? ", last note: " + esc(sc.x.note) : ""}.` : ""}</div></div>`;
+}
+
 function renderPower() {
   const pw = DATA.power, el = $("power-view");
   if (!pw || !pw.table || !pw.table.length) { el.innerHTML = `<div class="empty">Power rankings were not available this run.</div>`; return; }
@@ -1574,7 +1629,9 @@ $("view-tabs").addEventListener("click", e => {
   $("history-view").hidden = view !== "history";
   $("power-view").hidden = view !== "power";
   $("dvp-view").hidden = view !== "dvp";
+  $("social-view").hidden = view !== "social";
   if (view === "dvp") renderDvp();
+  if (view === "social") renderSocial();
   if (view === "games") renderGames();
   if (view === "power") renderPower();
   if (view === "history") { renderHistoryList(); renderHistoryDetail(); }

@@ -49,6 +49,7 @@ import parlay_track
 import review_extras
 import target_track
 import dvp_track
+import social_picks
 import straight_up
 
 MIN_FOR_SHARPER = 30               # games needed before the report says whether the model or the market was sharper
@@ -255,6 +256,10 @@ def build_report(log: pd.DataFrame, sched: pd.DataFrame, season: int, week: int,
     except Exception:                                         # the report must not fail on a missing or malformed targets log
         rep["targets"] = None
     try:
+        rep["social"] = social_picks.section(season, week)
+    except Exception:                                         # nor on a missing or malformed social-picks log
+        rep["social"] = None
+    try:
         rep["dvp"] = dvp_track.section(season, week)
     except Exception:                                         # nor on a missing defense-vs-position log
         rep["dvp"] = None
@@ -440,6 +445,10 @@ def render_markdown(rep: dict) -> str:
     dv = rep.get("dvp")
     if dv:
         L += ["## Defense vs position", "", dv["writeup"], ""]
+    so = rep.get("social")
+    if so:
+        L += ["## Social picks", "", so["writeup"], ""]
+        L += [f"- @{r['source']}: {r['wins']}-{r['losses']}" + (f"-{r['pushes']}" if r["pushes"] else "") + f", {r['units']:+.1f} units, weight {r['weight']:.2f} ({r['status']})" for r in so["tab"]] + [""]
     L += ["## Player props", ""]
     for p in rep["props"]:
         L += [f"### {p['title']}", "", p["writeup"], ""]
@@ -503,6 +512,10 @@ table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;p
     dv = rep.get("dvp")
     if dv:
         out.append(f'<h2>Defense vs position</h2><div class="card"><p>{e(dv["writeup"])}</p></div>')
+    so = rep.get("social")
+    if so:
+        out.append(f'<h2>Social picks</h2><div class="card"><p>{e(so["writeup"])}</p><ul>' + "".join(
+            f'<li>@{e(r["source"])}: {r["wins"]}-{r["losses"]}' + (f'-{r["pushes"]}' if r["pushes"] else "") + f', {r["units"]:+.1f} units, weight {r["weight"]:.2f} <span class="dim">({e(r["status"])})</span></li>' for r in so["tab"]) + "</ul></div>")
     out.append("<h2>Player props</h2>")
     for p in rep["props"]:
         out.append(f'<div class="card"><h3>{e(p["title"])}</h3><p>{e(p["writeup"])}</p>' + ("<ul>" + "".join(
