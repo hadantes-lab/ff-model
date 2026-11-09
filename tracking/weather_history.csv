@@ -429,3 +429,4 @@ pulled_at,season,week,game,commence,stadium,roof,indoors,temp_f,wind_mph,gust_mp
 2026-11-08T17:14:39+00:00,2026,10,LA @ ARI,2026-11-15T21:05:00Z,State Farm Stadium,nan,False,73,6,11,14,Rain showers
 2026-11-08T17:14:39+00:00,2026,10,SF @ DAL,2026-11-15T21:25:00Z,AT&T Stadium,nan,False,74,13,20,5,Partly cloudy
 2026-11-08T17:14:39+00:00,2026,10,LAC @ BAL,2026-11-17T01:15:00Z,M&T Bank Stadium,outdoors,False,48,12,28,0,Clear
+2026-11-09T21:27:57+00:00,2026,9,BUF @ MIN,2026-11-10T01:15:00Z,U.S. Bank Stadium,dome,True,,,,,
