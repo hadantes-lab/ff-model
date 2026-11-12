@@ -1,42 +1,92 @@
 {
- "generated": "2026-11-09T21:27:35+00:00",
+ "generated": "2026-11-12T18:56:07+00:00",
  "episodes": [
+  {
+   "show": "Even Money: NFL Betting (Ross Tucker, Steve Fezzik)",
+   "id": "evenmoney",
+   "source": "pod:evenmoney",
+   "title": "2026 NFL Week 10 Prop Bets & Parlays",
+   "published": "2026-11-12T15:09:00+00:00",
+   "url": "https://linktr.ee/evenmoneypod",
+   "transcript": false,
+   "picks": null
+  },
+  {
+   "show": "Pat Mayo Experience",
+   "id": "patmayo",
+   "source": "pod:patmayo",
+   "title": "NFL Week 10 Best Bets, Props, Teasers | 2026 NFL Picks & Game Previews | Rob/Cam vs CUST",
+   "published": "2026-11-12T15:00:07+00:00",
+   "url": "https://www.youtube.com/channel/UCJrBgtSiXKOdpoyvVqqhWww",
+   "transcript": false,
+   "picks": null
+  },
+  {
+   "show": "The Action Network Podcast",
+   "id": "actionnetwork",
+   "source": "pod:actionnetwork",
+   "title": "NFL Week 10 Betting Preview",
+   "published": "2026-11-12T00:20:29+00:00",
+   "url": "https://omny.fm/shows/the-action-network-sports-betting-podcast/nfl-week-10-betting-preview-4",
+   "transcript": true,
+   "picks": 7
+  },
+  {
+   "show": "Pat Mayo Experience",
+   "id": "patmayo",
+   "source": "pod:patmayo",
+   "title": "2026 NFL Week 10 Spread Picks, Trade Deadline Breakdown | Cust Corner: Jock Vibes, Video Game Ideas",
+   "published": "2026-11-11T01:28:22+00:00",
+   "url": "https://www.youtube.com/channel/UCJrBgtSiXKOdpoyvVqqhWww",
+   "transcript": false,
+   "picks": null
+  },
+  {
+   "show": "The Action Network Podcast",
+   "id": "actionnetwork",
+   "source": "pod:actionnetwork",
+   "title": "NFL Futures Watch | Week 10",
+   "published": "2026-11-10T23:49:11+00:00",
+   "url": "https://omny.fm/shows/the-action-network-sports-betting-podcast/nfl-futures-watch-week-10",
+   "transcript": true,
+   "picks": 1
+  },
+  {
+   "show": "Pat Mayo Experience",
+   "id": "patmayo",
+   "source": "pod:patmayo",
+   "title": "Week 10 Fantasy Football Rankings: Panic Trades, Waiver Wire Lifelines & Must-Start Sleepers",
+   "published": "2026-11-10T16:08:45+00:00",
+   "url": "https://www.youtube.com/channel/UCJrBgtSiXKOdpoyvVqqhWww",
+   "transcript": false,
+   "picks": null
+  },
+  {
+   "show": "Even Money: NFL Betting (Ross Tucker, Steve Fezzik)",
+   "id": "evenmoney",
+   "source": "pod:evenmoney",
+   "title": "2026 NFL Week 10 Bets",
+   "published": "2026-11-10T15:06:00+00:00",
+   "url": "https://linktr.ee/evenmoneypod",
+   "transcript": false,
+   "picks": null
+  },
+  {
+   "show": "Sharp Football Analysis (Warren Sharp)",
+   "id": "sharpfootball",
+   "source": "pod:sharpfootball",
+   "title": "NFL Week 9 Takeaways and Monday Night Football Best Bets",
+   "published": "2026-11-09T21:30:43+00:00",
+   "url": "https://www.sharpfootballanalysis.com/?utm_source=link-bio",
+   "transcript": false,
+   "picks": null
+  },
   {
    "show": "Pat Mayo Experience",
    "id": "patmayo",
    "source": "pod:patmayo",
    "title": "Austin Championship 2026 Picks, Bets & Course Preview | Fazio Canyons Analysis + WWT Recap, Blades Brown WINS",
    "published": "2026-11-09T20:28:27+00:00",
-   "url": "https://www.youtube.com/channel/UCJrBgtSiXKOdpoyvVqqhWww",
-   "transcript": false,
-   "picks": null
-  },
-  {
-   "show": "Pat Mayo Experience",
-   "id": "patmayo",
-   "source": "pod:patmayo",
-   "title": "Week 9 NFL Recap: Love's MVP Case, Shedeur Sanders, MNF Picks | George Top 5 Movies",
-   "published": "2026-11-09T16:31:39+00:00",
-   "url": "https://www.youtube.com/channel/UCJrBgtSiXKOdpoyvVqqhWww",
-   "transcript": false,
-   "picks": null
-  },
-  {
-   "show": "Pat Mayo Experience",
-   "id": "patmayo",
-   "source": "pod:patmayo",
-   "title": "NFL Week 9 INSTANT OVERREACTIONS, Recap & Week 10 Early Spread Picks, Judge Cust",
-   "published": "2026-11-09T01:49:46+00:00",
-   "url": "https://www.youtube.com/channel/UCJrBgtSiXKOdpoyvVqqhWww",
-   "transcript": false,
-   "picks": null
-  },
-  {
-   "show": "Pat Mayo Experience",
-   "id": "patmayo",
-   "source": "pod:patmayo",
-   "title": "NFL Week 9 Weekend Update: Best Underdog Props, Injury Report, DraftKings Strategy & Spread Picks",
-   "published": "2026-11-07T18:26:39+00:00",
    "url": "https://www.youtube.com/channel/UCJrBgtSiXKOdpoyvVqqhWww",
    "transcript": false,
    "picks": null
@@ -92,26 +142,6 @@
    "picks": null
   },
   {
-   "show": "The Action Network Podcast",
-   "id": "actionnetwork",
-   "source": "pod:actionnetwork",
-   "title": "NFL Week 9 Betting Preview",
-   "published": "2026-11-05T00:09:22+00:00",
-   "url": "https://omny.fm/shows/the-action-network-sports-betting-podcast/nfl-week-9-betting-preview-4",
-   "transcript": true,
-   "picks": null
-  },
-  {
-   "show": "The Action Network Podcast",
-   "id": "actionnetwork",
-   "source": "pod:actionnetwork",
-   "title": "2026 Midterm Election Recap & Reaction | Predicting Politics - Wed Nov 4",
-   "published": "2026-11-04T18:49:27+00:00",
-   "url": "https://omny.fm/shows/the-action-network-sports-betting-podcast/2026-midterm-election-recap-reaction-predicting-politics-wed-nov-4",
-   "transcript": true,
-   "picks": null
-  },
-  {
    "show": "Even Money: NFL Betting (Ross Tucker, Steve Fezzik)",
    "id": "evenmoney",
    "source": "pod:evenmoney",
@@ -139,36 +169,6 @@
    "published": "2026-11-02T03:48:03+00:00",
    "url": "https://www.adamchernoff.com/podcast/s/the_simple_handicap_nfl_betting_podcast_with_adam_chernoff/monday_preview_-_nfl_week_9",
    "transcript": true,
-   "picks": null
-  },
-  {
-   "show": "Sharp Football Analysis (Warren Sharp)",
-   "id": "sharpfootball",
-   "source": "pod:sharpfootball",
-   "title": "(40-16, 71%) NFL Week 8 Best Bets & Player Props 2026: Ravens-Bills, Bears-Seahawks",
-   "published": "2026-10-30T11:00:00+00:00",
-   "url": "https://www.sharpfootballanalysis.com/?utm_source=link-bio",
-   "transcript": false,
-   "picks": null
-  },
-  {
-   "show": "Even Money: NFL Betting (Ross Tucker, Steve Fezzik)",
-   "id": "evenmoney",
-   "source": "pod:evenmoney",
-   "title": "2026 NFL Week 8 Prop Bets & Parlays",
-   "published": "2026-10-29T14:13:00+00:00",
-   "url": "https://linktr.ee/evenmoneypod",
-   "transcript": false,
-   "picks": null
-  },
-  {
-   "show": "Even Money: NFL Betting (Ross Tucker, Steve Fezzik)",
-   "id": "evenmoney",
-   "source": "pod:evenmoney",
-   "title": "2026 NFL Week 8 Bets",
-   "published": "2026-10-27T14:19:00+00:00",
-   "url": "https://linktr.ee/evenmoneypod",
-   "transcript": false,
    "picks": null
   },
   {
