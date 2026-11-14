@@ -118,7 +118,7 @@ Moneyline parlays: 4 of 4 settled cashed; the stated chances expected 1.3. Indiv
 
 ## Top 10 prop picks
 
-The week's top 10 prop picks went 6-5, about 5.8 wins by their stated chances. At the prices logged, $1 flat on each returned +3.47 (+32% per pick). Best call: Dawson Knox Receptions over 1.5, finished 4. Biggest miss: Jahmyr Gibbs Receptions over 4.5, finished 0. Season to date over 5 weeks: 16-12 (57%), against 13.9 expected wins and +9.05 units at logged prices. Ten picks a week is a small sample: judge the model on the season line, not one week.
+The week's top 10 prop picks went 6-5, about 5.8 wins by their stated chances. At the prices logged, $1 flat on each returned +3.47 (+32% per pick). Best call: Dawson Knox Receptions over 1.5, finished 4. Biggest miss: Jahmyr Gibbs Receptions over 4.5, finished 0. Season to date over 6 weeks: 17-12 (59%), against 14.4 expected wins and +10.45 units at logged prices. Ten picks a week is a small sample: judge the model on the season line, not one week.
 
 - #1 Jakobi Meyers Receptions over 3.5 (48%), finished 4: hit
 - #1 Darnell Mooney Receptions over 1.5 (49%), finished 3: hit
@@ -159,15 +159,15 @@ Week 9: the schedule-adjusted ratings' softest quarter of defenses allowed -6% v
 
 ## Social picks
 
-Week 9: 125 tracked spread and total picks from 13 sources went 70-55 (56%; -110 needs 52.4%). 5 sources have 10+ graded picks this season; the best is @sbd-ai at 10-4 (shrunk to 55.6%, 68% chance its true rate beats the vig). Records are graded by us from each source's own posts, flat 1 unit at the stated price (-110 if none).
+Week 9: 125 tracked spread and total picks from 13 sources went 70-55 (56%; -110 needs 52.4%). 5 sources have 10+ graded picks this season; the best is @sbd-ai at 10-5 (shrunk to 54.5%, 63% chance its true rate beats the vig). Picks from sources that looked good at the time won 50% (4 picks) against 55% (132) for the rest. Records are graded by us from each source's own posts, flat 1 unit at the stated price (-110 if none).
 
-- @sbd-ai: 10-4, +5.1 units, weight 0.53 (tracked)
-- @espn-fpi: 7-4, +2.4 units, weight 0.09 (tracked)
-- @pt-median: 10-7, +2.1 units, weight 0.04 (tracked)
+- @sbd-ai: 10-5, +4.1 units, weight 0.36 (tracked)
+- @espn-fpi: 8-4, +3.3 units, weight 0.24 (tracked)
+- @pt-median: 11-8, +2.0 units, weight 0.03 (tracked)
 - @pickswise:luke-lindholm: 3-1, +1.7 units, weight 0.00 (unproven)
 - @pickswise:sam-avellone: 3-1, +1.7 units, weight 0.00 (unproven)
 - @pickswise:kevin-rogers: 5-3, +1.5 units, weight 0.00 (unproven)
-- @covers-computer: 10-9, +0.1 units, weight 0.00 (tracked)
+- @covers-computer: 11-10, -0.0 units, weight 0.00 (tracked)
 - @pickswise:aaron-taylor: 2-2, -0.2 units, weight 0.00 (unproven)
 
 ## Player props

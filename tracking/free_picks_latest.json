@@ -1,14 +1,14 @@
 {
- "generated": "2026-11-12T18:55:55.168126+00:00",
+ "generated": "2026-11-14T17:07:25.345279+00:00",
  "sources": {
   "espn-fpi": {
    "ok": true,
-   "picks": 10,
+   "picks": 9,
    "note": null
   },
   "covers-computer": {
    "ok": true,
-   "picks": 22,
+   "picks": 18,
    "note": null
   },
   "pickswise": {
@@ -18,7 +18,7 @@
   },
   "predictiontracker": {
    "ok": true,
-   "picks": 48,
+   "picks": 41,
    "note": null
   },
   "sbd-ai": {
@@ -28,19 +28,6 @@
   }
  },
  "picks": [
-  {
-   "source": "espn-fpi",
-   "platform": "web",
-   "game_id": "2026_10_WAS_NYG",
-   "game": "WAS @ NYG",
-   "season": 2026,
-   "week": 10,
-   "kickoff": "2026-11-13T01:15:00+00:00",
-   "market": "spread",
-   "side": "WAS",
-   "line": 2.5,
-   "odds": null
-  },
   {
    "source": "espn-fpi",
    "platform": "web",
@@ -90,7 +77,7 @@
    "kickoff": "2026-11-15T18:00:00+00:00",
    "market": "spread",
    "side": "MIN",
-   "line": 3.0,
+   "line": 2.5,
    "odds": null
   },
   {
@@ -161,32 +148,6 @@
   {
    "source": "covers-computer",
    "platform": "web",
-   "game_id": "2026_10_WAS_NYG",
-   "game": "WAS @ NYG",
-   "season": 2026,
-   "week": 10,
-   "kickoff": "2026-11-13T01:15:00+00:00",
-   "market": "spread",
-   "side": "WAS",
-   "line": 2.5,
-   "odds": null
-  },
-  {
-   "source": "covers-computer",
-   "platform": "web",
-   "game_id": "2026_10_WAS_NYG",
-   "game": "WAS @ NYG",
-   "season": 2026,
-   "week": 10,
-   "kickoff": "2026-11-13T01:15:00+00:00",
-   "market": "total",
-   "side": "under",
-   "line": 40.5,
-   "odds": null
-  },
-  {
-   "source": "covers-computer",
-   "platform": "web",
    "game_id": "2026_10_NE_DET",
    "game": "NE @ DET",
    "season": 2026,
@@ -194,7 +155,7 @@
    "kickoff": "2026-11-15T14:30:00+00:00",
    "market": "total",
    "side": "over",
-   "line": 50.5,
+   "line": 49.5,
    "odds": null
   },
   {
@@ -208,19 +169,6 @@
    "market": "spread",
    "side": "ATL",
    "line": 3.5,
-   "odds": null
-  },
-  {
-   "source": "covers-computer",
-   "platform": "web",
-   "game_id": "2026_10_KC_ATL",
-   "game": "KC @ ATL",
-   "season": 2026,
-   "week": 10,
-   "kickoff": "2026-11-15T18:00:00+00:00",
-   "market": "total",
-   "side": "over",
-   "line": 46.5,
    "odds": null
   },
   {
@@ -259,7 +207,7 @@
    "kickoff": "2026-11-15T18:00:00+00:00",
    "market": "spread",
    "side": "IND",
-   "line": -3.5,
+   "line": -4.5,
    "odds": null
   },
   {
@@ -285,7 +233,7 @@
    "kickoff": "2026-11-15T18:00:00+00:00",
    "market": "total",
    "side": "over",
-   "line": 41.5,
+   "line": 42.0,
    "odds": null
   },
   {
@@ -330,19 +278,6 @@
   {
    "source": "covers-computer",
    "platform": "web",
-   "game_id": "2026_10_HOU_CLE",
-   "game": "HOU @ CLE",
-   "season": 2026,
-   "week": 10,
-   "kickoff": "2026-11-15T18:00:00+00:00",
-   "market": "total",
-   "side": "under",
-   "line": 40.5,
-   "odds": null
-  },
-  {
-   "source": "covers-computer",
-   "platform": "web",
    "game_id": "2026_10_SEA_LV",
    "game": "SEA @ LV",
    "season": 2026,
@@ -376,7 +311,7 @@
    "kickoff": "2026-11-15T21:05:00+00:00",
    "market": "total",
    "side": "over",
-   "line": 39.0,
+   "line": 39.5,
    "odds": null
   },
   {
@@ -445,29 +380,16 @@
    "odds": null
   },
   {
-   "source": "pickswise:chris-farley",
+   "source": "pickswise:ricky-dimon",
    "platform": "web",
-   "game_id": "2026_10_WAS_NYG",
-   "game": "WAS @ NYG",
+   "game_id": "2026_10_NE_DET",
+   "game": "NE @ DET",
    "season": 2026,
    "week": 10,
-   "kickoff": "2026-11-13T01:15:00+00:00",
-   "market": "spread",
-   "side": "NYG",
-   "line": -2.5,
-   "odds": null
-  },
-  {
-   "source": "pickswise:chris-farley",
-   "platform": "web",
-   "game_id": "2026_10_WAS_NYG",
-   "game": "WAS @ NYG",
-   "season": 2026,
-   "week": 10,
-   "kickoff": "2026-11-13T01:15:00+00:00",
+   "kickoff": "2026-11-15T14:30:00+00:00",
    "market": "total",
    "side": "under",
-   "line": 41.5,
+   "line": 51.5,
    "odds": null
   },
   {
@@ -481,19 +403,6 @@
    "market": "spread",
    "side": "DET",
    "line": -2.5,
-   "odds": null
-  },
-  {
-   "source": "pickswise:ricky-dimon",
-   "platform": "web",
-   "game_id": "2026_10_NE_DET",
-   "game": "NE @ DET",
-   "season": 2026,
-   "week": 10,
-   "kickoff": "2026-11-15T14:30:00+00:00",
-   "market": "total",
-   "side": "under",
-   "line": 51.5,
    "odds": null
   },
   {
@@ -653,6 +562,32 @@
    "odds": null
   },
   {
+   "source": "pickswise:sam-avellone",
+   "platform": "web",
+   "game_id": "2026_10_CAR_NO",
+   "game": "CAR @ NO",
+   "season": 2026,
+   "week": 10,
+   "kickoff": "2026-11-15T18:00:00+00:00",
+   "market": "total",
+   "side": "over",
+   "line": 48.5,
+   "odds": null
+  },
+  {
+   "source": "pickswise:sam-avellone",
+   "platform": "web",
+   "game_id": "2026_10_CAR_NO",
+   "game": "CAR @ NO",
+   "season": 2026,
+   "week": 10,
+   "kickoff": "2026-11-15T18:00:00+00:00",
+   "market": "spread",
+   "side": "CAR",
+   "line": 2.5,
+   "odds": null
+  },
+  {
    "source": "pickswise:kevin-rogers",
    "platform": "web",
    "game_id": "2026_10_LA_ARI",
@@ -785,45 +720,6 @@
   {
    "source": "pt-median",
    "platform": "web",
-   "game_id": "2026_10_WAS_NYG",
-   "game": "WAS @ NYG",
-   "season": 2026,
-   "week": 10,
-   "kickoff": "2026-11-13T01:15:00+00:00",
-   "market": "spread",
-   "side": "NYG",
-   "line": -2.0,
-   "odds": null
-  },
-  {
-   "source": "nfelo",
-   "platform": "web",
-   "game_id": "2026_10_WAS_NYG",
-   "game": "WAS @ NYG",
-   "season": 2026,
-   "week": 10,
-   "kickoff": "2026-11-13T01:15:00+00:00",
-   "market": "spread",
-   "side": "WAS",
-   "line": 2.0,
-   "odds": null
-  },
-  {
-   "source": "sagarin",
-   "platform": "web",
-   "game_id": "2026_10_WAS_NYG",
-   "game": "WAS @ NYG",
-   "season": 2026,
-   "week": 10,
-   "kickoff": "2026-11-13T01:15:00+00:00",
-   "market": "spread",
-   "side": "NYG",
-   "line": -2.0,
-   "odds": null
-  },
-  {
-   "source": "pt-median",
-   "platform": "web",
    "game_id": "2026_10_NE_DET",
    "game": "NE @ DET",
    "season": 2026,
@@ -831,7 +727,7 @@
    "kickoff": "2026-11-15T14:30:00+00:00",
    "market": "spread",
    "side": "NE",
-   "line": 3.0,
+   "line": 2.5,
    "odds": null
   },
   {
@@ -844,7 +740,7 @@
    "kickoff": "2026-11-15T14:30:00+00:00",
    "market": "spread",
    "side": "NE",
-   "line": 3.0,
+   "line": 2.5,
    "odds": null
   },
   {
@@ -883,20 +779,7 @@
    "kickoff": "2026-11-15T18:00:00+00:00",
    "market": "spread",
    "side": "CLE",
-   "line": 5.0,
-   "odds": null
-  },
-  {
-   "source": "sagarin",
-   "platform": "web",
-   "game_id": "2026_10_HOU_CLE",
-   "game": "HOU @ CLE",
-   "season": 2026,
-   "week": 10,
-   "kickoff": "2026-11-15T18:00:00+00:00",
-   "market": "spread",
-   "side": "CLE",
-   "line": 5.0,
+   "line": 4.5,
    "odds": null
   },
   {
@@ -913,7 +796,7 @@
    "odds": null
   },
   {
-   "source": "nfelo",
+   "source": "pt-median",
    "platform": "web",
    "game_id": "2026_10_MIA_IND",
    "game": "MIA @ IND",
@@ -921,8 +804,21 @@
    "week": 10,
    "kickoff": "2026-11-15T18:00:00+00:00",
    "market": "spread",
-   "side": "IND",
-   "line": -3.5,
+   "side": "MIA",
+   "line": 4.5,
+   "odds": null
+  },
+  {
+   "source": "sagarin",
+   "platform": "web",
+   "game_id": "2026_10_MIA_IND",
+   "game": "MIA @ IND",
+   "season": 2026,
+   "week": 10,
+   "kickoff": "2026-11-15T18:00:00+00:00",
+   "market": "spread",
+   "side": "MIA",
+   "line": 4.5,
    "odds": null
   },
   {
@@ -1069,19 +965,6 @@
    "odds": null
   },
   {
-   "source": "pt-median",
-   "platform": "web",
-   "game_id": "2026_10_LAC_BAL",
-   "game": "LAC @ BAL",
-   "season": 2026,
-   "week": 10,
-   "kickoff": "2026-11-17T01:15:00+00:00",
-   "market": "spread",
-   "side": "BAL",
-   "line": -4.0,
-   "odds": null
-  },
-  {
    "source": "nfelo",
    "platform": "web",
    "game_id": "2026_10_LAC_BAL",
@@ -1091,33 +974,7 @@
    "kickoff": "2026-11-17T01:15:00+00:00",
    "market": "spread",
    "side": "LAC",
-   "line": 4.0,
-   "odds": null
-  },
-  {
-   "source": "pt-median",
-   "platform": "web",
-   "game_id": "2026_10_WAS_NYG",
-   "game": "WAS @ NYG",
-   "season": 2026,
-   "week": 10,
-   "kickoff": "2026-11-13T01:15:00+00:00",
-   "market": "total",
-   "side": "over",
-   "line": 41.0,
-   "odds": null
-  },
-  {
-   "source": "sagarin",
-   "platform": "web",
-   "game_id": "2026_10_WAS_NYG",
-   "game": "WAS @ NYG",
-   "season": 2026,
-   "week": 10,
-   "kickoff": "2026-11-13T01:15:00+00:00",
-   "market": "total",
-   "side": "over",
-   "line": 41.0,
+   "line": 4.5,
    "odds": null
   },
   {
@@ -1240,19 +1097,6 @@
   {
    "source": "pt-median",
    "platform": "web",
-   "game_id": "2026_10_NE_DET",
-   "game": "NE @ DET",
-   "season": 2026,
-   "week": 10,
-   "kickoff": "2026-11-15T14:30:00+00:00",
-   "market": "total",
-   "side": "under",
-   "line": 51.0,
-   "odds": null
-  },
-  {
-   "source": "pt-median",
-   "platform": "web",
    "game_id": "2026_10_MIN_GB",
    "game": "MIN @ GB",
    "season": 2026,
@@ -1286,7 +1130,7 @@
    "kickoff": "2026-11-15T18:00:00+00:00",
    "market": "total",
    "side": "over",
-   "line": 38.5,
+   "line": 37.5,
    "odds": null
   },
   {
@@ -1299,7 +1143,7 @@
    "kickoff": "2026-11-15T18:00:00+00:00",
    "market": "total",
    "side": "over",
-   "line": 38.5,
+   "line": 37.5,
    "odds": null
   },
   {
@@ -1351,7 +1195,7 @@
    "kickoff": "2026-11-15T18:00:00+00:00",
    "market": "total",
    "side": "over",
-   "line": 48.5,
+   "line": 49.0,
    "odds": null
   },
   {
