@@ -1,12 +1,42 @@
 {
- "generated": "2026-11-16T21:02:41+00:00",
+ "generated": "2026-11-19T19:30:12+00:00",
  "episodes": [
   {
    "show": "Pat Mayo Experience",
    "id": "patmayo",
    "source": "pod:patmayo",
-   "title": "NFL Week 10 Recap: Vikings Good + Packers, Texans, Patriots Cooked? | Robert Pattinson New James Bond",
-   "published": "2026-11-16T16:27:48+00:00",
+   "title": "NFL Week 11 Best Bets, Props, Teasers | 2026 NFL Picks & Game Previews | Money in Pinball, Blackjack Odds",
+   "published": "2026-11-19T15:38:33+00:00",
+   "url": "https://www.youtube.com/channel/UCJrBgtSiXKOdpoyvVqqhWww",
+   "transcript": false,
+   "picks": null
+  },
+  {
+   "show": "Even Money: NFL Betting (Ross Tucker, Steve Fezzik)",
+   "id": "evenmoney",
+   "source": "pod:evenmoney",
+   "title": "2026 NFL Week 11 Prop Bets & Parlays",
+   "published": "2026-11-19T15:09:00+00:00",
+   "url": "https://linktr.ee/evenmoneypod",
+   "transcript": false,
+   "picks": null
+  },
+  {
+   "show": "The Action Network Podcast",
+   "id": "actionnetwork",
+   "source": "pod:actionnetwork",
+   "title": "NFL Week 11 Betting Preview",
+   "published": "2026-11-19T00:23:26+00:00",
+   "url": "https://omny.fm/shows/the-action-network-sports-betting-podcast/nfl-week-11-betting-preview-4",
+   "transcript": true,
+   "picks": 4
+  },
+  {
+   "show": "Pat Mayo Experience",
+   "id": "patmayo",
+   "source": "pod:patmayo",
+   "title": "RSM Classic 2026 Picks, Bets & Course Changes, Weather | Tiger Woods Returns, Bryson & Others To DP World Tour",
+   "published": "2026-11-18T13:53:52+00:00",
    "url": "https://www.youtube.com/channel/UCJrBgtSiXKOdpoyvVqqhWww",
    "transcript": false,
    "picks": null
@@ -15,29 +45,49 @@
    "show": "Pat Mayo Experience",
    "id": "patmayo",
    "source": "pod:patmayo",
-   "title": "NFL Week 10 INSTANT OVERREACTIONS, Recap & Week 10 Early Spread Picks, Judge Cust: Gas Lanes",
-   "published": "2026-11-16T01:56:01+00:00",
+   "title": "2026 NFL Week 11 Spread Picks, Predictions | Cust Corner: Hunting excursions, Outrageous Friends, New Bond",
+   "published": "2026-11-18T00:48:50+00:00",
    "url": "https://www.youtube.com/channel/UCJrBgtSiXKOdpoyvVqqhWww",
    "transcript": false,
+   "picks": null
+  },
+  {
+   "show": "The Action Network Podcast",
+   "id": "actionnetwork",
+   "source": "pod:actionnetwork",
+   "title": "NFL Futures Watch | Week 11",
+   "published": "2026-11-17T23:44:44+00:00",
+   "url": "https://omny.fm/shows/the-action-network-sports-betting-podcast/nfl-futures-watch-week-11",
+   "transcript": true,
    "picks": null
   },
   {
    "show": "Pat Mayo Experience",
    "id": "patmayo",
    "source": "pod:patmayo",
-   "title": "NFL Week 10 Weekend Update: Best Underdog Props, Injury Report, DraftKings Strategy & Spread Picks",
-   "published": "2026-11-14T18:37:59+00:00",
+   "title": "Week 11 Fantasy Football Rankings & Start/Sit Advice: Navigating 6 BYE WEEK TEAMS",
+   "published": "2026-11-17T16:04:44+00:00",
    "url": "https://www.youtube.com/channel/UCJrBgtSiXKOdpoyvVqqhWww",
    "transcript": false,
    "picks": null
   },
   {
-   "show": "Pat Mayo Experience",
-   "id": "patmayo",
-   "source": "pod:patmayo",
-   "title": "NFL Week 10 DraftKings Picks: Strategy, Best Stacks, Ownership Traps & Value Plays",
-   "published": "2026-11-13T14:07:46+00:00",
-   "url": "https://www.youtube.com/channel/UCJrBgtSiXKOdpoyvVqqhWww",
+   "show": "Even Money: NFL Betting (Ross Tucker, Steve Fezzik)",
+   "id": "evenmoney",
+   "source": "pod:evenmoney",
+   "title": "2026 NFL Week 11 Bets",
+   "published": "2026-11-17T15:30:00+00:00",
+   "url": "https://linktr.ee/evenmoneypod",
+   "transcript": false,
+   "picks": null
+  },
+  {
+   "show": "Sharp Football Analysis (Warren Sharp)",
+   "id": "sharpfootball",
+   "source": "pod:sharpfootball",
+   "title": "NFL Week 10 Takeaways and Monday Night Football Best Bets",
+   "published": "2026-11-16T21:46:32+00:00",
+   "url": "https://www.sharpfootballanalysis.com/?utm_source=link-bio",
    "transcript": false,
    "picks": null
   },
@@ -92,26 +142,6 @@
    "picks": null
   },
   {
-   "show": "The Action Network Podcast",
-   "id": "actionnetwork",
-   "source": "pod:actionnetwork",
-   "title": "NFL Week 10 Betting Preview",
-   "published": "2026-11-12T00:20:29+00:00",
-   "url": "https://omny.fm/shows/the-action-network-sports-betting-podcast/nfl-week-10-betting-preview-4",
-   "transcript": true,
-   "picks": null
-  },
-  {
-   "show": "The Action Network Podcast",
-   "id": "actionnetwork",
-   "source": "pod:actionnetwork",
-   "title": "NFL Futures Watch | Week 10",
-   "published": "2026-11-10T23:49:11+00:00",
-   "url": "https://omny.fm/shows/the-action-network-sports-betting-podcast/nfl-futures-watch-week-10",
-   "transcript": true,
-   "picks": null
-  },
-  {
    "show": "Even Money: NFL Betting (Ross Tucker, Steve Fezzik)",
    "id": "evenmoney",
    "source": "pod:evenmoney",
@@ -128,36 +158,6 @@
    "title": "NFL Week 9 Takeaways and Monday Night Football Best Bets",
    "published": "2026-11-09T21:30:43+00:00",
    "url": "https://www.sharpfootballanalysis.com/?utm_source=link-bio",
-   "transcript": false,
-   "picks": null
-  },
-  {
-   "show": "Sharp Football Analysis (Warren Sharp)",
-   "id": "sharpfootball",
-   "source": "pod:sharpfootball",
-   "title": "(41-16, 72%) NFL Week 9 Best Bets & Player Props 2026: Bengals-Falcons, Jets-Chiefs",
-   "published": "2026-11-06T12:00:00+00:00",
-   "url": "https://www.sharpfootballanalysis.com/?utm_source=link-bio",
-   "transcript": false,
-   "picks": null
-  },
-  {
-   "show": "Even Money: NFL Betting (Ross Tucker, Steve Fezzik)",
-   "id": "evenmoney",
-   "source": "pod:evenmoney",
-   "title": "2026 NFL Week 9 Prop Bets & Parlays",
-   "published": "2026-11-05T15:02:00+00:00",
-   "url": "https://linktr.ee/evenmoneypod",
-   "transcript": false,
-   "picks": null
-  },
-  {
-   "show": "Even Money: NFL Betting (Ross Tucker, Steve Fezzik)",
-   "id": "evenmoney",
-   "source": "pod:evenmoney",
-   "title": "2026 NFL Week 9 Bets",
-   "published": "2026-11-03T15:05:00+00:00",
-   "url": "https://linktr.ee/evenmoneypod",
    "transcript": false,
    "picks": null
   },

@@ -522,3 +522,4 @@ pulled_at,season,week,game,commence,stadium,roof,indoors,temp_f,wind_mph,gust_mp
 2026-11-18T19:34:44+00:00,2026,12,SEA @ SF,2026-11-29T21:25:00Z,Levi's Stadium,outdoors,False,60,7,10,22,Overcast
 2026-11-18T19:34:44+00:00,2026,12,LV @ CLE,2026-11-30T01:20:00Z,Huntington Bank Field,outdoors,False,37,6,13,30,Fog
 2026-11-18T19:34:44+00:00,2026,12,CAR @ TB,2026-12-01T01:15:00Z,Raymond James Stadium,outdoors,False,57,11,16,6,Overcast
+2026-11-19T19:30:47+00:00,2026,11,IND @ HOU,2026-11-20T01:15:00Z,Reliant Stadium,nan,False,66,2,4,0,Overcast

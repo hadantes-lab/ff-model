@@ -1,16 +1,16 @@
 # Week 10, 2026: how the picks did
 
-Week 10: moneyline 9-4, game spread 7-6, game total 6-7, high-confidence props 104-119. (1 games still to be graded)
+Week 10: moneyline 9-5, game spread 8-6, game total 6-8, high-confidence props 111-135.
 
 ## Moneyline winners (straight up)
 
-Went 9-4 (69%) on straight-up winners; the market's probabilities expected about 8.6 wins, so that is right about where its own probabilities expected. The clear favorites (S, A and B tiers) went 4-0. Biggest miss: HOU (C tier, 65%) in HOU @ CLE.
+Went 9-5 (64%) on straight-up winners; the market's probabilities expected about 9.2 wins, so that is right about where its own probabilities expected. The clear favorites (S, A and B tiers) went 4-0. Biggest miss: HOU (C tier, 65%) in HOU @ CLE.
 
 | Tier | Range | Right | Wrong | Expected right |
 |---|---|---|---|---|
 | A | 76-84% | 2 | 0 | 1.6 |
 | B | 70-76% | 2 | 0 | 1.5 |
-| C | 65-70% | 1 | 1 | 1.3 |
+| C | 65-70% | 1 | 2 | 2.0 |
 | D | 60-65% | 3 | 1 | 2.5 |
 | E | 55-60% | 1 | 2 | 1.7 |
 
@@ -19,6 +19,7 @@ Went 9-4 (69%) on straight-up winners; the market's probabilities expected about
 - B BUF (76%) in BUF @ NYJ: right
 - B SEA (71%) in SEA @ LV: right
 - C HOU (65%) in HOU @ CLE: WRONG
+- C BAL (65%) in LAC @ BAL: WRONG
 - C IND (65%) in MIA @ IND: right
 - D SF (64%) in SF @ DAL: right
 - D CIN (62%) in PIT @ CIN: right
@@ -30,7 +31,7 @@ Went 9-4 (69%) on straight-up winners; the market's probabilities expected about
 
 ## Game spread picks
 
-7-6 (54%) against the posted line. The model's own probabilities expected 7.6 wins, so that is right about where its own probabilities expected. On probability quality the model scored 0.224 against the market's 0.247, but with only 13 games that is too few to say which was sharper.
+8-6 (57%) against the posted line. The model's own probabilities expected 8.1 wins, so that is right about where its own probabilities expected. On probability quality the model scored 0.226 against the market's 0.247, but with only 14 games that is too few to say which was sharper.
 
 - WAS @ NYG: away cover -2, 55%: win
 - NE @ DET: away cover -2.5, 57%: loss
@@ -45,10 +46,11 @@ Went 9-4 (69%) on straight-up winners; the market's probabilities expected about
 - SEA @ LV: away cover +6.5, 74%: win
 - SF @ DAL: away cover +4, 70%: win
 - PIT @ CIN: away cover -3.5, 63%: loss
+- LAC @ BAL: away cover -4.5, 50%: win
 
 ## Game total picks
 
-6-7 (46%) against the posted line. The model's own probabilities expected 6.7 wins, so that is right about where its own probabilities expected. On probability quality the model scored 0.259 against the market's 0.249, but with only 13 games that is too few to say which was sharper. Totals are the hardest game market to beat; a week of 15 games says very little.
+6-8 (43%) against the posted line. The model's own probabilities expected 7.2 wins, so that is right about where its own probabilities expected. On probability quality the model scored 0.258 against the market's 0.249, but with only 14 games that is too few to say which was sharper. Totals are the hardest game market to beat; a week of 15 games says very little.
 
 - WAS @ NYG: Under 41, 54%: loss
 - NE @ DET: Over 49.5, 52%: loss
@@ -63,10 +65,11 @@ Went 9-4 (69%) on straight-up winners; the market's probabilities expected about
 - SEA @ LV: Over 40.5, 52%: loss
 - SF @ DAL: Under 55.5, 50%: loss
 - PIT @ CIN: Under 49.5, 50%: loss
+- LAC @ BAL: Under 39, 50%: loss
 
 ## Power-rating spread picks
 
-8-5 (62%) against the posted line. The model's own probabilities expected 7.1 wins, so that is right about where its own probabilities expected. On probability quality the model scored 0.234 against the market's 0.247, but with only 13 games that is too few to say which was sharper.
+9-5 (64%) against the posted line. The model's own probabilities expected 7.6 wins, so that is right about where its own probabilities expected. On probability quality the model scored 0.234 against the market's 0.247, but with only 14 games that is too few to say which was sharper.
 
 - WAS @ NYG: home cover -2, 53%: loss
 - NE @ DET: home cover -2.5, 50%: win
@@ -81,6 +84,7 @@ Went 9-4 (69%) on straight-up winners; the market's probabilities expected about
 - SEA @ LV: away cover +6.5, 56%: win
 - SF @ DAL: away cover +4, 54%: win
 - PIT @ CIN: away cover -3.5, 52%: loss
+- LAC @ BAL: away cover -4.5, 52%: win
 
 ## Parlays
 
@@ -119,7 +123,7 @@ The week's top 10 prop picks went 4-4, about 4.3 wins by their stated chances. A
 
 ## Streaks
 
-The model's lean has been right 3+ weeks running on 52 player-markets: Ashton Jeanty Rush Yds (6 in a row); Darren Waller Receptions (6 in a row); Elijah Higgins Receptions (6 in a row). Of 608 player-markets tracked that long, about 101 such streaks would come from luck (fewer than chance alone gives), so a streak is a talking point, not a signal; the model's record on a player has not predicted his next result.
+The model's lean has been right 3+ weeks running on 52 player-markets: Ashton Jeanty Rush Yds (6 in a row); Darren Waller Receptions (6 in a row); Elijah Higgins Receptions (6 in a row). Of 614 player-markets tracked that long, about 102 such streaks would come from luck (fewer than chance alone gives), so a streak is a talking point, not a signal; the model's record on a player has not predicted his next result.
 
 - Ashton Jeanty Rush Yds: 6 straight (wk 3 under 68.5, wk 4 under 58.5, wk 6 under 55.5, wk 8 under 51.5, wk 9 under 29.5, wk 10 under 34.5)
 - Darren Waller Receptions: 6 straight (wk 3 over 1.5, wk 4 under 3.5, wk 6 under 2.5, wk 7 under 2.5, wk 9 over 1.5, wk 10 under 2.5)
@@ -136,44 +140,45 @@ The model's lean has been right 3+ weeks running on 52 player-markets: Ashton Je
 
 ## Target projections
 
-Week 10: 93 target projections graded, off by 2.40 targets on average against 2.38 for each player's recent average. Season to date (291 projections): 2.14 targets off on average versus 2.23 for the recent average (better); bias -0.26; 68% landed within one standard deviation of the projection (68% if its spread is right). No book posts a targets line, so this tracks the projection itself, not a betting result.
+Week 10: 99 target projections graded, off by 2.40 targets on average against 2.43 for each player's recent average. Season to date (297 projections): 2.14 targets off on average versus 2.25 for the recent average (better); bias -0.25; 68% landed within one standard deviation of the projection (68% if its spread is right). No book posts a targets line, so this tracks the projection itself, not a betting result.
 
 ## Defense vs position
 
-Week 10: the schedule-adjusted ratings' softest quarter of defenses allowed +2% versus the league, the toughest quarter -16%. Season to date (3 weeks, 1,512 defense-position-stat games): the last-season rating tracked what defenses allowed best (correlation +0.10; the softest quarter allowed +7% against the league, the toughest -8%). A reading only helps a projection if it predicts the NEXT game, which is what this checks; the player-level test (dvp_study.py) replays every game since 2019.
+Week 10: the schedule-adjusted ratings' softest quarter of defenses allowed +2% versus the league, the toughest quarter -9%. Season to date (3 weeks, 1,548 defense-position-stat games): the last-season rating tracked what defenses allowed best (correlation +0.07; the softest quarter allowed +5% against the league, the toughest -6%). A reading only helps a projection if it predicts the NEXT game, which is what this checks; the player-level test (dvp_study.py) replays every game since 2019.
 
 ## Social picks
 
-Week 10: 114 tracked spread and total picks from 13 sources went 56-58 (49%; -110 needs 52.4%). 8 sources have 10+ graded picks this season; the best is @espn-fpi at 13-7 (shrunk to 55.0%, 66% chance its true rate beats the vig). Picks from sources that looked good at the time won 58% (36 picks) against 52% (203) for the rest. That gap is within luck. Records are graded by us from each source's own posts, flat 1 unit at the stated price (-110 if none).
+Week 10: 123 tracked spread and total picks from 13 sources went 62-61 (50%; -110 needs 52.4%). 9 sources have 10+ graded picks this season; the best is @espn-fpi at 14-7 (shrunk to 55.7%, 70% chance its true rate beats the vig). Picks from sources that looked good at the time won 59% (39 picks) against 52% (209) for the rest. That gap is within luck. Records are graded by us from each source's own posts, flat 1 unit at the stated price (-110 if none).
 
-- @espn-fpi: 13-7, +4.8 units, weight 0.44 (tracked)
+- @espn-fpi: 14-7, +5.7 units, weight 0.56 (tracked)
 - @sbd-ai: 13-7, +4.8 units, weight 0.44 (tracked)
-- @pt-median: 22-16, +4.0 units, weight 0.24 (tracked)
+- @pt-median: 23-17, +3.9 units, weight 0.23 (tracked)
 - @pickswise:kevin-rogers: 10-6, +3.1 units, weight 0.20 (tracked)
 - @pickswise:luke-lindholm: 5-3, +1.5 units, weight 0.00 (unproven)
 - @pickswise:ricky-dimon: 5-3, +1.5 units, weight 0.00 (unproven)
 - @pickswise:sam-avellone: 5-3, +1.5 units, weight 0.00 (unproven)
-- @nfelo: 5-5, -0.5 units, weight 0.00 (tracked)
+- @nfelo: 6-5, +0.5 units, weight 0.00 (tracked)
 
 ## Player props
 
 ### Passing yards
 
-Across 2 graded props the model's raw lean was right 0% (0-2); it expected 68%. High-confidence picks (raw probability 60%+): 0-2 (0%) against an expected 68%, clearly worse than its probabilities expected. Probability quality: model 0.456 vs market 0.250 (too few to call). The model's projection missed by 91.8 on average and the posted line by 65.5.
+Across 3 graded props the model's raw lean was right 0% (0-3); it expected 63%. High-confidence picks (raw probability 60%+): 0-2 (0%) against an expected 68%, clearly worse than its probabilities expected. Probability quality: model 0.405 vs market 0.250 (too few to call). The model's projection missed by 88.6 on average and the posted line by 67.5.
 
 - J.J. McCarthy: Under 208.5 (70%), result 293.0: loss
 - Jayden Daniels: Under 202.5 (65%), result 249.0: loss
 
 ### Passing TDs
 
-Across 2 graded props the model's raw lean was right 50% (1-1); it expected 72%. High-confidence picks (raw probability 60%+): 1-1 (50%) against an expected 72%, right about where its own probabilities expected. Probability quality: model 0.266 vs market 0.270 (too few to call). The model's projection missed by 0.9 on average and the posted line by 1.0.
+Across 3 graded props the model's raw lean was right 33% (1-2); it expected 68%. High-confidence picks (raw probability 60%+): 1-2 (33%) against an expected 68%, a bit worse than its probabilities expected, within normal variation. Probability quality: model 0.301 vs market 0.330 (too few to call). The model's projection missed by 0.9 on average and the posted line by 0.8.
 
 - J.J. McCarthy: Under 1.5 (75%), result 1.0: win
 - Jayden Daniels: Under 1.5 (69%), result 3.0: loss
+- Justin Herbert: Over 0.5 (61%), result 0.0: loss
 
 ### Pass attempts
 
-Across 22 graded props the model's raw lean was right 64% (14-8); it expected 64%. High-confidence picks (raw probability 60%+): 7-7 (50%) against an expected 69%, a bit worse than its probabilities expected, within normal variation. Probability quality: model 0.255 vs market 0.253 (too few to call). The model's projection missed by 7.9 on average and the posted line by 7.6.
+Across 23 graded props the model's raw lean was right 61% (14-9); it expected 63%. High-confidence picks (raw probability 60%+): 7-7 (50%) against an expected 69%, a bit worse than its probabilities expected, within normal variation. Probability quality: model 0.256 vs market 0.253 (too few to call). The model's projection missed by 8.1 on average and the posted line by 7.8.
 
 - J.J. McCarthy: Under 29.5 (78%), result 36.0: loss
 - Brock Purdy: Under 31.5 (76%), result 28.0: win
@@ -184,14 +189,15 @@ Across 22 graded props the model's raw lean was right 64% (14-8); it expected 64
 
 ### Pass completions
 
-Across 2 graded props the model's raw lean was right 0% (0-2); it expected 71%. High-confidence picks (raw probability 60%+): 0-2 (0%) against an expected 71%, clearly worse than its probabilities expected. Probability quality: model 0.502 vs market 0.238 (too few to call). The model's projection missed by 7.3 on average and the posted line by 4.5.
+Across 3 graded props the model's raw lean was right 33% (1-2); it expected 67%. High-confidence picks (raw probability 60%+): 1-2 (33%) against an expected 67%, a bit worse than its probabilities expected, within normal variation. Probability quality: model 0.386 vs market 0.240 (too few to call). The model's projection missed by 7.0 on average and the posted line by 5.5.
 
 - J.J. McCarthy: Under 17.5 (76%), result 23.0: loss
 - Jayden Daniels: Under 19.5 (66%), result 23.0: loss
+- Justin Herbert: Under 19.5 (61%), result 12.0: win
 
 ### Rushing yards
 
-Across 67 graded props the model's raw lean was right 46% (31-36); it expected 62%. High-confidence picks (raw probability 60%+): 16-20 (44%) against an expected 69%, clearly worse than its probabilities expected. Probability quality: model 0.289 vs market 0.251 (market sharper). The model's projection missed by 19.6 on average and the posted line by 16.4.
+Across 74 graded props the model's raw lean was right 46% (34-40); it expected 62%. High-confidence picks (raw probability 60%+): 17-21 (45%) against an expected 68%, clearly worse than its probabilities expected. Probability quality: model 0.286 vs market 0.251 (market sharper). The model's projection missed by 20.9 on average and the posted line by 17.7.
 
 - Emmett Johnson: Under 75.5 (99%), result 101.0: loss
 - Austin Ekeler: Under 29.5 (81%), result 26.0: win
@@ -202,18 +208,18 @@ Across 67 graded props the model's raw lean was right 46% (31-36); it expected 6
 
 ### Rush attempts
 
-Across 44 graded props the model's raw lean was right 36% (16-28); it expected 64%. High-confidence picks (raw probability 60%+): 7-16 (30%) against an expected 72%, clearly worse than its probabilities expected. The picks the page recommended went 1-0. Probability quality: model 0.348 vs market 0.252 (market sharper). The model's projection missed by 4.0 on average and the posted line by 2.8.
+Across 50 graded props the model's raw lean was right 42% (21-29); it expected 63%. High-confidence picks (raw probability 60%+): 8-17 (32%) against an expected 72%, clearly worse than its probabilities expected. The picks the page recommended went 2-0. Probability quality: model 0.340 vs market 0.250 (market sharper). The model's projection missed by 4.1 on average and the posted line by 3.0.
 
 - Emmett Johnson: Under 17.5 (100%), result 22.0: loss
 - Rachaad White: Under 10.5 (88%), result 11.0: loss
+- Keaton Mitchell: Over 3.5 (80%), result 3.0: loss
 - Austin Ekeler: Under 8.5 (80%), result 9.0: loss
 - Kaleb Johnson: Under 9.5 (79%), result 10.0: loss
 - Ollie Gordon II: Under 18.5 (79%), result 20.0: loss
-- Deshaun Watson: Under 6.5 (78%), result 8.0: loss
 
 ### Receptions
 
-Across 145 graded props the model's raw lean was right 51% (74-71); it expected 62%. High-confidence picks (raw probability 60%+): 38-36 (51%) against an expected 70%, clearly worse than its probabilities expected. The picks the page recommended went 12-9. Probability quality: model 0.272 vs market 0.251 (market sharper). The model's projection missed by 1.6 on average and the posted line by 1.4.
+Across 159 graded props the model's raw lean was right 48% (77-82); it expected 63%. High-confidence picks (raw probability 60%+): 39-43 (48%) against an expected 70%, clearly worse than its probabilities expected. The picks the page recommended went 12-9. Probability quality: model 0.281 vs market 0.252 (market sharper). The model's projection missed by 1.6 on average and the posted line by 1.4.
 
 - Simi Fehoko: Under 1.5 (89%), result 1.0: win
 - Anthony Gould: Under 1.5 (88%), result 2.0: loss
@@ -224,7 +230,7 @@ Across 145 graded props the model's raw lean was right 51% (74-71); it expected 
 
 ### Receiving yards
 
-Across 145 graded props the model's raw lean was right 50% (73-72); it expected 62%. High-confidence picks (raw probability 60%+): 35-35 (50%) against an expected 69%, clearly worse than its probabilities expected. The picks the page recommended went 0-1. Probability quality: model 0.273 vs market 0.249 (market sharper). The model's projection missed by 23.8 on average and the posted line by 22.1.
+Across 159 graded props the model's raw lean was right 48% (76-83); it expected 62%. High-confidence picks (raw probability 60%+): 38-41 (48%) against an expected 69%, clearly worse than its probabilities expected. The picks the page recommended went 0-1. Probability quality: model 0.278 vs market 0.250 (market sharper). The model's projection missed by 23.7 on average and the posted line by 21.8.
 
 - John Metchie III: Over 7.5 (93%), result 4.0: loss
 - Anthony Gould: Under 16.5 (92%), result 28.0: loss
@@ -237,28 +243,29 @@ Across 145 graded props the model's raw lean was right 50% (73-72); it expected 
 
 | Group | Record | Win rate | Expected |
 |---|---|---|---|
-| game_rank_spread | 44-39 | 53% | 47.3 wins |
-| game_spread | 58-39 | 60% | 57.0 wins |
-| game_total | 54-45 | 55% | 63.0 wins |
-| moneyline | 70-29 | 71% | 64.6 wins |
+| game_rank_spread | 45-39 | 54% | 47.8 wins |
+| game_spread | 59-39 | 60% | 57.5 wins |
+| game_total | 54-46 | 54% | 63.5 wins |
+| moneyline | 70-30 | 70% | 65.3 wins |
 | parlays_ml | 11-4 | 73% | 4.8 wins |
 | parlays_pickem | 3-13 | 19% | 1.3 wins |
 | parlays_props | 2-14 | 12% | 2.4 wins |
 | parlays_teaser | 10-14 | 42% | 13.6 wins |
 | player_pass_attempts:high | 21-23 | 48% | 30.6 wins |
-| player_pass_completions:high | 10-9 | 53% | 12.7 wins |
-| player_pass_tds:high | 44-19 | 70% | 42.7 wins |
+| player_pass_completions:high | 11-9 | 55% | 13.4 wins |
+| player_pass_tds:high | 44-20 | 69% | 43.3 wins |
 | player_pass_yds:high | 26-50 | 34% | 51.5 wins |
-| player_reception_yds:high | 295-253 | 54% | 379.1 wins |
-| player_receptions:high | 331-213 | 61% | 374.9 wins |
-| player_rush_attempts:high | 34-45 | 43% | 56.8 wins |
-| player_rush_yds:high | 156-130 | 55% | 201.0 wins |
+| player_reception_yds:high | 298-259 | 54% | 385.2 wins |
+| player_receptions:high | 332-220 | 60% | 380.5 wins |
+| player_rush_attempts:high | 35-46 | 43% | 58.2 wins |
+| player_rush_yds:high | 157-131 | 55% | 202.2 wins |
 
 ## What the data is teaching the model
 
+- game_total: 54-46 over 100 picks is 2.0 standard deviations below what the model's own probabilities expected; its raw confidence runs too high here. That is what blending toward the market is for, so the real question is the weight (see above), not the raw number.
 - player_pass_attempts:high: 21-23 over 44 picks is 3.2 standard deviations below what the model's own probabilities expected; its raw confidence runs too high here. That is what blending toward the market is for, so the real question is the weight (see above), not the raw number.
 - player_pass_yds:high: 26-50 over 76 picks is 6.3 standard deviations below what the model's own probabilities expected; its raw confidence runs too high here. That is what blending toward the market is for, so the real question is the weight (see above), not the raw number.
-- player_reception_yds:high: 295-253 over 548 picks is 7.9 standard deviations below what the model's own probabilities expected; its raw confidence runs too high here. That is what blending toward the market is for, so the real question is the weight (see above), not the raw number.
-- player_receptions:high: 331-213 over 544 picks is 4.1 standard deviations below what the model's own probabilities expected; its raw confidence runs too high here. That is what blending toward the market is for, so the real question is the weight (see above), not the raw number.
-- player_rush_attempts:high: 34-45 over 79 picks is 5.8 standard deviations below what the model's own probabilities expected; its raw confidence runs too high here. That is what blending toward the market is for, so the real question is the weight (see above), not the raw number.
-- player_rush_yds:high: 156-130 over 286 picks is 5.9 standard deviations below what the model's own probabilities expected; its raw confidence runs too high here. That is what blending toward the market is for, so the real question is the weight (see above), not the raw number.
+- player_reception_yds:high: 298-259 over 557 picks is 8.1 standard deviations below what the model's own probabilities expected; its raw confidence runs too high here. That is what blending toward the market is for, so the real question is the weight (see above), not the raw number.
+- player_receptions:high: 332-220 over 552 picks is 4.5 standard deviations below what the model's own probabilities expected; its raw confidence runs too high here. That is what blending toward the market is for, so the real question is the weight (see above), not the raw number.
+- player_rush_attempts:high: 35-46 over 81 picks is 5.9 standard deviations below what the model's own probabilities expected; its raw confidence runs too high here. That is what blending toward the market is for, so the real question is the weight (see above), not the raw number.
+- player_rush_yds:high: 157-131 over 288 picks is 5.9 standard deviations below what the model's own probabilities expected; its raw confidence runs too high here. That is what blending toward the market is for, so the real question is the weight (see above), not the raw number.
