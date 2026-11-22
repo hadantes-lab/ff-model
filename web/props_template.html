@@ -99,7 +99,7 @@
   /* ---- prop list ---- */
   .list { padding: 14px 0 60px; }
   .cols, .row-head { display: grid; gap: 12px; align-items: center;
-    grid-template-columns: minmax(190px, 1.7fr) 118px 130px 88px minmax(140px, 1.1fr) 84px 22px; }
+    grid-template-columns: minmax(210px, 1.8fr) 112px 150px 150px 22px; }
   .cols { padding: 0 16px 6px; font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-faint); font-weight: 600; }
   .cols .r, .row-head .r { text-align: right; }
   .row { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 6px; }
@@ -135,6 +135,21 @@
   .pick .side { font-weight: 700; font-size: 12.5px; letter-spacing: 0.04em; }
   .pick .side.over { color: var(--gold); }
   .pick .book { font-size: 11.5px; color: var(--text-faint); }
+  .lean .side { font-weight: 700; font-size: 14px; letter-spacing: 0.05em; }
+  .lean .side.over { color: var(--gold); } .lean .side.under { color: var(--text); }
+  .lean .sub2 { font-size: 11.5px; color: var(--text-faint); }
+  .conf { display: flex; flex-direction: column; gap: 3px; align-items: flex-end; justify-self: end; }
+  .conf .pill { font-family: "IBM Plex Mono"; font-weight: 700; font-size: 14px; padding: 2px 9px; border-radius: 7px; background: var(--surface-2); color: var(--text-dim); }
+  .conf.high .pill { background: var(--pos-bg); color: var(--pos); }
+  .conf.low .pill { background: var(--surface-2); color: var(--text-faint); font-weight: 600; }
+  .conf .gr { font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--text-faint); font-weight: 600; }
+  .row.hot .row-head { box-shadow: inset 3px 0 0 var(--gold); }
+  .row.match .row-head { background: linear-gradient(90deg, var(--pos-bg), transparent 55%); }
+  .tag.hot { background: var(--gold); color: var(--gold-ink); }
+  .tag.ok { background: var(--pos-bg); color: var(--pos); }
+  .leanbox { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 16px; align-items: baseline; }
+  .leanbox .big { font-size: 22px; font-weight: 700; font-family: "IBM Plex Mono"; }
+  .leanbox ul { margin: 6px 0 0; padding-left: 18px; font-size: 13px; color: var(--text-dim); }
   .ev { font-family: "IBM Plex Mono"; font-weight: 700; text-align: right; padding: 3px 8px; border-radius: 7px; justify-self: end; font-size: 13px; }
   .ev.pos { background: var(--pos-bg); color: var(--pos); }
   .ev.neg { background: var(--neg-bg); color: var(--neg); }
@@ -193,10 +208,8 @@
     .row-head { grid-template-columns: 1fr auto; row-gap: 7px; }
     .row-head .caret { display: none; }
     .row-head .mk { grid-column: 1; display: flex; gap: 8px; align-items: baseline; }
-    .row-head .model { grid-column: 1; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
-    .row-head .edge { text-align: left; }
-    .row-head .pick { grid-column: 1; }
-    .row-head .ev { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
+    .row-head .lean { grid-column: 1; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+    .row-head .conf { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
     .detail { grid-template-columns: 1fr; }
     .stats { margin-left: 0; width: 100%; }
     .stat { flex: 1; min-width: 0; }
@@ -409,17 +422,18 @@
       <button class="active" data-pos="">All</button><button data-pos="QB">QB</button><button data-pos="RB">RB</button><button data-pos="WR">WR</button><button data-pos="TE">TE</button>
     </div>
     <span id="player-chip"></span>
-    <label class="check"><input type="checkbox" id="only-ev"> Model +EV only</label>
+    <label class="check"><input type="checkbox" id="only-hot"> Hitting only</label>
+    <label class="check"><input type="checkbox" id="only-match"> Defense agrees</label>
     <label class="check"><input type="checkbox" id="hide-thin"> Hide thin samples</label>
     <select class="field spacer" id="sort" aria-label="Sort">
-      <option value="conf">Sort: most confident</option><option value="ev">Sort: best EV</option><option value="edge">Sort: biggest edge</option><option value="gap">Sort: biggest raw model gap</option>
+      <option value="conf">Sort: most confident</option><option value="lean">Sort: strongest model lean</option>
       <option value="name">Sort: player</option><option value="time">Sort: kickoff</option>
     </select>
   </div>
 </div>
 
 <div class="wrap list">
-  <div class="cols"><div>Player</div><div>Line</div><div>Model</div><div class="r">Edge</div><div>Best price</div><div class="r">EV / $1</div><div></div></div>
+  <div class="cols"><div>Player</div><div>Line</div><div>Model lean</div><div class="r">Confidence</div><div></div></div>
   <div id="rows"></div>
 </div>
 </div>
@@ -498,24 +512,24 @@ function renderHeader() {
   const when = new Date(DATA.generated);
   $("meta").textContent = `Week ${DATA.week}, ${DATA.season} · ${DATA.n_games} games · lines pulled ${when.toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })}`;
   $("demo").hidden = !DATA.sample;
-  const gaps = P.filter(p => p.edge != null && Math.abs(p.edge) >= 5 && !p.thin).length;
+  const nHigh = P.filter(p => p.lean && p.lean.grade === "high" && !p.thin).length, nHot = P.filter(p => p.lean && p.lean.hot).length;
   $("stats").innerHTML = [
-    ["Props", P.length.toLocaleString(), ""], ["Edges 5+ pt", gaps.toLocaleString(), "hi"], ["Games", DATA.n_games, ""],
+    ["Props", P.length.toLocaleString(), ""], ["High confidence", nHigh.toLocaleString(), "hi"], ["Hitting", nHot.toLocaleString(), ""], ["Games", DATA.n_games, ""],
   ].map(([k, v, c]) => `<div class="stat ${c}"><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
   $("foot").innerHTML = `
     <p><strong>How it works.</strong> Each prop is simulated 20,000 times from the player's last 17 games (recent games weigh more), scaled for how the opposing defense treats that position. Counts (receptions, TDs) use Poisson / negative-binomial draws; yardage uses a skewed gamma. Anytime TD rates are pulled toward the position average so a scoreless streak doesn't read as impossible.</p>
     <p><strong>Validated against history.</strong> The projection engine was tested walk-forward on 2024&ndash;25 (each game projected using only earlier games). That found projections for high-usage players run about 5% hot, so they are calibrated back (this cut error on every market); it confirmed a defense-strength adjustment helps a little; and it showed the game total and spread genuinely move volume and yardage out of sample (higher totals lift receiving and passing-TD projections; favorites pass less). Man/zone coverage matchups turned out to be a very weak signal, so they move projections by well under 1%.</p>
     <p><strong>How much the model is trusted (measured).</strong> The model was checked against 14,777 real prop lines from 2024&ndash;25 (ESPN BET, with prices). Against the closing line it adds no measurable information in any market, and against the opening line, where picks win a little more than half the time, they still lose money at the real opening prices (about &minus;4% per bet; no market clears the bar after allowing for testing ten of them). So each market's blend weight is the one that scored best in that test: 0&ndash;5%, far under the 15% cap used before. Game-script volume adjustments (favorites run more, underdogs throw more) are real at the team level but the books already price them; see the README.</p>
-    <p><strong>Adjusted vs raw.</strong> Against real lines the raw simulation differed from the market by about 12 points on a typical prop, when a genuine edge is a few points at most, so most of that gap is the model missing things the market knows (roles, injuries, weather, game script). Edge and EV therefore use the model <em>shrunk toward the market</em>: the market's price plus a small share (at most 15%, less for players with thin history) of the model's disagreement. That 15% is a judgment call, not a fitted number; calibrating it properly needs closing lines and game results. The raw model probability is shown next to it. Rows tagged &ldquo;model far from market&rdquo; are where the raw model disagrees most, and are the ones most likely to be model error.</p>
-    <p><strong>Edge</strong> is adjusted P(over) minus the market's no-vig P(over), averaged across books. <strong>EV / $1</strong> uses the best price on the recommended side. Anytime TD has no &ldquo;under&rdquo; to remove the vig with, so its market number includes the vig, which makes its edges conservative. Thin samples (fewer than 6 games) are tagged.</p>
+    <p><strong>Adjusted vs raw.</strong> Against real lines the raw simulation differed from the market by about 12 points on a typical prop, when a genuine edge is a few points at most, so most of that gap is the model missing things the market knows (roles, injuries, weather, game script). So the blended number (the market's price plus a small share, at most 15%, of the model's disagreement) is used only to say which side the market favors; the lean itself is the raw model's side, and how far it sits from the market is what separates a confident lean from a coin flip.</p>
+    <p><strong>Model lean and confidence.</strong> The lean is the side the raw simulation favors at the line you would play (Underdog's when the pull had it). Confidence is the measured chance that lean hits, from a curve fitted to this season's graded props: how hard the raw model leans, and whether the market's own side agrees (a lean the market also favors has hit about 56%, one against it about 49%). Checked week by week on results the curve had not seen, its predicted rates matched the actual ones and beat a flat 50-50 guess by a small margin, so treat 55&ndash;60% as a real but modest edge, not a lock. <strong>Hitting</strong> (gold bar) marks a type of lean that has been hitting at a good clip this season, or a player the model has been right on 80%+ of the time; the type record predicts the next week only weakly, and a player's own record has <em>not</em> predicted his next result, so read it as history. <strong>Defense agrees</strong> (green) means the opposing defense is soft for an over or tough for an under on that stat; it lifted hit rate by about a point, too little to move confidence. A <em>cold</em> type (it has been missing, e.g. QB passing-yards unders this season) is capped at low confidence. Anytime TDs have no over/under, so they carry no lean. Thin samples (fewer than 6 games) are tagged.</p>
     <p>${DATA.credits ? esc(DATA.credits) + " · " : ""}Distributions are simulated from nflverse play data; lines from The Odds API.</p>`;
 }
 
 /* ---------- filters + list ---------- */
-const S = { markets: new Set(), pos: "", game: "", player: null, q: "", sort: "conf", onlyEv: false, hideThin: false, limit: 80, open: null, openGames: new Set() };
+const S = { markets: new Set(), pos: "", game: "", player: null, q: "", sort: "conf", onlyHot: false, onlyMatch: false, hideThin: false, limit: 80, open: null, openGames: new Set() };
 const TG = (DATA.targets || []).map((p, i) => Object.assign(p, { tid: i }));
 /* confidence = the chance the better side hits at the pick'em line (Underdog's when the pull had it, else the sportsbook line) */
-const confOf = p => p.pickem ? p.pickem.prob : Math.max(p.over, p.under);
+const confOf = p => p.lean ? p.lean.confidence : 0;     // no lean (anytime TDs) sorts last
 
 function buildControls() {
   const labels = [...new Map(P.map(p => [p.market, p.label]))];
@@ -526,31 +540,62 @@ function visible() {
   const q = S.q.trim().toLowerCase();
   let rows = P.filter(p =>
     (!S.markets.size || S.markets.has(p.market)) && (!S.pos || p.pos === S.pos) && (!S.game || p.game === S.game) && (!S.player || p.player === S.player) &&
-    (!q || p.player.toLowerCase().includes(q) || p.team.toLowerCase().includes(q) || p.game.toLowerCase().includes(q)) && (!S.onlyEv || (p.pick_ev != null && p.pick_ev > 0)) && (!S.hideThin || !p.thin));
-  const key = { conf: p => -confOf(p), ev: p => -(p.pick_ev ?? -9), edge: p => -Math.abs(p.edge ?? 0), gap: p => -Math.abs((p.line_gap ?? 0) / (p.line || 1)), name: p => p.player, time: p => p.commence + p.player }[S.sort];
+    (!q || p.player.toLowerCase().includes(q) || p.team.toLowerCase().includes(q) || p.game.toLowerCase().includes(q)) && (!S.onlyHot || (p.lean && p.lean.hot)) && (!S.onlyMatch || (p.lean && p.lean.matchup.state === "supports")) && (!S.hideThin || !p.thin));
+  const key = { conf: p => -confOf(p), lean: p => -(p.lean ? p.lean.raw_prob : 0), name: p => p.player, time: p => p.commence + p.player }[S.sort];
   return rows.sort((a, b) => { const x = key(a), y = key(b); return x < y ? -1 : x > y ? 1 : 0; });
 }
 
+function leanCellHTML(p) {
+  const l = p.lean;
+  if (!l) return p.kind === "td" ? `<div class="side">&mdash;</div><div class="sub2">model ${pct(p.model_over, 0)} &middot; mkt ${p.market_over != null ? pct(p.market_over, 0) : "&mdash;"}</div>` : `<div class="side">&mdash;</div>`;
+  return `<div class="side ${l.side}">${l.side === "over" ? "OVER" : "UNDER"}</div><div class="sub2">${l.book ? "UD " : ""}${l.line} &middot; model ${p.kind === "td" ? pct(p.over, 0) : p.mean}</div>`;
+}
+
 function rowHTML(p) {
-  const e = p.edge, ec = e == null ? "flat" : e > 1 ? "pos" : e < -1 ? "neg" : "flat";
-  const pick = p.pick ? p[p.pick === "over" ? "best_over" : "best_under"] : null;
-  const evc = p.pick_ev == null ? "flat" : p.pick_ev > 0.005 ? "pos" : p.pick_ev < -0.005 ? "neg" : "flat";
-  const big = p.gap != null && Math.abs(p.gap) >= 12;
-  return `<div class="row ${S.open === p.id ? "open" : ""} ${p.top_rank ? "top-pick" : ""}" data-id="${p.id}">
+  const l = p.lean;
+  const m = l && l.matchup && l.matchup.state;
+  const tags = [
+    p.injury ? `<span class="tag warn">${esc(p.injury)}</span>` : "",
+    p.promoted ? `<span class="tag" title="A teammate ahead of him in usage is Out/Doubtful/IR; his volume is scaled x${p.promoted} toward the team's rate">backup starting</span>` : "",
+    p.thin ? `<span class="tag warn">${p.n_games} games</span>` : "",
+    l && l.hot ? `<span class="tag hot" title="${esc(l.hot_why.join(". "))}. Read as history: a type's record predicts next week only weakly, a player's own record not at all.">Hitting</span>` : "",
+    l && l.cold ? `<span class="tag warn" title="${esc(l.cold_why)}">Cold type</span>` : "",
+    m === "supports" ? `<span class="tag ok" title="${esc(l.matchup.note)}">Defense agrees</span>` : "",
+    m === "against" ? `<span class="tag warn" title="${esc(l.matchup.note)}">Defense against</span>` : "",
+    l && !l.agree ? `<span class="tag warn" title="The market's own side at this line is the other one; these leans have hit about 49% this season">vs market</span>` : "",
+  ].join("");
+  const cls = l ? l.grade : "low";
+  return `<div class="row ${S.open === p.id ? "open" : ""} ${l && l.hot ? "hot" : ""} ${m === "supports" ? "match" : ""}" data-id="${p.id}">
     <div class="row-head" role="button" tabindex="0" aria-expanded="${S.open === p.id}">
       <div class="who"><div class="name">${esc(p.player)}</div>
-        <div class="sub"><span>${p.team} ${p.home ? "vs" : "@"} ${p.opp}</span><span class="tag">${p.pos}</span>${p.top_rank ? `<span class="tag gold" title="One of the week's 10 best prop picks by expected value">Top ${p.top_rank}</span>` : ""}${p.confidence && p.confidence.n ? `<span class="tag ${p.confidence.grade >= 6.5 ? "ok" : p.confidence.grade <= 3.5 ? "warn" : ""}" title="${confTitle(p.confidence)}">Model ${p.confidence.grade.toFixed(1)}/10</span>` : ""}
-          ${p.injury ? `<span class="tag warn">${esc(p.injury)}</span>` : ""}${p.promoted ? `<span class="tag" title="A teammate ahead of him in usage is Out/Doubtful/IR; his volume is scaled x${p.promoted} toward the team's rate">backup starting</span>` : ""}${p.thin ? `<span class="tag warn">${p.n_games} games</span>` : ""}${p.env && Math.abs(p.env.mult - 1) >= 0.04 ? `<span class="tag" title="Game total ${p.env.total}, ${p.team} implied ${p.env.implied}: moves the projection ${signed((p.env.mult - 1) * 100, 1)}%">${p.env.total} total ${signed((p.env.mult - 1) * 100, 0)}%</span>` : ""}${p.pickem ? `<span class="tag ${p.pickem.grade === "high" ? "ok" : p.pickem.grade === "low" ? "warn" : ""}" title="${p.pickem.book ? esc(p.pickem.book) + " line" : "Sportsbook line (no pick'em line in this pull)"}: chance the ${p.pickem.side} hits ${pct(p.pickem.prob, 1)}${p.pickem.line_edge >= 0.01 ? "; the pick'em line is softer than the sportsbooks' by " + pct(p.pickem.line_edge, 1) : ""}${p.pickem.agree ? "" : "; the raw model leans the other way"}">${p.pickem.book ? "UD " : ""}${p.pickem.side === "over" ? "O" : "U"} ${p.pickem.line} &middot; ${pct(p.pickem.prob)}</span>` : ""}${p.dfs && p.dfs.some(d => d.gap !== 0) && !p.pickem?.book ? `<span class="tag">pick'em line differs</span>` : ""}${big ? `<span class="tag warn" title="The raw model is ${Math.abs(p.gap).toFixed(0)} points from the market, far more than a real edge usually is">model far from market</span>` : ""}</div></div>
-      <div class="mk"><div class="lbl">${esc(p.label)}</div><div class="line">${fmtLine(p)}</div></div>
-      <div class="model"><div class="mean">${p.kind === "td" ? pct(p.over, 1) : "μ " + p.mean}</div>
-        <div class="pair">${p.kind === "td" ? "P(TD) adj" : "P(over) adj " + pct(p.over)} · raw ${pct(p.model_over)}${p.market_over != null ? ` · mkt ${pct(p.market_over)}${p.fair_over == null ? "*" : ""}` : ""}</div></div>
-      <div class="edge ${ec}">${e == null ? "—" : signed(e) + " pt"}</div>
-      <div class="pick">${pick ? `<div class="side ${p.pick}">${sideName(p, p.pick)} <span class="num">${price(pick.price)}</span></div><div class="book">${esc(pick.book)}</div>` : "—"}</div>
-      <div class="ev ${evc} num">${p.pick_ev == null ? "—" : signed(p.pick_ev * 100, 1) + "%"}</div>
+        <div class="sub"><span>${p.team} ${p.home ? "vs" : "@"} ${p.opp}</span><span class="tag">${p.pos}</span>${tags}</div></div>
+      <div class="mk"><div class="lbl">${esc(p.label)}</div><div class="line">${l ? l.line : fmtLine(p)}</div></div>
+      <div class="lean">${leanCellHTML(p)}</div>
+      <div class="conf ${cls}">${l ? `<span class="pill" title="${confTitleLean(l)}">${pct(l.confidence)}</span><span class="gr">${l.grade}</span>` : `<span class="pill">&mdash;</span>`}</div>
       <div class="caret" aria-hidden="true">›</div>
     </div>
     ${S.open === p.id ? `<div class="detail" id="detail-${p.id}"></div>` : ""}
   </div>`;
+}
+
+function confTitleLean(l) {
+  return `Chance this lean hits, from a curve fitted to this season's graded props (raw model strength ${pct(l.raw_prob)}, market ${l.agree ? "agrees" : "disagrees"}). Out of sample it ran close to the stated rate.`;
+}
+
+/* the lean written out, at the top of an opened prop */
+function leanPanelHTML(p) {
+  const l = p.lean;
+  if (!l) return p.kind === "td" ? `<div class="panel"><h3>Model lean</h3><div class="note" style="margin:0">Anytime TDs have no over or under, so no lean. The model gives ${pct(p.model_over, 1)} raw (${pct(p.over, 1)} after blending toward the market) against ${p.market_over != null ? pct(p.market_over, 1) : "no"} in the market.</div></div>` : "";
+  const items = [
+    `The raw simulation gives the <b>${l.side}</b> ${pct(l.raw_prob, 0)} at ${l.book ? esc(l.book) + "'s " : "the sportsbook "}line ${l.line}; the market's own side at that line is the <b>${l.agree ? l.side : (l.side === "over" ? "under" : "over")}</b>, so the lean ${l.agree ? "agrees with" : "goes against"} the market${l.agree ? "" : " (these have hit about 49% this season)"}.`,
+    l.matchup && l.matchup.note ? `Defense: ${esc(l.matchup.note)}${l.matchup.state === "supports" ? ", which backs the lean" : l.matchup.state === "against" ? ", which works against the lean" : ""}.` : "",
+    l.segment ? `This type of lean (${esc(p.label)}, ${l.side}, ${l.agree ? "with" : "against"} the market) is ${l.segment.hits} of ${l.segment.n} this season (${pct(l.segment.hits / l.segment.n, 0)}).` : "",
+    l.player ? `The model has been right on ${esc(p.player)}'s ${esc(p.label)} ${l.player.hits} of ${l.player.n} times this season (history only: a player's record has not predicted his next result).` : "",
+    l.cold_why ? esc(l.cold_why) + "; confidence is capped at low." : "",
+  ].filter(Boolean);
+  return `<div class="panel"><h3>Model lean</h3><div class="leanbox"><div class="big" style="color:${l.side === "over" ? "var(--gold)" : "var(--text)"}">${l.side === "over" ? "OVER" : "UNDER"} ${l.line}</div>
+    <div><b>${pct(l.confidence, 1)}</b> confidence (${l.grade}) &middot; model projection ${p.mean} &plusmn; ${p.sd}</div></div>
+    <ul>${items.map(i => `<li>${i}</li>`).join("")}</ul></div>`;
 }
 
 function gameMeta(game) { return (DATA.games || []).find(g => g.game === game) || null; }
@@ -560,13 +605,13 @@ function gameHeadHTML(game, rows, open, commence) {
   const w = ((DATA.context || {}).weather || {})[game];
   const wx = !w ? "" : w.indoors ? "Dome" : `${w.temp_f ?? "?"}&deg; &middot; ${w.wind_mph ?? "?"} mph wind`;
   const spread = g ? (g.home_spread <= 0 ? `${home} ${g.home_spread}` : `${away} ${-g.home_spread}`) : "";
-  const withPk = rows.filter(p => p.pickem);
-  const best = withPk.slice().sort((a, b) => b.pickem.prob - a.pickem.prob)[0];
-  const nHigh = withPk.filter(p => p.pickem.prob >= 0.6).length;
+  const withLean = rows.filter(p => p.lean && !p.thin);
+  const best = withLean.slice().sort((a, b) => b.lean.confidence - a.lean.confidence)[0];
+  const nHigh = withLean.filter(p => p.lean.grade === "high").length;
   return `<button class="gsec-head" data-gsec="${esc(game)}" aria-expanded="${open}">
     <div><strong>${esc(away)} @ ${esc(home)}</strong><div class="gm"><span>${new Date(commence).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })}</span></div></div>
     <div class="gm">${spread ? `<span>${esc(spread)}</span>` : ""}${g ? `<span>O/U ${g.total}</span>` : ""}${wx ? `<span>${wx}</span>` : ""}</div>
-    <div class="gc">${rows.length} props${nHigh ? ` &middot; <b>${nHigh} high confidence</b>` : ""}${best ? `<br>Most confident: ${esc(best.player)} ${esc(best.label)} ${best.pickem.side} ${best.pickem.line} (${pct(best.pickem.prob)})` : ""}</div>
+    <div class="gc">${rows.length} props${nHigh ? ` &middot; <b>${nHigh} high confidence</b>` : ""}${best ? `<br>Most confident: ${esc(best.player)} ${esc(best.label)} ${best.lean.side} ${best.lean.line} (${pct(best.lean.confidence)})` : ""}</div>
     <div class="caret" aria-hidden="true">&rsaquo;</div></button>`;
 }
 
@@ -858,6 +903,7 @@ function renderDetail(p) {
   const el = $("detail-" + p.id);
   const bo = p.best_over, bu = p.best_under;
   el.innerHTML = `
+    ${leanPanelHTML(p)}
     <div class="panel hc" id="hc-${p.id}"></div>
     <div class="panel ctx" id="ctx-${p.id}"></div>
     <div class="panel">
@@ -1181,7 +1227,7 @@ function railModel(props, gameLines, q) {
     const [away, home] = g.game.split(" @ ");
     const gameMatch = !q || g.game.toLowerCase().includes(q);
     let players = [...g.players.values()].map(list => ({ name: list[0].player, pos: list[0].pos, team: list[0].team,
-      feat: railFeatured(list), n: list.length, top: list.some(p => p.top_rank) }));
+      feat: railFeatured(list), n: list.length, top: list.some(p => p.top_rank || (p.lean && p.lean.grade === "high" && !p.thin)) }));
     if (q && !gameMatch) players = players.filter(pl => pl.name.toLowerCase().includes(q) || pl.team.toLowerCase().includes(q));
     if (!gameMatch && !players.length) return;
     players.sort((a, b) => (RAIL_POS[a.pos] ?? 9) - (RAIL_POS[b.pos] ?? 9) || b.feat.line - a.feat.line || a.name.localeCompare(b.name));
@@ -1207,10 +1253,10 @@ function renderRail() {
         ${open ? `<div class="rplayers">${g.players.map(pl => {
           const f = pl.feat, bo = f.best_over, bu = f.best_under;
           return `<button class="rp ${S.player === pl.name ? "sel" : ""}" data-player="${esc(pl.name)}" data-game="${esc(g.game)}">
-            <div class="nm">${pl.top ? `<span class="star" title="One of the week's top 10 picks">&#9733;</span> ` : ""}${esc(pl.name)}</div>
+            <div class="nm">${pl.top ? `<span class="star" title="A high-confidence lean">&#9733;</span> ` : ""}${esc(pl.name)}</div>
             <div class="ln">${f.kind === "td" ? "Any TD" : f.line}</div>
             <div class="sub">${pl.pos} &middot; ${esc(pl.team)} &middot; ${esc(f.label)}</div>
-            <div class="px">${bo && bu ? `${price(bo.price)}/${price(bu.price)}` : ""}</div></button>`;
+            <div class="px">${f.lean ? `${f.lean.side === "over" ? "O" : "U"} ${pct(f.lean.confidence)}` : ""}</div></button>`;
         }).join("")}</div>` : ""}</div>`;
     }).join("")}`;
   $("player-chip").innerHTML = S.player ? `<button class="pchip" id="clear-player" title="Show everyone again">${esc(S.player)} <span aria-hidden="true">&#10005;</span></button>` : "";
@@ -1218,10 +1264,10 @@ function renderRail() {
 
 function railSelect(game, player) {
   if (player) {
-    S.markets.clear(); S.pos = ""; S.onlyEv = false; S.hideThin = false;
+    S.markets.clear(); S.pos = ""; S.onlyHot = false; S.onlyMatch = false; S.hideThin = false;
     document.querySelectorAll("#market-chips button").forEach(b => b.setAttribute("aria-pressed", "false"));
     document.querySelectorAll("#pos-seg button").forEach(b => b.classList.toggle("active", b.dataset.pos === ""));
-    $("only-ev").checked = false; $("hide-thin").checked = false;
+    $("only-hot").checked = false; $("only-match").checked = false; $("hide-thin").checked = false;
     S.game = game; S.player = player;
     const mine = P.filter(p => p.player === player && p.game === game);
     S.open = mine.length ? railFeatured(mine).id : null;
@@ -1234,36 +1280,32 @@ function railSelect(game, player) {
   if (S.open != null) { const row = document.querySelector(`.row[data-id="${S.open}"]`); if (row) row.scrollIntoView({ block: "start", behavior: "smooth" }); }
 }
 
-/* ---------- top 10 props ---------- */
+/* ---------- best leans ---------- */
 function renderTopPicks() {
-  const top = P.filter(p => p.top_rank).sort((a, b) => a.top_rank - b.top_rank);
   const el = $("top-picks");
-  if (!top.length && DATA.trust_note) {
-    el.hidden = false;
-    el.innerHTML = `<div class="board"><h2>Top 10 prop picks this week</h2><div class="note" style="margin:6px 0 0;"><strong>No prop clears the bar.</strong> ${esc(DATA.trust_note)}</div></div>`;
-    return;
-  }
+  const seen = new Set();
+  const top = P.filter(p => p.lean && !p.thin && !p.injury && !p.lean.cold && p.lean.agree).sort((a, b) => b.lean.confidence - a.lean.confidence)
+    .filter(p => { const k = p.player_id || p.player; if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 10);
   el.hidden = !top.length;
   if (!top.length) return;
-  el.innerHTML = `<div class="board"><h2>Top 10 prop picks this week</h2>
-    <div class="note">Ranked by expected value of the recommended side, using the model shrunk toward the market. Excluded: anytime TDs, thin samples, injured players, and props where the raw model is far from the market. One pick per player. Treat these as the model's strongest leanings, not sure things: see the track record above for how each market has actually done.</div>
-    <div class="brow head"><div>#</div><div>Player</div><div>Pick</div><div>Prob</div><div>Best price</div><div style="text-align:right;">EV / $1</div></div>
-    ${top.map(p => {
-      const side = p.pick, pr = p[side === "over" ? "best_over" : "best_under"];
-      return `<div class="brow glow"><div class="n">${p.top_rank}</div>
+  el.innerHTML = `<div class="board"><h2>Most confident leans this week</h2>
+    <div class="note">The ten leans with the highest measured chance of hitting, one per player, all on the market's side. Excluded: thin samples, injured players, cold types. Confidence is a hit rate fitted to this season's graded props (see the note at the bottom): 55&ndash;60% is a real but modest edge.</div>
+    <div class="brow head"><div>#</div><div>Player</div><div>Lean</div><div>Confidence</div><div>Why it stands out</div><div></div></div>
+    ${top.map((p, i) => {
+      const l = p.lean, m = l.matchup && l.matchup.state;
+      return `<div class="brow glow"><div class="n">${i + 1}</div>
         <div><button class="lnk" data-open="${p.id}"><strong>${esc(p.player)}</strong></button><div class="sub" style="color:var(--text-faint); font-size:12px;">${p.team} ${p.home ? "vs" : "@"} ${p.opp} &middot; ${esc(p.label)}</div></div>
-        <div>${sideName(p, side)}</div>
-        <div class="num">${pct(side === "over" ? p.over : p.under)}</div>
-        <div>${pr ? `<span class="num">${price(pr.price)}</span> <span style="color:var(--text-faint)">${esc(pr.book)}</span>` : "&mdash;"}</div>
-        <div class="num ev pos" style="text-align:right;">${signed(p.pick_ev * 100, 1)}%</div></div>`;
+        <div><b style="color:${l.side === "over" ? "var(--gold)" : "var(--text)"}">${l.side === "over" ? "OVER" : "UNDER"} ${l.line}</b></div>
+        <div class="num"><b>${pct(l.confidence)}</b></div>
+        <div>${l.hot ? `<span class="tag hot">Hitting</span> ` : ""}${m === "supports" ? `<span class="tag ok" title="${esc(l.matchup.note)}">Defense agrees</span>` : ""}</div><div></div></div>`;
     }).join("")}</div>`;
 }
 
 function openProp(id) {
-  S.markets.clear(); S.pos = ""; S.game = ""; S.player = null; S.q = ""; S.onlyEv = false; S.hideThin = false; S.limit = 1000; S.open = id;
+  S.markets.clear(); S.pos = ""; S.game = ""; S.player = null; S.q = ""; S.onlyHot = false; S.onlyMatch = false; S.hideThin = false; S.limit = 1000; S.open = id;
   document.querySelectorAll("#market-chips button").forEach(b => b.setAttribute("aria-pressed", "false"));
   document.querySelectorAll("#pos-seg button").forEach(b => b.classList.toggle("active", b.dataset.pos === ""));
-  $("q").value = ""; $("only-ev").checked = false; $("hide-thin").checked = false;
+  $("q").value = ""; $("only-hot").checked = false; $("only-match").checked = false; $("hide-thin").checked = false;
   renderRail(); renderList();
   const row = document.querySelector(`.row[data-id="${id}"]`);
   if (row) row.scrollIntoView({ block: "center", behavior: "smooth" });
@@ -1292,12 +1334,13 @@ function parlayCardHTML(p, title) {
 }
 
 function pickemLegHTML(l) {
+  const unlisted = l.listed === false ? `<span class="tag warn" title="Underdog had no line on this prop in the pull; the sportsbook line stands in. Check the app before using it.">check app</span>` : "";
+  const hot = l.hot ? `<span class="tag hot" title="This type of lean has been hitting at a good clip this season">Hitting</span>` : "";
+  const mu = l.matchup === "supports" ? `<span class="tag ok" title="${esc(l.matchup_note || "")}">Defense agrees</span>` : l.matchup === "against" ? `<span class="tag warn" title="${esc(l.matchup_note || "")}">Defense against</span>` : "";
   const script = l.script_note ? `<span class="tag ${l.script > 0 ? "ok" : "warn"}" title="${esc(l.script_note)}">script ${l.script > 0 ? "fits" : "against"}</span>` : "";
-  const unlisted = l.listed === false ? `<span class="tag warn" title="Underdog had no line on this prop in the pull; the sportsbook line stands in because it is near even. Check the app before using it.">check app</span>` : "";
-  const soft = l.line_edge >= 0.01 ? `<span class="tag ok" title="This line is softer than the sportsbooks' by ${pct(l.line_edge, 1)}">soft line</span>` : "";
   return `<div class="pleg"><div class="nm">${esc(l.player)}<div class="sub">${esc(l.team)} &middot; ${esc(l.game)}</div></div>
     <div>${esc(l.label)} <b>${l.side === "over" ? "Higher" : "Lower"} ${l.line}</b></div><div class="num">${pct(l.prob)}</div><div class="uleg-line">${esc(l.book)}</div>
-    <div class="sub" style="color:var(--text-faint)">${script} ${soft} ${unlisted}</div></div>`;
+    <div class="sub" style="color:var(--text-faint)">${hot} ${mu} ${script} ${unlisted}</div></div>`;
 }
 
 function pickemCardHTML(e, i) {
@@ -1305,10 +1348,11 @@ function pickemCardHTML(e, i) {
   const ev = x => x == null ? "&mdash;" : `<b class="pev ${evCls(x)}">${x > 0 ? "+" : ""}${(x * 100).toFixed(0)}%</b>`;
   const dist = e.hit_distribution || [];
   const near = dist.length > 1 ? dist[dist.length - 1] + dist[dist.length - 2] : null;
-  const sg = e.same_game && e.same_game.length ? `<div class="pnote">Two picks share a game (${e.same_game.map(esc).join(", ")}); their correlation is already counted in the chances above.</div>` : "";
-  return `<div class="pcard ${e.ev > 0 ? "pos" : ""}"><div class="phead"><span class="pprice">${e.n_legs}-pick</span><strong>${esc(e.label)} #${i + 1}</strong>
-      <span class="pstat">all ${e.n_legs} hit <b>${pct(e.joint_prob, 1)}</b>${st ? ` &middot; ${st.multiplier}x needs <b>${pct(st.breakeven_prob, 1)}</b>` : ""}${near != null ? ` &middot; at most one miss <b>${pct(near, 1)}</b>` : ""}</span>
-      <span class="pstat">avg pick <b>${pct(e.avg_leg_prob, 1)}</b> &middot; standard ${ev(st && st.ev)} &middot; flex ${ev(fx && fx.ev)} per $1${e.volume_legs ? ` &middot; ${e.volume_legs} volume pick${e.volume_legs > 1 ? "s" : ""}` : ""}</span></div>
+  const sg = e.single_game ? `<div class="pnote">All ${e.n_legs} picks are in one game (${esc(e.legs[0].game)}): they tend to hit or miss together, and that is already counted (correlations at half strength).</div>`
+    : e.same_game && e.same_game.length ? `<div class="pnote">Picks share a game (${e.same_game.map(esc).join(", ")}); their correlation is already counted in the chances above.</div>` : "";
+  return `<div class="pcard ${e.ev > 0 ? "pos" : ""}"><div class="phead"><span class="pprice">${e.n_legs}-pick</span><strong>${esc(e.label)}${e.single_game ? ` &middot; ${esc(e.legs[0].game)}` : ""}</strong>
+      <span class="pstat">all ${e.n_legs} hit <b>${pct(e.joint_prob, 1)}</b>${e.breakeven_multiple ? ` &middot; worth playing if the app pays <b>${e.breakeven_multiple}x</b> or more` : ""}${near != null ? ` &middot; at most one miss <b>${pct(near, 1)}</b>` : ""}</span>
+      <span class="pstat">avg pick <b>${pct(e.avg_leg_prob, 1)}</b>${e.hot_legs ? ` &middot; ${e.hot_legs} hitting` : ""}${e.matchup_legs ? ` &middot; ${e.matchup_legs} with the defense behind them` : ""} &middot; at the assumed ${st ? st.multiplier + "x" : "&mdash;"}: standard ${ev(st && st.ev)}, flex ${ev(fx && fx.ev)} per $1</span></div>
     ${e.legs.map(pickemLegHTML).join("")}${sg}</div>`;
 }
 
@@ -1319,11 +1363,17 @@ function renderParlayPanel() {
   el.hidden = false;
   const be = pk && pk.breakeven_leg ? Object.entries(pk.breakeven_leg).map(([k, v]) => `${k}-pick ${(v * 100).toFixed(1)}%`).join(", ") : "";
   const udCount = P.filter(p => p.pickem && p.pickem.book).length;
-  const pickemHTML = pk ? `<div class="board"><h2>Underdog pick'em entries: 4&ndash;5 picks, ranked by confidence</h2>
-    <div class="note">Each pick is a line and a side (Higher/Lower). <b>${udCount ? `${udCount} props here use Underdog's own line` : "No Underdog line was in this pull, so picks are priced at the sportsbook consensus line"}</b>; a pick's chance is the market's own probability for that side, moved by how far the model says the line sits from the sportsbooks' (capped at a few points), and the chance every pick hits uses measured same-game correlations. <b>High confidence</b> entries are the 4-pick sets most likely to hit in full (and the ones a flex entry suits); <b>high upside</b> entries are 5-pick sets for the 20x payout. Volume markets (attempts, completions, receptions) get extra weight when the game script fits: rushing when a team is favored, passing when it trails. Only props Underdog actually lists count at full strength: a lopsided sportsbook price is not a pick'em line (Underdog would not offer it at the flat payout), and a near-even sportsbook line only stands in, marked "check app", when Underdog's board lacked the prop. A pick needs about ${be} to break even on a standard entry.
-    <strong>Read the EV first:</strong> the model has not beaten the market on props (see the track record), so expect these to be near or below break-even unless a pick'em line really is soft; "soft line" marks where one is. Payout tables are assumptions (${Object.entries(pk.payouts.standard).map(([k, v]) => `${k}-pick ${v}x`).join(", ")}; flex 4-pick 6x / 1.5x, 5-pick 10x / 2x / 0.4x): confirm yours in the app, they change with promotions.</div>
-    ${pk.entries.length ? pk.entries.map(pickemCardHTML).join("") : `<div class="note" style="margin-top:8px;"><strong>None this run.</strong> Fewer than four qualifying picks (the slate is light, or the props pull was limited by credits).</div>`}
-    <div class="note">${pk.candidate_legs} picks qualified (${(pk.searched || 0).toLocaleString()} entries searched).</div></div>` : "";
+  const bt = DATA.pickem_backtest, btRow = (kind, k) => bt && bt.rows.find(r => r.kind === kind && r.k === k);
+  const btCell = (kind, k) => { const r = btRow(kind, k); return r ? `${pct(r.rate, 0)} (${r.hits} of ${r.entries})` : null; };
+  const btHTML = bt && btRow("stack", 3) && btRow("stack", 4) && btRow("plain", 3) && btRow("plain", 4)
+    ? `replayed week by week on this season's graded props (weeks ${bt.weeks[0]}&ndash;${bt.weeks[bt.weeks.length - 1]}, each week's confidence fitted only on earlier weeks), the single-game stacks this page builds hit in full ${btCell("stack", 3)} of the time at 3 picks (${pct(btRow("stack", 3).breakeven, 1)} breaks even at the assumed ${btRow("stack", 3).multiplier}x) and ${btCell("stack", 4)} at 4 picks (${pct(btRow("stack", 4).breakeven, 1)} at ${btRow("stack", 4).multiplier}x). Just taking each game's most confident legs did ${btCell("plain", 3)} and ${btCell("plain", 4)}: searching for correlation added nothing measurable, which is why correlations count at half strength. About ${btRow("stack", 3).entries} entries per size is a small sample (&plusmn;5 points), the replay used sportsbook lines, not Underdog's, and the payouts are assumed, so this says the approach is sane, not that it prints money.`
+    : `not enough graded weeks yet to replay these entries.`;
+  const pickemHTML = pk ? `<div class="board"><h2>Underdog entries built from the model's leans</h2>
+    <div class="note">Every pick is the model's lean (the side its simulation favors at <b>${udCount ? "Underdog's own line" : "the sportsbook line, since this pull had no Underdog lines"}</b>), on the market's side, with the calibrated chance that lean hits as the pick's chance (at least ${pct(pk.min_conf || 0.53)}). <b>Single-game stacks come first</b>: legs from one game move together (a quarterback's lean with his receivers', a game script that fits), and an every-pick-hits entry gains from that. <b>High confidence</b> (4 picks) and <b>high upside</b> (5 picks) are slate-wide, up to three picks from a game. The gold bar and green tag are the same highlights as the board above. Each entry shows the payout the app must offer for it to be worth playing, so compare that with the multiplier you see in the app.</div>
+    <details class="note" style="margin-top:6px"><summary style="cursor:pointer"><b>Payouts, and how much to believe this</b></summary><p style="margin:6px 0"><strong>Check the multiplier, then the chance:</strong> the worth-playing multiple is 1 &divide; the chance every pick hits. Underdog's multipliers vary with the picks and promotions and its payout page would not load for me, so the EV figures use assumed tables (${Object.entries(pk.payouts.standard).map(([k, v]) => `${k}-pick ${v}x`).join(", ")}; flex 4-pick 6x / 1.5x, 5-pick 10x / 2x / 0.4x): trust the app's number over mine.</p>
+    <p style="margin:6px 0"><strong>How much to believe it:</strong> ${btHTML}</p></details>
+    ${pk.entries.length ? pk.entries.map(pickemCardHTML).join("") : `<div class="note" style="margin-top:8px;"><strong>None this run.</strong> Fewer than three qualifying picks (the slate is light, or the props pull was limited by credits).</div>`}
+    <div class="note">${pk.candidate_legs} picks qualified (${(pk.searched || 0).toLocaleString()} slate-wide entries searched, plus every game's best stacks).</div></div>` : "";
   const best = pp && pp.parlays.length ? Math.max(...pp.parlays.map(p => p.ev)) : null;
   const sbHTML = pp ? `<details class="board" style="margin-top:12px;"><summary style="cursor:pointer; font-weight:700;">Sportsbook prop parlays: 4&ndash;5 legs, plus-money</summary>
     <div class="note" style="margin-top:8px;">The same idea at sportsbook prices. <strong>Read the edge column first:</strong> every leg's price carries the sportsbook's margin and a parlay multiplies it, so most of these have a <em>negative</em> expected value. Ranked by the least-negative edge.</div>
@@ -1771,7 +1821,8 @@ $("rail-list").addEventListener("click", e => {
 $("player-chip").addEventListener("click", e => { if (e.target.closest("#clear-player")) railSelect(S.game, null); });
 $("q").addEventListener("input", e => { S.q = e.target.value; S.limit = 80; renderRail(); renderList(); });
 $("sort").addEventListener("change", e => { S.sort = e.target.value; renderList(); });
-$("only-ev").addEventListener("change", e => { S.onlyEv = e.target.checked; S.limit = 80; renderList(); });
+$("only-hot").addEventListener("change", e => { S.onlyHot = e.target.checked; S.limit = 80; renderList(); });
+$("only-match").addEventListener("change", e => { S.onlyMatch = e.target.checked; S.limit = 80; renderList(); });
 $("hide-thin").addEventListener("change", e => { S.hideThin = e.target.checked; S.limit = 80; renderList(); });
 $("rows").addEventListener("click", e => {
   const gh = e.target.closest(".gsec-head");

@@ -3,12 +3,19 @@ name: Republish site
 # Puts a finished site back on GitHub Pages WITHOUT re-fetching anything (zero Odds API credits). Use it when a refresh built and
 # uploaded the site but the publish step failed: pass that run's id (gh run list --workflow refresh-site.yml) and it re-deploys
 # the page that run built. The run's tracking-log rows are not recovered by this (they were never committed); only the page is.
+# With rebuild_props on, the props page inside that site is also re-rendered with the CURRENT template and re-derived leans / Underdog
+# entries (rederive_props.py reads the data back out of the page itself), so a page-design or entry-logic change goes live without
+# pulling odds: still zero Odds API credits.
 on:
   workflow_dispatch:
     inputs:
       run_id:
         description: "Run id of the refresh whose built site (github-pages artifact) should be published"
         required: true
+      rebuild_props:
+        description: "Also re-render the props page with the current template and re-derived leans and entries (no odds pulled)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -27,6 +34,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           name: github-pages
@@ -38,6 +46,16 @@ jobs:
           mkdir site
           tar -xf built/artifact.tar -C site
           ls site | head
+      - uses: actions/setup-python@v5
+        if: inputs.rebuild_props
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Rebuild the props page from its own data
+        if: inputs.rebuild_props
+        run: |
+          pip install -r requirements.txt
+          python rederive_props.py site/props/index.html
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

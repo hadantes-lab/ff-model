@@ -183,6 +183,10 @@ def _pk_prop(pid, market="player_receptions", side="over", prob=0.60, agree=True
          "kind": "count", "line": 4.5, "over": prob, "under": 1 - prob, "model_over": 0.6 if side == "over" else 0.4,
          "pickem": {"line": 4.5, "book": "Underdog", "side": side, "prob": prob, "sportsbook_prob": prob - 0.02, "line_edge": 0.02, "agree": agree, "grade": "high"}}
     d.update(kw)
+    pk = d["pickem"]
+    d["lean"] = {"side": pk["side"], "line": pk["line"], "book": pk["book"], "raw_prob": pk["prob"], "confidence": pk["prob"], "grade": "high", "agree": pk["agree"],
+                 "matchup": {"state": None, "rank": None, "note": None}, "segment": None, "seg_hot": False, "player": None, "player_hot": False,
+                 "hot": False, "hot_why": [], "cold": False, "cold_why": None}
     return d
 
 
@@ -237,16 +241,35 @@ class TestPickem(unittest.TestCase):
         relaxed = pl.pickem_legs(props, [], require_agree=False)
         self.assertEqual({l["player_id"] for l in relaxed}, {"a", "b"})
 
-    def test_a_lopsided_sportsbook_line_with_no_underdog_line_is_not_a_pickem_leg(self):
-        lopsided = _pk_prop("x", prob=0.64, pickem={"line": 1.5, "book": None, "side": "under", "prob": 0.64, "sportsbook_prob": 0.64,
-                                                    "line_edge": 0.0, "agree": True, "grade": "high"})
-        near_even = _pk_prop("y", prob=0.53, pickem={"line": 4.5, "book": None, "side": "over", "prob": 0.53, "sportsbook_prob": 0.53,
-                                                     "line_edge": 0.0, "agree": True, "grade": "low"})
-        listed = _pk_prop("z", prob=0.64)                                   # Underdog posts it, so its stated chance counts
-        legs = pl.pickem_legs([lopsided, near_even, listed], [])
-        self.assertEqual({l["player_id"] for l in legs}, {"y", "z"})
-        self.assertTrue(next(l for l in legs if l["player_id"] == "z")["listed"])
-        self.assertFalse(next(l for l in legs if l["player_id"] == "y")["listed"])
+    def test_a_prop_underdog_does_not_list_can_stand_in_but_ranks_below_a_listed_one(self):
+        nolist = _pk_prop("y", prob=0.60, pickem={"line": 4.5, "book": None, "side": "over", "prob": 0.60, "sportsbook_prob": 0.60,
+                                                  "line_edge": 0.0, "agree": True, "grade": "high"})
+        listed = _pk_prop("z", prob=0.60)
+        legs = pl.pickem_legs([nolist, listed], [])
+        self.assertEqual([l["player_id"] for l in legs], ["z", "y"])
+        self.assertTrue(legs[0]["listed"])
+        self.assertFalse(legs[1]["listed"])
+
+    def test_a_cold_type_and_a_weak_lean_are_not_legs(self):
+        cold = _pk_prop("c", prob=0.60)
+        cold["lean"]["cold"] = True
+        weak = _pk_prop("w", prob=0.52)
+        ok = _pk_prop("k", prob=0.55)
+        self.assertEqual([l["player_id"] for l in pl.pickem_legs([cold, weak, ok], [])], ["k"])
+
+    def test_hot_and_matchup_move_the_ranking_a_little(self):
+        base, hot, back, against = (_pk_prop(x, prob=0.56) for x in "abcd")
+        hot["lean"]["hot"] = True
+        back["lean"]["matchup"] = {"state": "supports", "rank": 28, "note": "n"}
+        against["lean"]["matchup"] = {"state": "against", "rank": 3, "note": "n"}
+        order = [l["player_id"] for l in pl.pickem_legs([base, hot, back, against], [])]
+        self.assertEqual(order[-1], "d")
+        self.assertEqual(set(order[:2]), {"b", "c"})
+
+    def test_legs_carry_the_lean_and_its_confidence(self):
+        leg = pl.pickem_legs([_pk_prop("a", side="under", prob=0.57)], [])[0]
+        self.assertEqual((leg["side"], leg["line"], leg["prob"]), ("under", 4.5, 0.57))
+        self.assertIn("hot", leg)
 
     def test_volume_markets_get_the_bigger_script_bonus(self):
         game = {"game": "ZZZ @ Ta", "home": "Ta", "away": "ZZZ", "home_spread": -7.0, "total": 44.0}      # Ta favored by 7
@@ -259,29 +282,75 @@ class TestPickem(unittest.TestCase):
         self.assertFalse(legs["b"]["volume"])
         self.assertGreater(legs["a"]["score"], legs["b"]["score"])
 
-    def test_build_pickem_returns_confidence_then_upside_entries(self):
-        props = [_pk_prop(f"p{i}", prob=0.68 - 0.01 * i) for i in range(12)]
-        legs = pl.pickem_legs(props, [])
+    def _slate(self, n_games=4, per_game=5, base=0.62):
+        props = []
+        for g in range(n_games):
+            team = f"T{g}"
+            for i in range(per_game):
+                props.append(_pk_prop(f"g{g}p{i}", team=team, game=f"ZZZ @ {team}", market=["player_reception_yds", "player_receptions", "player_rush_yds", "player_pass_yds", "player_pass_attempts"][i],
+                                      prob=base - 0.01 * i - 0.002 * g))
+        return props
+
+    def test_build_pickem_puts_single_game_stacks_first_then_slate_wide_entries(self):
+        legs = pl.pickem_legs(self._slate(), [])
         out = pl.build_pickem(legs, CORR)
-        self.assertEqual(len(out["entries"]), 4)
-        self.assertEqual({e["label"] for e in out["entries"]}, {"High confidence", "High upside"})
+        labels = [e["label"] for e in out["entries"]]
+        self.assertTrue(labels[0].startswith("Single-game stack"))
+        self.assertIn("High confidence", labels)
+        self.assertIn("High upside", labels)
+        order = {"Single-game stack (3)": 0, "Single-game stack (4)": 1, "High confidence": 2, "High upside": 3}
+        self.assertEqual([order[l] for l in labels], sorted(order[l] for l in labels))
         for e in out["entries"]:
-            self.assertEqual(e["n_legs"], 4 if e["label"] == "High confidence" else 5)
-            self.assertEqual(len({l["player_id"] for l in e["legs"]}), e["n_legs"])
+            self.assertEqual(len({l["player_id"] for l in e["legs"]}), e["n_legs"])           # one pick per player
             self.assertAlmostEqual(sum(e["hit_distribution"]), 1.0, places=2)
             self.assertIn(e["best_type"], ("standard", "flex"))
-        probs = [e["avg_leg_prob"] for e in out["entries"]]
-        self.assertEqual(probs, sorted(probs, reverse=True))                 # sorted by confidence
+            self.assertAlmostEqual(e["breakeven_multiple"], 1 / e["joint_prob"], delta=0.02)
+            if e["label"].startswith("Single-game"):
+                self.assertTrue(e["single_game"])
+                self.assertEqual(len({l["game"] for l in e["legs"]}), 1)
+                self.assertEqual(e["n_legs"], 3 if "(3)" in e["label"] else 4)
+            else:
+                games = [l["game"] for l in e["legs"]]
+                self.assertLessEqual(max(games.count(g) for g in set(games)), pl.PICKEM_MAX_PER_GAME)
         ids = [{l["id"] for l in e["legs"]} for e in out["entries"]]
-        for i in range(4):
-            for j in range(i + 1, 4):
+        for i in range(len(ids)):
+            for j in range(i + 1, len(ids)):
                 self.assertLessEqual(len(ids[i] & ids[j]), pl.MAX_SHARED_LEGS)
         json.dumps(out)
 
-    def test_build_all_adds_a_pickem_block(self):
-        props = [_pk_prop(f"p{i}", prob=0.62) for i in range(10)]
+    def test_each_game_gets_at_most_one_stack_of_a_size(self):
+        legs = pl.pickem_legs(self._slate(n_games=5), [])
+        out = pl.build_pickem(legs, CORR)
+        threes = [e for e in out["entries"] if e["label"] == "Single-game stack (3)"]
+        self.assertEqual(len(threes), pl.N_STACKS)
+        self.assertEqual(len({e["legs"][0]["game"] for e in threes}), len(threes))
+
+    def test_a_one_game_slate_still_gets_a_stack(self):
+        legs = pl.pickem_legs(self._slate(n_games=1, per_game=4), [])
+        out = pl.build_pickem(legs, CORR)
+        self.assertTrue(any(e["label"].startswith("Single-game stack") for e in out["entries"]))
+
+    def test_entries_use_only_underdog_listed_props_when_there_are_enough(self):
+        nolist = {"line": 4.5, "book": None, "side": "over", "prob": 0.66, "sportsbook_prob": 0.66, "line_edge": 0.0, "agree": True, "grade": "high"}
+        props = self._slate(n_games=3, per_game=4) + [_pk_prop(f"u{i}", team="TU", game="ZZZ @ TU", prob=0.66, pickem=dict(nolist)) for i in range(4)]
         out = pl.build_all(props, [], None, CORR, None, 2026, 8)
-        self.assertEqual(len(out["pickem"]["entries"]), 4)
+        self.assertTrue(all(l["listed"] for e in out["pickem"]["entries"] for l in e["legs"]))
+        few = [_pk_prop(f"u{i}", team="TU", game="ZZZ @ TU", prob=0.66, pickem=dict(nolist)) for i in range(4)]       # nothing listed: unlisted props may stand in
+        out = pl.build_all(few, [], None, CORR, None, 2026, 8)
+        self.assertTrue(out["pickem"]["entries"])
+        self.assertFalse(any(l["listed"] for e in out["pickem"]["entries"] for l in e["legs"]))
+
+    def test_correlations_are_scaled_for_entries(self):
+        a = _pk_prop("a", market="player_pass_yds", team="T0", game="ZZZ @ T0")
+        b = _pk_prop("b", market="player_reception_yds", team="T0", game="ZZZ @ T0")
+        a["pos"], b["pos"] = "QB", "WR"
+        la, lb = pl.pickem_legs([a, b], [])
+        full = CORR.rho(la, lb)
+        self.assertAlmostEqual(pl.ScaledCorr(CORR).rho(la, lb), full * pl.CORR_SCALE)
+
+    def test_build_all_adds_a_pickem_block(self):
+        out = pl.build_all(self._slate(), [], None, CORR, None, 2026, 8)
+        self.assertGreaterEqual(len(out["pickem"]["entries"]), 4)
         json.dumps(out)
         self.assertEqual(pl.build_all([], [], None, CORR, None, 2026, 8)["pickem"]["entries"], [])
 

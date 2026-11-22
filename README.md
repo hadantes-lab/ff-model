@@ -582,6 +582,28 @@ fix the entries average ~54% a pick and sit between -3% and +4% EV, the soft Und
 soft, which the Odds API doesn't show, so a plus here is an upper bound.
 Same logging/grading as other parlays (`tracking/parlay_log.csv`, flex pays on partial hits).
 
+**Round three: model leans, confidence, and single-game Underdog entries** (`lean.py`, `pickem_study.py`, `rederive_props.py`). The props board was simplified to *Player, Line, Model lean,
+Confidence*: no best price, no EV (the page is for Underdog, where there is no price to shop). What the research on this season's 3,630 graded props (`tracking/props_log.csv`) found:
+- **Lean** is the side of the line the *raw* model favors at the line you'd play (Underdog's when the pull had it). The blended probability sits within a few points of the market on every prop,
+  so it cannot say how hard the model leans.
+- **Confidence** is a measured hit rate, a two-variable logistic on how hard the raw model leans and whether the market's side agrees, refit from the log every run. Hit rates in the log: ~50% when the raw
+  model barely leans up to ~57% when it leans hard; **56% when the market agrees with the lean against 49% when it does not**. Checked walk-forward (each week fitted on earlier weeks only) the predicted rates
+  matched the actual ones and beat a flat 50-50 guess on Brier score (0.2478 vs 0.2493: real but small). The curve is pulled 10% toward 50% because its top bucket ran ~2 points under its stated rate.
+- **"Hitting at a good clip"** is shown two ways, and the page says which: the *type* of lean (market, side, with/against the market) this season, which predicts next week only weakly (correlation +0.06;
+  best-record types hit ~55%, worst ~47%), and the *player's own* record, which does **not** predict his next result (the model's side hit 47-53% whatever his record so far was), consistent with
+  `player_confidence.py`. A type with a shrunk record of 46% or worse over 25+ picks is "cold" (QB passing-yards unders: 34 of 98) and capped at low confidence.
+- **Defense agrees** (soft defense backing an over, tough backing an under, from the defense-vs-position ranks): the lean hit 54.3% when it did, 52.7% when the defense was against. Adding it to the
+  confidence model did not improve the out-of-sample score, so it is a highlight, not part of the number.
+- **Underdog entries** now come from the leans (legs = leans the market agrees with, confidence >= 53%, not cold, only props Underdog lists unless it lists fewer than 6). Old entries often did not match the
+  leans because legs were chosen by the market-anchored probability (~53.5% on every pick), so the strongest raw leans never ranked. New: **single-game stacks** first (best 3- and 4-pick sets from one game,
+  one per game), then slate-wide 4-pick *high confidence* and 5-pick *high upside*. Correlations (measured on 2024-25 and re-checked on 2026: QB passing yards vs his receivers' yards +0.24..+0.31,
+  and +0.65..+0.76 between one receiver's yards and receptions, which never matters because an entry here never holds a player twice) are counted at **half strength**. `python pickem_study.py` replays the stack builder week by
+  week with no look-ahead: 3-pick stacks hit 21% (17 of 80 games; break-even 16.7% at the assumed 6x) and 4-pick 14% (11 of 80; 10% at 10x); simply taking each game's most confident legs did 25% and 18%.
+  The correlation search added nothing measurable (80 entries move a hit rate ~5 points), which is why it is halved. Each entry shows the multiplier the app must pay for it to be worth playing (1 / chance).
+- **Payouts are still assumed.** Underdog's help-center pages return 403 to automated readers and search results disagree (a 3-pick flex at 3.25x on one page, 3x-20x for 2-5 picks standard on another), so
+  `parlays.PICKEM_PAYOUTS` stays as the usual table and the page tells you to trust the app's number.
+- `rederive_props.py` rebuilds a published props page from its own embedded data with the current template and logic (zero credits); the **Republish site** workflow runs it with `rebuild_props`.
+
 *The By-game page.* This Week is now one section per game (kickoff, spread, total, weather, count and best of its props, a defense-vs-position strip showing how soft each
 opponent is by position), opening to that game's props sorted by confidence (the chance the better side hits at the pick'em line; the other sorts remain). The top-10 board, track
 record and parlay panels sit above; the left rail still jumps to a game or player.

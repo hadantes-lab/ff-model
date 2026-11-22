@@ -28,8 +28,10 @@ import game_context as gc
 import context_data
 import espn_lines
 import game_odds as go
+import lean
 import line_history
 import parlay_track
+import pickem_study
 import parlays
 import market_trust
 import player_confidence
@@ -1006,6 +1008,15 @@ def main():
     except Exception as e:
         log(f"Game logs unavailable for the hit-rate chart ({e}); the chart will say no game log is available.")
     context = build_context(props, games, history, int(season), args.sample)
+    lean_info = None
+    try:                                   # the simple view of every prop: lean, calibrated confidence, hot/cold record, matchup (see lean.py)
+        lean_info = lean.annotate(props, props_tracker._load(), (context or {}).get("dvp"), conf_records, int(season))
+        cal = lean_info["calibration"]
+        log(f"Leans: {lean_info['n']} of {len(props)} props have a lean ({cal['source']} confidence curve on {cal['n']} graded props); "
+            f"{sum(1 for p in props if p.get('lean') and p['lean']['hot'])} hot, "
+            f"{sum(1 for p in props if p.get('lean') and p['lean']['matchup']['state'] == 'supports')} with the matchup behind them.")
+    except Exception as ex:
+        log(f"Leans unavailable ({ex}); the page falls back to the plain probabilities.")
     n_tot = totals_model.apply(games, context.get("weather"))
     for g in games:                      # re-pick each total's side on the new probabilities
         refresh_total_pick(g)
@@ -1031,7 +1042,7 @@ def main():
                 f"({sum(e['status'] == 'upcoming' for e in entries)} still to come).")
     except Exception as e:
         log(f"Straight-up pool unavailable ({e}); the page omits it.")
-    parlay_block = None
+    parlay_block, pickem_backtest = None, None
     try:
         if args.sample:                       # demo only: invent moneyline prices from the spread with a flat 4.5% vig
             for g in games:
@@ -1045,6 +1056,10 @@ def main():
         summary = pd.read_csv(weekly_report.SUMMARY_FILE) if weekly_report.SUMMARY_FILE.exists() else None
         sched_hist = nfl.load_schedules(list(range(2014, int(season) + 1))).to_pandas()
         parlay_block = parlays.build_all(props, games, summary, sched=sched_hist, season=int(season), week=int(week))
+        try:                               # does this kind of single-game entry pay? replayed on the season's graded props, no look-ahead
+            pickem_backtest = pickem_study.stack_backtest(props_tracker._load())
+        except Exception as ex:
+            log(f"Entry replay skipped ({ex})")
         log(f"Parlays: {len(parlay_block['props']['parlays'])} prop, {len(parlay_block['ml']['parlays'])} moneyline, "
             f"{len(parlay_block['teasers']['legs'])} Wong teaser legs.")
     except Exception as e:
@@ -1082,6 +1097,7 @@ def main():
         "su_pool": su_pool,
         "team_breakdown": team_breakdown,
         "parlays": parlay_block,
+        "lean_info": lean_info, "pickem_backtest": pickem_backtest,
         "power": None if power is None else {"table": power["table"], "hfa": round(power["hfa"], 2),
                                               "per_rank": round(team_ratings.PER_RANK, 3)},
     }

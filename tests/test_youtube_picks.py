@@ -50,6 +50,8 @@ def _state():
 
 class TestFetch(unittest.TestCase):
     def setUp(self):
+        self.addCleanup(setattr, yp, "SHOW_DAYS", yp.SHOW_DAYS)
+        yp.SHOW_DAYS = 100000                                  # the fixture videos are dated 2026-11-06: keep them "recent" whatever today is
         self.tmp = tempfile.TemporaryDirectory()
         self.log = pathlib.Path(self.tmp.name) / "log.csv"
 

@@ -333,11 +333,12 @@ def _summary(legs, joint, naive, kind) -> dict:
             "same_game": same_game, "legs": legs}
 
 
-def _combo_ok(legs, corr: CorrModel):
+def _combo_ok(legs, corr: CorrModel, max_per_game: int = None):
+    max_per_game = MAX_PER_GAME if max_per_game is None else max_per_game
     games = {}
     for l in legs:
         games[l["game"]] = games.get(l["game"], 0) + 1
-    if max(games.values()) > MAX_PER_GAME:
+    if max(games.values()) > max_per_game:
         return False
     if len({l["player_id"] for l in legs}) < len(legs):
         return False
@@ -446,40 +447,59 @@ def pickem_evs(dist: list) -> dict:
     return out
 
 
+MIN_LISTED_LEGS = 6            # below this many Underdog-listed legs (e.g. a pull with no Underdog lines) props it does not list may stand in, marked "check app"
+PICKEM_MIN_CONF = 0.53         # a leg needs at least this calibrated chance (lean.py): below it the lean is barely better than a coin flip
+PICKEM_MAX_PER_GAME = 3        # in the slate-wide entries; single-game stacks are the whole point of the other kind
+STACK_SIZES = (3, 4)           # single-game entries
+STACK_POOL = 9                 # best legs of one game searched
+N_STACKS = 3
+CORR_SCALE = 0.5               # correlations are halved for ranking and for the chances shown (see the note in build_pickem)
+HOT_BONUS, MATCHUP_BONUS, MATCHUP_PENALTY = 0.01, 0.01, 0.02
+
+
+class ScaledCorr:
+    """A CorrModel with every correlation scaled toward zero (the backtested ones did not all show up in the live 2026 results)."""
+
+    def __init__(self, corr, k=CORR_SCALE):
+        self.corr, self.k = corr, k
+
+    def rho(self, a, b):
+        return self.corr.rho(a, b) * self.k
+
+
 def pickem_legs(props: list, games: list, quality: dict = None, require_agree: bool = True) -> list:
     """
-    One leg per qualifying prop: its pick'em line (Underdog's when the pull had it), on the side with the better chance, where
-    the model's own lean agrees with that side. Skips thin samples, injured players and anytime TDs, and any prop with no Underdog line unless
-    its sportsbook line is near even (see UNLISTED_MAX_PROB). Score rewards a high
-    chance, a market the model has been doing well in, a game script that fits (more for the volume markets), and a pick'em
-    line that is softer than the sportsbooks'.
+    One leg per qualifying prop, built from the MODEL'S LEAN (lean.py): the side the raw simulation favors at the line you would play
+    (Underdog's when the pull had it), with the calibrated chance that lean hits as the leg's probability. A leg must be a lean the market
+    agrees with (those hit ~56% this season, against ~49% for leans against the market; relaxed only when too few qualify), have at least
+    PICKEM_MIN_CONF, not be in a type of lean that has been missing (cold), and not be a thin sample, an injured player, or an anytime TD.
+    Props Underdog does not list can stand in only with a penalty and the "check app" tag. Score = how far past a coin flip the
+    chance is, plus small bonuses for a hot record, the defense backing the lean, and a game script that fits.
     """
-    quality = quality or {}
     gm = {g["game"]: g for g in games}
     legs = []
     for p in props:
-        pk = p.get("pickem")
-        if not pk or p.get("model_only") or p.get("thin") or p.get("injury") or "player_id" not in p:
+        ln = p.get("lean")
+        if not ln or p.get("model_only") or p.get("thin") or p.get("injury") or "player_id" not in p or ln.get("cold"):
             continue
-        if (require_agree and not pk["agree"]) or pk["prob"] < PICKEM_MIN_PROB:
-            continue
-        if not pk.get("book") and pk["prob"] > UNLISTED_MAX_PROB:
-            # A lopsided sportsbook price (an under at 64% because of the juice) is not a pick'em line: Underdog would not offer it at the
-            # flat payout, so counting it there would invent value. Only Underdog's own posted lines count in full.
+        if (require_agree and not ln["agree"]) or ln["confidence"] < PICKEM_MIN_CONF:
             continue
         g = gm.get(p["game"], {})
         team_margin = None
         if g.get("home_spread") is not None:
             team_margin = -g["home_spread"] if p["team"] == g.get("home") else g["home_spread"]
-        align, why = script_alignment(p["market"], pk["side"], team_margin, g.get("total")) if team_margin is not None else (0, "")
-        q = quality.get(p["market"], 0.5)
+        align, why = script_alignment(p["market"], ln["side"], team_margin, g.get("total")) if team_margin is not None else (0, "")
         bonus = SCRIPT_BONUS_VOLUME if p["market"] in VOLUME_MARKETS else SCRIPT_BONUS
-        legs.append({"id": f"{p['player_id']}|{p['market']}|{pk['side']}", "kind": "pickem", "player_id": p["player_id"], "player": p["player"],
+        listed = bool(ln.get("book"))
+        mu = (ln.get("matchup") or {}).get("state")
+        legs.append({"id": f"{p['player_id']}|{p['market']}|{ln['side']}", "kind": "pickem", "player_id": p["player_id"], "player": p["player"],
                      "team": p["team"], "opp": p["opp"], "game": p["game"], "pos": p["pos"], "market": p["market"], "label": p["label"],
-                     "side": pk["side"], "line": pk["line"], "book": pk["book"] or "sportsbook line", "listed": bool(pk.get("book")), "prob": pk["prob"],
-                     "sportsbook_prob": pk["sportsbook_prob"], "line_edge": pk["line_edge"], "quality": q, "script": align,
-                     "script_note": why, "volume": p["market"] in VOLUME_MARKETS,
-                     "score": (pk["prob"] - 0.5) * quality_factor(q) + bonus * align + 0.5 * max(pk["line_edge"], 0) - (0.0 if pk.get("book") else UNLISTED_PENALTY)})
+                     "side": ln["side"], "line": ln["line"], "book": ln.get("book") or "sportsbook line", "listed": listed,
+                     "prob": ln["confidence"], "raw_prob": ln["raw_prob"], "agree": ln["agree"], "grade": ln["grade"], "hot": bool(ln["hot"]),
+                     "matchup": mu, "matchup_note": (ln.get("matchup") or {}).get("note"), "script": align, "script_note": why,
+                     "volume": p["market"] in VOLUME_MARKETS,
+                     "score": (ln["confidence"] - 0.5) + bonus * align + (HOT_BONUS if ln["hot"] else 0) + (MATCHUP_BONUS if mu == "supports" else 0)
+                              - (MATCHUP_PENALTY if mu == "against" else 0) - (0.0 if listed else UNLISTED_PENALTY)})
     legs.sort(key=lambda l: -l["score"])
     return legs
 
@@ -494,23 +514,75 @@ def _pickem_summary(legs, label, corr) -> dict:
     dist = hit_distribution(ps, R)
     evs = pickem_evs(dist)
     options = {k: v for k, v in evs.items() if v}
-    best = max(options, key=lambda k: options[k]["ev"])
-    same_game = [g for g in {l["game"] for l in legs} if sum(1 for l in legs if l["game"] == g) > 1]
+    best = max(options, key=lambda k: options[k]["ev"]) if options else None
+    games = {}
+    for l in legs:
+        games[l["game"]] = games.get(l["game"], 0) + 1
+    same_game = [g for g, c in games.items() if c > 1]
     return {"id": _parlay_id(legs), "kind": "pickem", "label": label, "n_legs": n, "joint_prob": dist[n], "naive_prob": float(np.prod(ps)),
+            "correlation_lift": dist[n] / float(np.prod(ps)) if np.prod(ps) else 1.0,
+            "breakeven_multiple": round(1 / dist[n], 2) if dist[n] > 0 else None,
             "hit_distribution": [round(x, 4) for x in dist], "avg_leg_prob": float(np.mean(ps)), "standard": evs["standard"], "flex": evs["flex"],
-            "best_type": best, "ev": options[best]["ev"], "script_aligned": sum(1 for l in legs if l.get("script", 0) > 0),
-            "volume_legs": sum(1 for l in legs if l.get("volume")), "same_game": same_game, "legs": legs}
+            "best_type": best, "ev": options[best]["ev"] if best else None, "script_aligned": sum(1 for l in legs if l.get("script", 0) > 0),
+            "volume_legs": sum(1 for l in legs if l.get("volume")), "hot_legs": sum(1 for l in legs if l.get("hot")),
+            "matchup_legs": sum(1 for l in legs if l.get("matchup") == "supports"), "same_game": same_game,
+            "single_game": len(games) == 1, "legs": legs}
 
 
-def build_pickem(legs: list, corr: CorrModel, n_confidence: int = 2, n_upside: int = 2, pool: int = PICKEM_POOL) -> dict:
+def _stack_candidates(legs: list, corr, k: int) -> list:
+    """For every game with enough legs: its best k-leg combination by chance of hitting every one -> [(joint, combo)] best first."""
+    by = {}
+    for l in legs:
+        by.setdefault(l["game"], []).append(l)
+    out = []
+    for game, ls in by.items():
+        ls = ls[:STACK_POOL]
+        best = None
+        for combo in itertools.combinations(ls, k):
+            if not _combo_ok(combo, corr, max_per_game=k):
+                continue
+            j = _approx_joint(combo, corr)
+            if best is None or j > best[0]:
+                best = (j, combo)
+        if best:
+            out.append(best)
+    out.sort(key=lambda c: -c[0])
+    return out
+
+
+def build_pickem(legs: list, corr: CorrModel, n_confidence: int = 1, n_upside: int = 1, pool: int = PICKEM_POOL) -> dict:
     """
-    Underdog entries: `n_confidence` 4-pick entries chosen for the highest chance every pick hits (flex-friendly), and
-    `n_upside` 5-pick entries chosen for the best standard-entry value (the 20x payout), none sharing more than two picks.
-    Returned best-chance first.
+    Underdog entries built from the model's leans, correlated plays first.
+      Single-game stacks: the best 3- and 4-pick sets from ONE game (a QB's lean with his receivers' leans, a game script that fits), because
+        legs in one game move together and an every-pick-hits entry gains from that. One stack per game, best chance first.
+      High confidence / high upside: slate-wide 4- and 5-pick sets, up to three picks from a game, so a strong stack can still win a place.
+    Correlations are halved (CORR_SCALE) for ranking and for the chances shown: the full backtested values (2024-25) are real, but in the
+    2026 results the correlation-optimized sets hit a little LESS often than their stated chance while the plain highest-confidence sets
+    matched theirs, so the halved value is the cautious middle.
     """
+    cs = ScaledCorr(corr)
+    chosen, used = [], []
+
+    def add(combo, label):
+        ids = {l["id"] for l in combo}
+        cap = 1 if label.startswith("Single-game") else MAX_SHARED_LEGS        # two stacks share at most one pick; the slate-wide entries at most two
+        if any(len(ids & u) > cap for u in used):
+            return False
+        chosen.append(_pickem_summary(list(combo), label, cs))
+        used.append(ids)
+        return True
+
+    for k in STACK_SIZES:
+        got = 0
+        for j, combo in _stack_candidates(legs, cs, k):
+            if add(combo, f"Single-game stack ({k})"):
+                got += 1
+            if got == (N_STACKS if k == STACK_SIZES[0] else 1):
+                break
+
     top, per_game = [], {}
     for l in legs:
-        if per_game.get(l["game"], 0) >= 3:
+        if per_game.get(l["game"], 0) >= PICKEM_MAX_PER_GAME:
             continue
         per_game[l["game"]] = per_game.get(l["game"], 0) + 1
         top.append(l)
@@ -519,26 +591,23 @@ def build_pickem(legs: list, corr: CorrModel, n_confidence: int = 2, n_upside: i
     cands = {4: [], 5: []}
     for k in (4, 5):
         for combo in itertools.combinations(top, k):
-            if _combo_ok(combo, corr):
-                cands[k].append((_approx_joint(combo, corr), combo))
-    chosen, used = [], []
+            if _combo_ok(combo, cs, max_per_game=PICKEM_MAX_PER_GAME):
+                cands[k].append((_approx_joint(combo, cs), combo))
 
     def take(k, n, label, key):
         got = 0
         for j, combo in sorted(cands[k], key=key):
-            ids = {l["id"] for l in combo}
-            if any(len(ids & u) > MAX_SHARED_LEGS for u in used):
-                continue
-            chosen.append(_pickem_summary(list(combo), label, corr))
-            used.append(ids)
-            got += 1
+            if add(combo, label):
+                got += 1
             if got == n:
                 break
 
     take(4, n_confidence, "High confidence", lambda c: -c[0])
     take(5, n_upside, "High upside", lambda c: -(c[0] * PICKEM_PAYOUTS["standard"][5]))
-    chosen.sort(key=lambda e: (-e["avg_leg_prob"], -e["joint_prob"]))
-    return {"entries": chosen, "candidate_legs": len(legs), "searched": len(cands[4]) + len(cands[5]),
+    order = {"Single-game stack (3)": 0, "Single-game stack (4)": 1, "High confidence": 2, "High upside": 3}
+    chosen.sort(key=lambda e: (order.get(e["label"], 9), -e["joint_prob"]))
+    return {"entries": chosen, "candidate_legs": len(legs), "searched": sum(len(v) for v in cands.values()),
+            "corr_scale": CORR_SCALE, "min_conf": PICKEM_MIN_CONF,
             "payouts": {"standard": {str(k): v for k, v in PICKEM_PAYOUTS["standard"].items()},
                         "flex": {str(k): {str(h): m for h, m in t.items()} for k, t in PICKEM_PAYOUTS["flex"].items()}},
             "breakeven_leg": {str(k): round(pickem_breakeven(k), 4) for k in (3, 4, 5)}}
@@ -745,11 +814,14 @@ def build_all(props: list, games: list, summary: pd.DataFrame = None, corr: Corr
         l["week"] = week
     out["props"] = build_prop_parlays(legs, corr) if legs else {"parlays": [], "candidate_legs": 0, "searched": 0}
     plegs = pickem_legs(props, upcoming, quality)
-    if len(plegs) < 8:                                           # too few where model and market agree: take every qualifying leg
+    if len(plegs) < 5:                                           # too few leans the market agrees with: take every qualifying lean
         plegs = pickem_legs(props, upcoming, quality, require_agree=False)
+    listed = [l for l in plegs if l["listed"]]                   # an entry has to be playable: use only props Underdog actually lists, unless it lists too few
+    if len(listed) >= MIN_LISTED_LEGS:
+        plegs = listed
     for l in plegs:
         l["week"] = week
-    out["pickem"] = build_pickem(plegs, corr) if len(plegs) >= 4 else {"entries": [], "candidate_legs": len(plegs), "searched": 0}
+    out["pickem"] = build_pickem(plegs, corr) if len(plegs) >= 3 else {"entries": [], "candidate_legs": len(plegs), "searched": 0}
     if not out["props"]["parlays"]:
         n_games = len({l["game"] for l in legs})
         out["notes"].append(
