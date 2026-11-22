@@ -57,7 +57,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
+      url: ${{ steps.deploy_retry.outputs.page_url || steps.deploy.outputs.page_url }}
     env:
       ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
       X_BEARER_TOKEN: ${{ secrets.X_BEARER_TOKEN }}     # optional: without it no social posts are fetched and nothing is spent
@@ -162,8 +162,18 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
+      # deploy-pages occasionally cannot see the artifact upload-pages-artifact finalized a second earlier ("Found 0 artifact(s)",
+      # a GitHub-side race: it cost the Nov 21 slate its publish), so one failure waits and tries once more.
       - name: Publish
         id: deploy
+        continue-on-error: true
+        uses: actions/deploy-pages@v4
+      - name: Wait before retrying the publish
+        if: steps.deploy.outcome == 'failure'
+        run: sleep 45
+      - name: Publish (retry)
+        id: deploy_retry
+        if: steps.deploy.outcome == 'failure'
         uses: actions/deploy-pages@v4
 
       # tracking/props_log.csv, web/track_record.json and web/player_history.json are this
@@ -171,8 +181,9 @@ jobs:
       # back to the repo. This holds our own logged predictions and results, never a
       # sportsbook's odds board. live_calibration.json is NOT committed -- it's cheaply
       # regenerated from the tracking log every run, so there's nothing to persist.
+      # !cancelled(): a failed publish must not discard the picks this run already logged (the Nov 21 slate's rows were lost that way).
       - name: Commit the props tracking log
-        if: steps.key.outputs.have_key == 'true'
+        if: ${{ !cancelled() && steps.key.outputs.have_key == 'true' }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
