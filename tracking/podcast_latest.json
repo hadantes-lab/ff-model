@@ -1,14 +1,94 @@
 {
- "generated": "2026-11-19T19:30:12+00:00",
+ "generated": "2026-11-23T22:39:24+00:00",
  "episodes": [
+  {
+   "show": "Sharp Football Analysis (Warren Sharp)",
+   "id": "sharpfootball",
+   "source": "pod:sharpfootball",
+   "title": "NFL Week 11 Takeaways and Monday Night Football Best Bets",
+   "published": "2026-11-23T21:51:07+00:00",
+   "url": "https://www.sharpfootballanalysis.com/?utm_source=link-bio",
+   "transcript": false,
+   "picks": null
+  },
   {
    "show": "Pat Mayo Experience",
    "id": "patmayo",
    "source": "pod:patmayo",
-   "title": "NFL Week 11 Best Bets, Props, Teasers | 2026 NFL Picks & Game Previews | Money in Pinball, Blackjack Odds",
-   "published": "2026-11-19T15:38:33+00:00",
+   "title": "NFL Week 11 Recap: SF Unstoppable? RIP Tom Jackson, Hall of Fame Debates, MNF Picks & Props",
+   "published": "2026-11-23T16:33:24+00:00",
    "url": "https://www.youtube.com/channel/UCJrBgtSiXKOdpoyvVqqhWww",
    "transcript": false,
+   "picks": null
+  },
+  {
+   "show": "Pat Mayo Experience",
+   "id": "patmayo",
+   "source": "pod:patmayo",
+   "title": "NFL Week 11 INSTANT OVERREACTIONS, Recap & Week 12 Early Spread Picks, Judge Cust",
+   "published": "2026-11-23T02:00:56+00:00",
+   "url": "https://www.youtube.com/channel/UCJrBgtSiXKOdpoyvVqqhWww",
+   "transcript": false,
+   "picks": null
+  },
+  {
+   "show": "Pat Mayo Experience",
+   "id": "patmayo",
+   "source": "pod:patmayo",
+   "title": "NFL Week 11 Weekend Update: Best Underdog Props, Injury Report, DraftKings Strategy & Spread Picks",
+   "published": "2026-11-21T17:50:08+00:00",
+   "url": "https://www.youtube.com/channel/UCJrBgtSiXKOdpoyvVqqhWww",
+   "transcript": false,
+   "picks": null
+  },
+  {
+   "show": "Pat Mayo Experience",
+   "id": "patmayo",
+   "source": "pod:patmayo",
+   "title": "NFL Week 11 DraftKings Picks: Strategy, Best Stacks, Ownership Traps & Leverage Lineups",
+   "published": "2026-11-20T14:23:29+00:00",
+   "url": "https://www.youtube.com/channel/UCJrBgtSiXKOdpoyvVqqhWww",
+   "transcript": false,
+   "picks": null
+  },
+  {
+   "show": "Sharp Football Analysis (Warren Sharp)",
+   "id": "sharpfootball",
+   "source": "pod:sharpfootball",
+   "title": "(42-17, 71%) NFL Week 11 Best Bets & Player Props 2026: Raiders-Broncos, Vikings-49ers",
+   "published": "2026-11-20T12:00:00+00:00",
+   "url": "https://www.sharpfootballanalysis.com/?utm_source=link-bio",
+   "transcript": false,
+   "picks": null
+  },
+  {
+   "show": "Sharp Football Analysis (Warren Sharp)",
+   "id": "sharpfootball",
+   "source": "pod:sharpfootball",
+   "title": "NFL Week 11 Preview: Bucs-Lions, Vikings-49ers and More",
+   "published": "2026-11-20T08:25:48+00:00",
+   "url": "https://www.sharpfootballanalysis.com/?utm_source=link-bio",
+   "transcript": false,
+   "picks": null
+  },
+  {
+   "show": "The Action Network Podcast",
+   "id": "actionnetwork",
+   "source": "pod:actionnetwork",
+   "title": "NFL Betting Playground | Week 11",
+   "published": "2026-11-20T06:55:00+00:00",
+   "url": "https://omny.fm/shows/the-action-network-sports-betting-podcast/nfl-betting-playground-week-11",
+   "transcript": true,
+   "picks": 4
+  },
+  {
+   "show": "The Action Network Podcast",
+   "id": "actionnetwork",
+   "source": "pod:actionnetwork",
+   "title": "NFL Touchdown Show | Week 11",
+   "published": "2026-11-19T23:23:46+00:00",
+   "url": "https://omny.fm/shows/the-action-network-sports-betting-podcast/nfl-touchdown-show-week-11",
+   "transcript": true,
    "picks": null
   },
   {
@@ -29,26 +109,6 @@
    "published": "2026-11-19T00:23:26+00:00",
    "url": "https://omny.fm/shows/the-action-network-sports-betting-podcast/nfl-week-11-betting-preview-4",
    "transcript": true,
-   "picks": 4
-  },
-  {
-   "show": "Pat Mayo Experience",
-   "id": "patmayo",
-   "source": "pod:patmayo",
-   "title": "RSM Classic 2026 Picks, Bets & Course Changes, Weather | Tiger Woods Returns, Bryson & Others To DP World Tour",
-   "published": "2026-11-18T13:53:52+00:00",
-   "url": "https://www.youtube.com/channel/UCJrBgtSiXKOdpoyvVqqhWww",
-   "transcript": false,
-   "picks": null
-  },
-  {
-   "show": "Pat Mayo Experience",
-   "id": "patmayo",
-   "source": "pod:patmayo",
-   "title": "2026 NFL Week 11 Spread Picks, Predictions | Cust Corner: Hunting excursions, Outrageous Friends, New Bond",
-   "published": "2026-11-18T00:48:50+00:00",
-   "url": "https://www.youtube.com/channel/UCJrBgtSiXKOdpoyvVqqhWww",
-   "transcript": false,
    "picks": null
   },
   {
@@ -59,16 +119,6 @@
    "published": "2026-11-17T23:44:44+00:00",
    "url": "https://omny.fm/shows/the-action-network-sports-betting-podcast/nfl-futures-watch-week-11",
    "transcript": true,
-   "picks": null
-  },
-  {
-   "show": "Pat Mayo Experience",
-   "id": "patmayo",
-   "source": "pod:patmayo",
-   "title": "Week 11 Fantasy Football Rankings & Start/Sit Advice: Navigating 6 BYE WEEK TEAMS",
-   "published": "2026-11-17T16:04:44+00:00",
-   "url": "https://www.youtube.com/channel/UCJrBgtSiXKOdpoyvVqqhWww",
-   "transcript": false,
    "picks": null
   },
   {
@@ -92,46 +142,6 @@
    "picks": null
   },
   {
-   "show": "Sharp Football Analysis (Warren Sharp)",
-   "id": "sharpfootball",
-   "source": "pod:sharpfootball",
-   "title": "(42-16, 72%) NFL Week 10 Best Bets & Player Props 2026: Lions-Patriots, Chiefs-Falcons",
-   "published": "2026-11-13T12:00:00+00:00",
-   "url": "https://www.sharpfootballanalysis.com/?utm_source=link-bio",
-   "transcript": false,
-   "picks": null
-  },
-  {
-   "show": "The Action Network Podcast",
-   "id": "actionnetwork",
-   "source": "pod:actionnetwork",
-   "title": "NFL Betting Playground | Week 10",
-   "published": "2026-11-13T06:55:00+00:00",
-   "url": "https://omny.fm/shows/the-action-network-sports-betting-podcast/nfl-betting-playground-week-10",
-   "transcript": true,
-   "picks": null
-  },
-  {
-   "show": "The Action Network Podcast",
-   "id": "actionnetwork",
-   "source": "pod:actionnetwork",
-   "title": "NFL Touchdown Show | Week 10",
-   "published": "2026-11-12T23:44:13+00:00",
-   "url": "https://omny.fm/shows/the-action-network-sports-betting-podcast/nfl-touchdown-show-week-10",
-   "transcript": true,
-   "picks": null
-  },
-  {
-   "show": "Sharp Football Analysis (Warren Sharp)",
-   "id": "sharpfootball",
-   "source": "pod:sharpfootball",
-   "title": "NFL Week 10 Preview: Vikings-Packers, 49ers-Cowboys and More",
-   "published": "2026-11-12T21:50:04+00:00",
-   "url": "https://www.sharpfootballanalysis.com/?utm_source=link-bio",
-   "transcript": false,
-   "picks": null
-  },
-  {
    "show": "Even Money: NFL Betting (Ross Tucker, Steve Fezzik)",
    "id": "evenmoney",
    "source": "pod:evenmoney",
@@ -148,16 +158,6 @@
    "title": "2026 NFL Week 10 Bets",
    "published": "2026-11-10T15:06:00+00:00",
    "url": "https://linktr.ee/evenmoneypod",
-   "transcript": false,
-   "picks": null
-  },
-  {
-   "show": "Sharp Football Analysis (Warren Sharp)",
-   "id": "sharpfootball",
-   "source": "pod:sharpfootball",
-   "title": "NFL Week 9 Takeaways and Monday Night Football Best Bets",
-   "published": "2026-11-09T21:30:43+00:00",
-   "url": "https://www.sharpfootballanalysis.com/?utm_source=link-bio",
    "transcript": false,
    "picks": null
   },

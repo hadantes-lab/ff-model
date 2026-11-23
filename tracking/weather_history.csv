@@ -528,3 +528,4 @@ pulled_at,season,week,game,commence,stadium,roof,indoors,temp_f,wind_mph,gust_mp
 2026-11-22T18:38:42+00:00,2026,11,JAX @ NYG,2026-11-22T21:25:00Z,MetLife Stadium,outdoors,False,57,6,15,9,Overcast
 2026-11-22T18:38:42+00:00,2026,11,MIN @ SF,2026-11-23T01:20:00Z,Estadio Banorte,outdoors,False,64,2,14,58,Light drizzle
 2026-11-22T18:38:42+00:00,2026,11,CIN @ WAS,2026-11-24T01:15:00Z,Northwest Stadium,outdoors,False,47,14,31,1,Overcast
+2026-11-23T22:39:57+00:00,2026,11,CIN @ WAS,2026-11-24T01:15:00Z,Northwest Stadium,outdoors,False,54,14,26,17,Overcast
