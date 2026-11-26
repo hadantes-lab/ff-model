@@ -559,3 +559,4 @@ pulled_at,season,week,game,commence,stadium,roof,indoors,temp_f,wind_mph,gust_mp
 2026-11-25T20:38:24+00:00,2026,13,CAR @ MIN,2026-12-06T21:25:00Z,U.S. Bank Stadium,dome,True,,,,,
 2026-11-25T20:38:24+00:00,2026,13,HOU @ PIT,2026-12-07T01:20:00Z,Acrisure Stadium,outdoors,False,48,3,4,23,Overcast
 2026-11-25T20:38:24+00:00,2026,13,DAL @ SEA,2026-12-08T01:15:00Z,Lumen Field,outdoors,False,44,8,26,22,Partly cloudy
+2026-11-26T16:00:19+00:00,2026,12,CHI @ DET,2026-11-26T18:00:00Z,Ford Field,dome,True,,,,,
